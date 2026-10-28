@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "town-embeddings-research"
+version = "0.1.0"
+description = "Model-independent Pizzaïolo dataset preparation and research dashboard"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "matplotlib>=3.7,<4",
+  "numpy>=1.24,<3",
+  "opencv-python-headless>=4.8,<5",
+  "owlready2>=0.46,<1",
+  "pandas>=2,<4",
+  "Pillow>=10,<13",
+  "scikit-learn>=1.3,<2",
+  "streamlit>=1.49,<2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9"]
+
+[project.scripts]
+town = "town_model.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+town_model = ["dataset/assets/*.xml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"

@@ -1,0 +1,3848 @@
+{
+  "asset_checksums": {
+    "audit/generator_master.csv": "1da4026ec5fe0decd4499511979610d6da5bbf2d432005f873b41f55f6754dbc",
+    "audit/generator_master_with_source_labels.csv": "bde52f2136c6551df6b2b127eb6f9dee96a8c6d53b5a5e4dee35768a894f5341",
+    "images/img_00000.png": "fb15665c650f772df26f2af41ade88aceaa3c23329ba2b7b2e6dbc8a81250524",
+    "images/img_00001.png": "978b11f44999dffd647ab7b20d4b48e942e646ac6889795ee1f4fee07f80e3c0",
+    "images/img_00002.png": "2147584917a457474d3775d788d9192e3b640619315411c77002925442304e3b",
+    "images/img_00003.png": "563a63b9b237ed6e42464918a8f691ece0429bd29a500b6dadbced8b18a86ef5",
+    "images/img_00004.png": "89e839676b962db86d8637135124b67a1159f86dedf34fea3bd2326796f2b0c4",
+    "images/img_00005.png": "15872bfbe9aef101b14fc741c6a276cb2291f85b5b446913e1e9ae331f2727dd",
+    "images/img_00006.png": "ba8bcc49ab170e94885b269689f8c65451953eb40291a57f86f1950ef0e2bbf3",
+    "images/img_00007.png": "d338b5e39332007cc11bf2ab3d2b6a09aa0ece693474927adffb075b2c6319af",
+    "images/img_00008.png": "abbe0c719cf55dab478a0643dc80f3db169ecc86e120f9925ee821fed613b947",
+    "images/img_00009.png": "dae745c30df21ab90af5232549be0f2e7b56fe430060da38a4dc879bc151c2a3",
+    "images/img_00010.png": "f5965b772bfdc787f1b6d4af1bcf0a8e129aa63764800915ed08616b6863dee4",
+    "images/img_00011.png": "6e28b9fbdda908cb10eb7c3ccea927c8219e9906009ce71fc4b35f81dde1b30a",
+    "images/img_00012.png": "a0cb5f1b49d5d3d905cfed433b05e0d4d91874f3bce68df2f41508da8304deb6",
+    "images/img_00013.png": "e6052a6741ab6c02c8bb6e790d7d5f43a84c49378ee45d7c5eff926e6bc2468a",
+    "images/img_00014.png": "090d4baa02e79bc75262d6d9112617d49b67d3c8e0a88928db01d9a068ab77fd",
+    "images/img_00015.png": "c0829d74fb6941d4aa45ff248acd46167d3cc2a3d92192ab32a525403f3d52b6",
+    "images/img_00016.png": "223b111de65036243c9486522e3ea6021462ebd2ac20681b93935125a516a83a",
+    "images/img_00017.png": "a78cd3fafe291fbac410e2dd149bfa8bef8ee373876f7e59006086796f24d560",
+    "images/img_00018.png": "f1977baf8f1d7b6fba79332a5ecd0abdbe2914d477d1d386a47cfa1585f2fc1d",
+    "images/img_00019.png": "80722dda5e403e4361bfd9286848af5147b4eeb68b6eafa9cff01be248d873e7",
+    "images/img_00020.png": "b1f121b22385a2c9991232b69a5f4344b990f48d28866c13ce76ca463e899948",
+    "images/img_00021.png": "2f68d85af12c53c3684cf1f2165f25d5076938d65f7a026c647c42612c270812",
+    "images/img_00022.png": "41a7e9add9788739d141f7853794abdb14f6bdd67e1d10556e0dc6a546296812",
+    "images/img_00023.png": "686517487de138aeee2df9b67e345be2cc8a04aa90456f1c2065a79613761b73",
+    "images/img_00024.png": "862dd99db5013e60c3c5cf502dd534a55c6dd2b3e095c32a68164bb6f3fc9e14",
+    "images/img_00025.png": "45aa80944fb494041f173a77b597bb7823fae423ca77c009c7b46de3ebf74997",
+    "images/img_00026.png": "b30ff399219d7cd44d29eea0fb40391bc26bc57e5f6cb338553e9b95a424a220",
+    "images/img_00027.png": "21ad2538ea98c72c6695802ffdc4a310691dc5f2780b1f12b403cc6d330aeca1",
+    "images/img_00028.png": "b524b0f4f327b3f390f7ffb2daca2e84d94d029c2b13f83a08fd1d5f1d1fa8ec",
+    "images/img_00029.png": "347bb76637ca1dac44c05b937f5c67b105ab02034b8dbc313ee8265fc2d68010",
+    "images/img_00030.png": "4583982006d9d48d10b33d091f6d9d85382f788fb23a91e499c99543a610fc32",
+    "images/img_00031.png": "dd7cb456e0d89d2691dd815734665a1201314946344790c522206818a83faee0",
+    "images/img_00032.png": "71ab146e9b98c00c52d17bae616e174acd66291a63c759329f0e49ef1b886573",
+    "images/img_00033.png": "bdabb3d3603de213a34cfd70667cd685b5f750a12e1b8751b4937eed83038c20",
+    "images/img_00034.png": "e2dfc4e3a12c9dd4554b8dcd3964aa0a9c04bda2e8bddae8b9532a1486f7ca41",
+    "images/img_00035.png": "b11c52393d070912cb323920ba7dbd425bcfd1d5daab893d650c568012c88f8c",
+    "images/img_00036.png": "d3e34ea209bd1698e53425634216a84be8bac19eb24d610395d9009da22317e5",
+    "images/img_00037.png": "f3c8401250facfc08d64ce62d776528ea6591c22cd4fe0187201e2b3b97c60e1",
+    "images/img_00038.png": "edc2841e942cdc2cfaed58c22a6438e55ae7002d5158a6ed7ec748f206238455",
+    "images/img_00039.png": "c21985052fc34252489533a1ea39f99281dbd1a929b98517c41fffca8147b731",
+    "images/img_00040.png": "ba9bb978a13319b472a8bc8de2e875a40b69068b897c5bcc5ff9afb285e78f15",
+    "images/img_00041.png": "c4879579bac65e406dec1e612bd04c4d5e3043289033f3bc1fbb801bf06a18a6",
+    "images/img_00042.png": "1910e85ead69a2185a089723c81f3821667dc5b620c5ca8ff9c4ce7e779c4940",
+    "images/img_00043.png": "7985b177050da34dbadc616cbcf933315c1e4865fdda9373b8932bfd624c6709",
+    "images/img_00044.png": "cda4d5db787fc613f84f7e6dc0b64bb0639504aadaa2541e18fa570e2b0c84c9",
+    "images/img_00045.png": "ea61a823fde8ae3684de5c06baab90abf4a7c66431960289c1fb13ac5e08479a",
+    "images/img_00046.png": "d5b9e7d1bda75b5774054fd996e99fdd5d27cee1cb7b2970d2fc0d36d4bbfd23",
+    "images/img_00047.png": "41e8c6f87d9a9d2faae1b2ae487b6fb9f579db035d67883e5ded0606b1ea9616",
+    "labels/concepts.json": "4788e47eaa01a48a0cbccaedacf82b0e7fb7f6490d5e91b62c318a2e45f2ea2a",
+    "labels/img_00000_bboxes.json": "793d2c9b8f3445d010ce14976c594f010af754504ebdcb3c2c5886c074c9cc31",
+    "labels/img_00000_contours.json": "e66a612cd452f1164d87ac273f7cbbf7e1ff77214615c4d1b2d6de662d4bcac4",
+    "labels/img_00000_segmentation.txt": "4e83f9fc09b55eace00e38a67e6663a6b7b3d858be9278020c3209c9e54ace00",
+    "labels/img_00001_bboxes.json": "d8aee8683209170cf4547cfb3852bf5e097372d785f37c0ef3731dd7ed7b5ca2",
+    "labels/img_00001_contours.json": "e1cad9e1e372c2acc9214f86c82e794de9b903fb1e7ed14a895f6f9a730102af",
+    "labels/img_00001_segmentation.txt": "740f832473db712e9748386e6f12be8e80a52dba3fd22d28dbf3a897e1880bf8",
+    "labels/img_00002_bboxes.json": "87c1bd17dd8441c78b12e4daede6d4998fcfe6c4d65d90058261969c4f2e3d7e",
+    "labels/img_00002_contours.json": "01a4a4b66c35625b25bd853cd098dac6f3513d96f2d11dbe1db1db6d33851faa",
+    "labels/img_00002_segmentation.txt": "fa39e775faafb36fada8c1143698e22c3bd8a81721998ccf07c92fe05246c804",
+    "labels/img_00003_bboxes.json": "e4ebcd4dadd314470363f8292dc8039e0738b6a5f1e538ee97c10583d676aafa",
+    "labels/img_00003_contours.json": "3fb0109d5a05ed9219c77404b2c6e83ce7648c24b261c55f98161677cd69cf30",
+    "labels/img_00003_segmentation.txt": "36533727720e0130aaf0a232a93ece6abb9103d232bdfe6ac2434274e0c38ff6",
+    "labels/img_00004_bboxes.json": "ff007db5f20a513a829c6bd6b0e34f9b7c9a090275a6fe076ae5a86b14c0dfa7",
+    "labels/img_00004_contours.json": "3581901767340f08ba465cdb312d9374d6e92dc497f60e5a4f5da5c5f5f6188d",
+    "labels/img_00004_segmentation.txt": "cdf285223584be39a4e9c8dd87aa1532ef2a1b1cb6d7067354ef528e0a69f79f",
+    "labels/img_00005_bboxes.json": "8af9ca7b1465236af52ea719a9de3e9866d0ba588c5b43011657f908f8531520",
+    "labels/img_00005_contours.json": "9a4cf9661d7f99549e01068d0dc0e0b985d024283cdc67fa4eb883c84f3989d9",
+    "labels/img_00005_segmentation.txt": "0a26d6904f020394594ed8a3657d1d464b94172511b09c81322040b998a8d32b",
+    "labels/img_00006_bboxes.json": "ad168e5f95eaa4901fe751177c2ec6dea31a13501ca78986c45ef719d9387cc2",
+    "labels/img_00006_contours.json": "89ddf907d679ff1645d358ac20a62fd0dead41bfcf2b44ebdae90c8514091f7f",
+    "labels/img_00006_segmentation.txt": "9923745e9e76144f6df0fd3faf953578675cf0b68fcb9199909984ebbf51ef1b",
+    "labels/img_00007_bboxes.json": "ef7deac2bf91b19865a14e27bbd62b72dd2582f9c29aace87010f181f58f6113",
+    "labels/img_00007_contours.json": "d86e65f6aad2255c767f05471a9fc4062a2907ca28866a9ee98fd7df37322260",
+    "labels/img_00007_segmentation.txt": "ac88f3cae923cbb1f27c27d852a956b3278580e41b92047b0e2fa14277203632",
+    "labels/img_00008_bboxes.json": "a24472107e56c79ba5a2f01c969f991fe8d0d5deb31356922a43665297497e4d",
+    "labels/img_00008_contours.json": "45dec3fe2f316932e17bb19069624341bd0d5d6ddf23bc8223051ffdb2596b78",
+    "labels/img_00008_segmentation.txt": "eb2769873b57682f303cfa3fecf30001ea4d2df8eb98b5ef7f51fe014a51e3ec",
+    "labels/img_00009_bboxes.json": "1b7a7ef4a042398427aeca20007651162d93e48452551fd69edfa3565b281641",
+    "labels/img_00009_contours.json": "b729363d1e7c61a9db983d90ff7eb59835189195a4f37f914bb96536526d03f4",
+    "labels/img_00009_segmentation.txt": "24bbde9d0a0fe3a654974d8959a0a85a34224b5e435018b4c4e3b42c3adc2dc0",
+    "labels/img_00010_bboxes.json": "2a33cd52845836d5226740664f7edf1ba17f4d0ef3fd863d9c4cd0dd501f27e1",
+    "labels/img_00010_contours.json": "140502aff333a84ec05a67f81fa8f97babb722aad01ab3e9567e19072484ce3a",
+    "labels/img_00010_segmentation.txt": "34ad139d0b1e21850e21cce17e209ff6e6b38e11694d286284f711458c4e5633",
+    "labels/img_00011_bboxes.json": "fb52967d3f917a68406d3924820a1aa38892b866922e6e6f52cd416393e3a172",
+    "labels/img_00011_contours.json": "ef41177fc3298d51292e677c3cb26a994074ea47b1d19196ae8e71f6a37ca6ad",
+    "labels/img_00011_segmentation.txt": "7c5fef0713b451104ddb64f6369b4a2a9b39ee9b0057d812ec2027473921df01",
+    "labels/img_00012_bboxes.json": "d86f9e243b31d4452fbadbb00bc0da9116ee33117b28034eaf0c04984389cf54",
+    "labels/img_00012_contours.json": "25767f4ac7394800ae68c66ebdb4b5a980dd642b734730170110ef970e03fcd5",
+    "labels/img_00012_segmentation.txt": "20be592f5fada931ec22e228e31a6cecd9552f77e6d85466f9348b2eb696abd6",
+    "labels/img_00013_bboxes.json": "9b4245327b3b3dda4c5a5455a4fe467ef6261377e50d7a2a3518344c3b5609a5",
+    "labels/img_00013_contours.json": "e4c2bffe1f97a7849b09ab5438e6f7293dc6be7b5d59298ce939694afb2ecb6a",
+    "labels/img_00013_segmentation.txt": "c5c86e22efc8cdc076e63b777c2c48cf719136fd4905cb828294cbc54e401a31",
+    "labels/img_00014_bboxes.json": "78a231e5daf3a989bba186a5764d5165b3c8002141b931f18fbb36fe2f52cafb",
+    "labels/img_00014_contours.json": "4cfedeccda24ed939af72e8c0a7aa82df48347c70064c079bb9fd3a4a5edb50d",
+    "labels/img_00014_segmentation.txt": "f7547e6b8b2f95e5a4267b1cf0c8d8d36fe93bc13cb7f500e106e7b94cd23040",
+    "labels/img_00015_bboxes.json": "9c220788a45a909027786738b6d2f34464bf90c4713e7654d21f5f869ae4127a",
+    "labels/img_00015_contours.json": "7b465da2ff4eb49b0e26d7c3dec3ee04c016deba143c03d8b8b711cf4c1600d4",
+    "labels/img_00015_segmentation.txt": "85f23c5cb6098497b9a43da6e479b2a3c35a782e68edbefaa56033351b32207a",
+    "labels/img_00016_bboxes.json": "580a367d968b5b4b44f1a3b76fc6462f8dd7492ae8a128dec10f95c9496a39fb",
+    "labels/img_00016_contours.json": "a144c209f2243c0f828117ea96c2c96bed635a0353ccff628bb9895b95b5c573",
+    "labels/img_00016_segmentation.txt": "193ca3506415f49de07362e90d7c96acb687c33f86ea8743db9422ad8ec270f2",
+    "labels/img_00017_bboxes.json": "9469202dd6bdaf114efa2a439ff69fabfe4804612171911af7bfb63a3d77da53",
+    "labels/img_00017_contours.json": "25a3f6d9c207cee04f03a04c4f7f6a1929de0a80b28bff4ea36723773e1e5e2c",
+    "labels/img_00017_segmentation.txt": "6bb388320ff4c58f18163a945d1d0ea143723ea7afc5bda64108f5ada4d5c646",
+    "labels/img_00018_bboxes.json": "504e449dbf29a9713c9850712383f303eeb1f6def9bc8101bc38550e02bb044f",
+    "labels/img_00018_contours.json": "a81a18a120acf177aad8cc37765993210bb02f1a3a8255d31c4d482c78f9412e",
+    "labels/img_00018_segmentation.txt": "8852c0ffb2f098958feb672e896e53b8ecd1f0bfce102a32e923354ff8b9b2b2",
+    "labels/img_00019_bboxes.json": "6d0fca972032c9341daab3183245ba035ddc23034bdd06487261844276c78890",
+    "labels/img_00019_contours.json": "f213b12f6ebf4bdc4c442de4d80c8e207a81f7d97679bcb103110763f301fa60",
+    "labels/img_00019_segmentation.txt": "f6926e227dabc3c47c9e9aab4fbcf81922282d9e9fd1d811934c92a50e385f56",
+    "labels/img_00020_bboxes.json": "2bb3c58163fe2fc15aa35cecf8def76b8133e2c46d2d24fa9a915091dac3df2f",
+    "labels/img_00020_contours.json": "ebbb777282e0988a6b9d1a220e296da1ca6ec85e697dc8b4b7dc99d2d049d781",
+    "labels/img_00020_segmentation.txt": "11e595159d18b6c5d3633c320fe5e1d9121a5a7245281be82d93fad4973a6a07",
+    "labels/img_00021_bboxes.json": "5531d405a5fbeecf598f5e99162b361eedea81d5bb8348d297fa492626ac4303",
+    "labels/img_00021_contours.json": "abeae2aec23d84e628ef3af75bd59bb932bed194d49f053a2955d74eed279369",
+    "labels/img_00021_segmentation.txt": "0c1cac3ea24c01f844959837d8d9ccaf2b8395a21e0b6cb6c26a4f138fccdfc7",
+    "labels/img_00022_bboxes.json": "b9cac28e952f4256aff715076ccfec575a978e977d8bac538f3128acea99572d",
+    "labels/img_00022_contours.json": "8225dffbbc3200b9e190016f7300fc9c1c6fe00f1f640e8a756575358f9405c5",
+    "labels/img_00022_segmentation.txt": "d57cb6c81f3376184e836bc15770619aabe6641946b5c85f554345a93179c3f9",
+    "labels/img_00023_bboxes.json": "409ace80915c19509ee298e1a904fcb4509f058501f96f473e2fb02a0913f116",
+    "labels/img_00023_contours.json": "6839a5174f2424106fe1b07058560eb2f2aeb8f525b511a4deab9aafc03d2208",
+    "labels/img_00023_segmentation.txt": "1da7ac68bf4db6f93d943e0b875f79ac205cfd6245f4953afb21f88a11220a4a",
+    "labels/img_00024_bboxes.json": "5ac86bd4a8a9b2790a2635c92097b558bcb245542f87f5c79ffb2500fe76405e",
+    "labels/img_00024_contours.json": "dddda2d0218b59a1d0780a1584e9abed012487f3e3c376f92c91e5f525b3ff27",
+    "labels/img_00024_segmentation.txt": "591ab1d03005368f6b1662129e0c4435095e41d40fd28e5a06900dc8d6cf1028",
+    "labels/img_00025_bboxes.json": "a6a62ed97f5bdfa9161ea0e196db2b401bbbb28f39a7d4819679b5bea478a402",
+    "labels/img_00025_contours.json": "e29a979a8abfb15835b6865f4dd606fe7a9994007e1b5d7bc2a44d255157effa",
+    "labels/img_00025_segmentation.txt": "5e4c68ac94951805058b4b560ee75b0a542520e17d97db113b32b50f954720a6",
+    "labels/img_00026_bboxes.json": "09edb2a05f7828147fcecb4721443fd08edca3426cf8434b85481db8115c18c7",
+    "labels/img_00026_contours.json": "6cf4ebd46d43611de9d593379f7195d0c2e63ae52eb0ce59b7cfd779bb108527",
+    "labels/img_00026_segmentation.txt": "2eb807f121dcf1723569132ca7577852966c640b7ae70a4481d19c32d6667f61",
+    "labels/img_00027_bboxes.json": "8bf797e447f39b22b40c5fd65ef257d6666862af322c08f0e4455c8ed68f1808",
+    "labels/img_00027_contours.json": "3195c0b68659154df45c313aa79f4a0b516923b5d97c34d7ba0175d55fcda303",
+    "labels/img_00027_segmentation.txt": "91f008607de85f6470c918675aa1cfb32345e0bb52579d98152ed78023769083",
+    "labels/img_00028_bboxes.json": "506c1c33c00561e2e3487ca6c6922da6cba54fea52912b682606880a1d3d88fe",
+    "labels/img_00028_contours.json": "1543edacede9fb42c6ff19640798c7a5b3e8293d694bc8640cd032cca3607cb2",
+    "labels/img_00028_segmentation.txt": "cfa11fe83dbab4fe8ecd3e4c9ee8679afecf2973ef2daa3b2b25bf83fdd19fb5",
+    "labels/img_00029_bboxes.json": "f6367bdd1f6e025b1d059be9d6f724eeedd7ed055e90a4c85e6879c6433db997",
+    "labels/img_00029_contours.json": "0a5ec8580a7d02cab5f247beb9425ab4c0c15e771adaba63cf6110e4bce69efb",
+    "labels/img_00029_segmentation.txt": "3f3c4601c77b97a682050afa98fc7973fb42b67a14b727f3ee859cb185ba85a5",
+    "labels/img_00030_bboxes.json": "b2b99476a363f292fd65a5312d5fc52b9f43c8f5c00e697638259755bb7cd011",
+    "labels/img_00030_contours.json": "9ba722210e5e165e32b8b308e3a3d50642dbd7beb69bd03e18d5b5d50ae3a337",
+    "labels/img_00030_segmentation.txt": "41c818b3105f96ed24414dd05b6daf3e5bba9c3f281974591be1991efdbe4472",
+    "labels/img_00031_bboxes.json": "a629257533f5e8132960f8c87243d66f4bb4e080615c56081ae6c73060b7efdb",
+    "labels/img_00031_contours.json": "9f2a90cf2e51873a03852ebecce9f81fcc72b0c91d085c5ad7bbae55cca95d3b",
+    "labels/img_00031_segmentation.txt": "57fbda831fef88d8a3c5aba47bdcc52a1031b83f060e7a767cf569008c5dfb29",
+    "labels/img_00032_bboxes.json": "402d600ff85be2f5b8bf1bf957e50ec38e0d8b711ddb49a6ef374d8cabc11444",
+    "labels/img_00032_contours.json": "8f7269d011a7a00ec16cb209bd178d6005529e445c88e51b99e9d1e8a0fd050f",
+    "labels/img_00032_segmentation.txt": "49238d2def6d29484162fb73acbffdbdd8033a7ec7a1f7fbccc078e988041185",
+    "labels/img_00033_bboxes.json": "e921a6b1c110c97f284d7cc6418efacf6ed54acc7940aae8ff1fc6e3f52b05e6",
+    "labels/img_00033_contours.json": "263cb60f7c3f870baf74e86fea3387f4da59b13cfeebe28cb67ddb5154e8f1c9",
+    "labels/img_00033_segmentation.txt": "d24856992a33fce1021111d81bdb371c5a45644efc126ffc442a79ee9a192bc3",
+    "labels/img_00034_bboxes.json": "8fe3f0ce1cb374de94f1aa96cb9bcd45b56ce78d16843f51199a93a10fe22e91",
+    "labels/img_00034_contours.json": "766b4fad7756da0514a57a6bcc176418cef1868fb67a3c7bf326c82f370afea7",
+    "labels/img_00034_segmentation.txt": "848b0f3d6641a8dc9a8f2b242511d27385370379732d594b8372b4dba9b4b9ca",
+    "labels/img_00035_bboxes.json": "4c92cb5903a5a329d116c2347806e769146a6708f94642a15e88b2b96b8dd694",
+    "labels/img_00035_contours.json": "f32d7aa9a7d58cbc3e8754fd67cb8cebab751980e4167aa78481b14f0842dabb",
+    "labels/img_00035_segmentation.txt": "dff00e306880f50e6fc1ec0e9a3b6b7ac31cd8169a0ee182f11a0e737ec567a3",
+    "labels/img_00036_bboxes.json": "94d9ff8761bf9ebbfadb51c082a71a3e8e00a7151761aff5d17446a154a1100c",
+    "labels/img_00036_contours.json": "e545b72186ecdd3f15ac4db22f44a95e07071e0f0e16a1a790c04042f936f728",
+    "labels/img_00036_segmentation.txt": "88d1106dc1d437d3a4883bba0e4e28733c7035d64004389daaaa525f25266026",
+    "labels/img_00037_bboxes.json": "6c5b109c05100f37fd5c373c8919ae0120ba2cbc04de66abcc2949cb4c9fc019",
+    "labels/img_00037_contours.json": "2d837f3387504dba8dd14df1f2cfb413ed16d92460e19988fe70bf1a1c6c86ff",
+    "labels/img_00037_segmentation.txt": "d867d8f48bcd3e409abd9d397a4a7aceb076fcd78a79941e287fe024ca5b36b4",
+    "labels/img_00038_bboxes.json": "52449d2da0ebd3ec729eaea680074ebbd7f1d62f24226d188a23c84e88007a6a",
+    "labels/img_00038_contours.json": "6386a4f5724d43ee546ed01b180928b7a098d381784ad2d9bccc031ccc00018e",
+    "labels/img_00038_segmentation.txt": "bb0cf2c5a3a65b3331bf60a047aa3aae11ff2d01cb661dcf3b0179f5b169ec8e",
+    "labels/img_00039_bboxes.json": "65481fd3b558edd44238c44d8f8a3e98936148f5b77421621aee5ffd284143ca",
+    "labels/img_00039_contours.json": "00121b3852f2cd473a2117009515f71784be59d9ef5f631e3d8956c8229ba653",
+    "labels/img_00039_segmentation.txt": "51033d84523e018b9ad689541601f8d01138f587f05d7aade597fd90a946cd4f",
+    "labels/img_00040_bboxes.json": "2562df77a3d4ef398c79c2db590100f4b410f012ea7237642fddbe470ff06e57",
+    "labels/img_00040_contours.json": "e98a605aaafca2e22bd0e247e4e04c59385b2e805e212f57345c84fa7ea5c8da",
+    "labels/img_00040_segmentation.txt": "495130f4d8d63576aec731b25ab9849e741d33204954b5c1b29570a3005c6983",
+    "labels/img_00041_bboxes.json": "f2759bc0942d1a568192c9dd5dd3f674960036fb95ba30f5d15013b0b7c9d07d",
+    "labels/img_00041_contours.json": "7862a6ab18e86987ff750f783c551a6c34be3246f9fe9ef4f98b6ed228c8b619",
+    "labels/img_00041_segmentation.txt": "f7fc92501182d7a239b7328977a7f44ddbe5ca09eabb971c4f0a638552c79273",
+    "labels/img_00042_bboxes.json": "9f43cf62da76693bb3a5ba19b19a94fe66b9e3ba2079e4ef41f1d7d62f0d6575",
+    "labels/img_00042_contours.json": "ecd3d9c130a0479cc94b3e7dde7fa1ba5d076ef9456d8054d7941b50d5f6b518",
+    "labels/img_00042_segmentation.txt": "d45ea33ba628b74945eac3c65acc3deff75994427bee05232e2c00faf8f2c103",
+    "labels/img_00043_bboxes.json": "2a03cb7dfc1324bfeab295fa0a7b1665f8f402a8693fc7e22a1acd0ab3bf4ffd",
+    "labels/img_00043_contours.json": "fef88cebb4380be0b562936b61e9bda3b5381a95f4f4dba4422c5d415e9a7548",
+    "labels/img_00043_segmentation.txt": "6b06bb6b4218abe3d989c067420b56f252e5ea525c034c761caf4d9e74e0d102",
+    "labels/img_00044_bboxes.json": "d938ec9319a805fab2835e6b5cd8f298cb7d05c2ed4988725709ff6dad913b83",
+    "labels/img_00044_contours.json": "09fea23d16ade1e1eac9cf6d2a649c85f5f9e3e6d1289a419b331a46a73af77c",
+    "labels/img_00044_segmentation.txt": "bd6c3b9bc837126b197a9f117da839f7f0794f7002d25ecfa41315693745a1b8",
+    "labels/img_00045_bboxes.json": "c412c624f8211f69663f752d463fb5b26c008d9f7f74f50a11b568bc2c4b65d1",
+    "labels/img_00045_contours.json": "55ca2650bfabcd40fd59ec1492302c8e231602e7c2fcf8bafd5a86da4c59bc81",
+    "labels/img_00045_segmentation.txt": "1702dc54ce8d18af6d2c4cff8d60c6977eec7deb89ad5f861573a9c1edffd71d",
+    "labels/img_00046_bboxes.json": "6b1075b62e96cc4ebde2c93a32efeba8f85226464e17d65aa3cb2e1f612e332e",
+    "labels/img_00046_contours.json": "3cdb407e8467e0014c33b13b57c73360535b974a93da23ce51ed8498b14422ae",
+    "labels/img_00046_segmentation.txt": "efae48172aab1d395198da6b9738afccf3b82a6b53ee70abeaf03d20eb464fe6",
+    "labels/img_00047_bboxes.json": "f8b9f828e5cc7cbf332719f650dfce6b5669278375b96de3a79903d176d84deb",
+    "labels/img_00047_contours.json": "246d10d72549f4d13b3976c740342e5371d8b39a8190673d8810dfe525df357a",
+    "labels/img_00047_segmentation.txt": "b74dc5c939c6ec0a739e81a6662964b8d153e94c6152f9baf60fa41431e4315d",
+    "ontology/pizzaiolo.xml": "e349737f26aebd5b41c228043cdd35991775ecbacbc68a8f543c76466fe97253",
+    "samples.jsonl": "970582e121cdb58249c2f9ea469c2d0172d85b8d7f284d8c06eba954193b74fb",
+    "splits/test.json": "8846960a889cd2471f87ce390ed88d9d49eaabafd133023197e9cc186bbfa606",
+    "splits/train.json": "d21401e3d0185a448e236a4a3e507af3dbece2227dc4ef64e66f18e4fe82c4d9",
+    "splits/validation.json": "88062f4d8b17363ede06803d8898471b5a2c62fd51e16b8f246390e7889bf1c2",
+    "vocabularies/detector_categories.json": "48c980a33269b740352464c5c2d5f3a6fd9ed93f84ed58e5367f74664d806cea",
+    "vocabularies/ontology_classes.json": "e803479520664a5de823848c41a29f45a70f6d2a755049a9be14b52312cddd54"
+  },
+  "compatibility": {
+    "rule": "Readers must reject unknown major versions and require matching ontology/class-vocabulary hashes; no implicit class-ID migration is performed",
+    "schema_major": 1
+  },
+  "component_id_policy": "<sample_id>/<detector-category>/occurrence_<zero-based-index-padded-to-3>",
+  "coordinate_contract": {
+    "image_color_space": "RGB",
+    "source": "pinned Pizzaïolo [x, y, width, height] integer boundingRect output",
+    "wire": "original-image pixel xyxy; x2=x+width and y2=y+height; finite pixel-edge extents, no normalization or resize"
+  },
+  "dataset_id": "pizza-dcc148789aecf8af86a3",
+  "manifest_id": "39fdb93eecbfa81f7b6d22d0eebd9f1e7e69ad90636c99b4092ee8d814b53f3c",
+  "ontology": {
+    "class_count": 66,
+    "country_individuals": [
+      "America",
+      "England",
+      "France",
+      "Germany",
+      "Italy"
+    ],
+    "individual_count": 5,
+    "path": "ontology/pizzaiolo.xml",
+    "sha256": "e349737f26aebd5b41c228043cdd35991775ecbacbc68a8f543c76466fe97253"
+  },
+  "resolved_config": {
+    "generation_seed": 42,
+    "pizza_type_counts": {
+      "American": 3,
+      "AmericanHot": 3,
+      "Cajun": 3,
+      "Capricciosa": 3,
+      "Fiorentina": 3,
+      "FourSeasons": 3,
+      "Giardiniera": 3,
+      "LaReine": 3,
+      "Mushroom": 3,
+      "Napoletana": 3,
+      "Parmense": 3,
+      "Siciliana": 3,
+      "SloppyGiuseppe": 3,
+      "Soho": 3,
+      "Veneziana": 3,
+      "random": 3
+    },
+    "pizza_types": [
+      "American",
+      "AmericanHot",
+      "Cajun",
+      "Capricciosa",
+      "Fiorentina",
+      "FourSeasons",
+      "Giardiniera",
+      "LaReine",
+      "Mushroom",
+      "Napoletana",
+      "Parmense",
+      "Siciliana",
+      "SloppyGiuseppe",
+      "Soho",
+      "Veneziana",
+      "random"
+    ],
+    "split_ratios": {
+      "test": 0.2,
+      "train": 0.6,
+      "validation": 0.2
+    },
+    "split_seed": 42,
+    "total_instances": 48
+  },
+  "sample_id_policy": "original pinned-generator ref, stable within the dataset version",
+  "sample_ids": [
+    "img_00000",
+    "img_00001",
+    "img_00002",
+    "img_00003",
+    "img_00004",
+    "img_00005",
+    "img_00006",
+    "img_00007",
+    "img_00008",
+    "img_00009",
+    "img_00010",
+    "img_00011",
+    "img_00012",
+    "img_00013",
+    "img_00014",
+    "img_00015",
+    "img_00016",
+    "img_00017",
+    "img_00018",
+    "img_00019",
+    "img_00020",
+    "img_00021",
+    "img_00022",
+    "img_00023",
+    "img_00024",
+    "img_00025",
+    "img_00026",
+    "img_00027",
+    "img_00028",
+    "img_00029",
+    "img_00030",
+    "img_00031",
+    "img_00032",
+    "img_00033",
+    "img_00034",
+    "img_00035",
+    "img_00036",
+    "img_00037",
+    "img_00038",
+    "img_00039",
+    "img_00040",
+    "img_00041",
+    "img_00042",
+    "img_00043",
+    "img_00044",
+    "img_00045",
+    "img_00046",
+    "img_00047"
+  ],
+  "sample_record_count": 48,
+  "schema_version": "1.0.0",
+  "source": {
+    "generator_commit": "6c0bcb221a957c184012beaf103bebcde4b1f793",
+    "generator_license": "CC BY-NC 4.0",
+    "generator_repository": "https://github.com/SysReIC/pizzaiolo.git",
+    "image_label_inference": "audited fourth_attempt infer_pizzaiolo_label predicates; 32 overlapping image-level classes",
+    "preparation_commit": "99956608ac88fd5ab3011d28d57937c7b5e32983",
+    "preparation_dirty": false,
+    "preparation_package_version": "0.1.0",
+    "raw_master_canonicalization": "hasTopping set values sorted lexicographically; source ordering is nondeterministic and semantically unordered",
+    "raw_master_csv": "audit/generator_master.csv"
+  },
+  "split_policy": {
+    "files": {
+      "test": "splits/test.json",
+      "train": "splits/train.json",
+      "validation": "splits/validation.json"
+    },
+    "name": "generator-type-stratified two-stage seeded split, adapted from fourth_attempt",
+    "ratios": {
+      "test": 0.2,
+      "train": 0.6,
+      "validation": 0.2
+    },
+    "seed": 42,
+    "sizes": {
+      "test": 16,
+      "train": 16,
+      "validation": 16
+    }
+  },
+  "statistics": {
+    "class_support_by_split": {
+      "test": {
+        "classes": [
+          {
+            "class_id": 0,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "American",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 1,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "AmericanHot",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 2,
+            "component": {
+              "known_negative": 241,
+              "positive": 20,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "AnchovyTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 3,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Cajun",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 4,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Capricciosa",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 5,
+            "component": {
+              "known_negative": 258,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "CheeseTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 6,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "CheesyPizza",
+            "pizza": {
+              "known_negative": 13,
+              "positive": 3,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 7,
+            "component": {
+              "known_negative": 250,
+              "positive": 11,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Country",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 8,
+            "component": {
+              "known_negative": 258,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "DeepPanBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 9,
+            "component": {
+              "known_negative": 0,
+              "positive": 261,
+              "unknown": 0
+            },
+            "fixed_positive": true,
+            "name": "DomainThing",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": false,
+            "unsupported": false
+          },
+          {
+            "class_id": 10,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Fiorentina",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 11,
+            "component": {
+              "known_negative": 11,
+              "positive": 250,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Food",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 12,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "FourSeasons",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 13,
+            "component": {
+              "known_negative": 253,
+              "positive": 8,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "FruitTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 14,
+            "component": {
+              "known_negative": 251,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GarlicTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 15,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GenerousPizza",
+            "pizza": {
+              "known_negative": 12,
+              "positive": 4,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 16,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Giardiniera",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 17,
+            "component": {
+              "known_negative": 251,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GreenPepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 18,
+            "component": {
+              "known_negative": 248,
+              "positive": 13,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "HamTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 19,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 261
+            },
+            "fixed_positive": false,
+            "name": "Hot",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 20,
+            "component": {
+              "known_negative": 257,
+              "positive": 4,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "JalapenoPepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 21,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "LaReine",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 22,
+            "component": {
+              "known_negative": 223,
+              "positive": 38,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "MeatTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 23,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 261
+            },
+            "fixed_positive": false,
+            "name": "Medium",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 24,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 261
+            },
+            "fixed_positive": false,
+            "name": "Mild",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 25,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Mushroom",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 26,
+            "component": {
+              "known_negative": 227,
+              "positive": 34,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "MushroomTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 27,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "NamedPizza",
+            "pizza": {
+              "known_negative": 1,
+              "positive": 15,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 28,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Napoletana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 29,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "NonVegetarianPizza",
+            "pizza": {
+              "known_negative": 6,
+              "positive": 10,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 30,
+            "component": {
+              "known_negative": 193,
+              "positive": 68,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "OliveTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 31,
+            "component": {
+              "known_negative": 250,
+              "positive": 11,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "OnionTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 32,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Parmense",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 33,
+            "component": {
+              "known_negative": 258,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ParmesanTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 34,
+            "component": {
+              "known_negative": 258,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PeperonataTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 35,
+            "component": {
+              "known_negative": 236,
+              "positive": 25,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PeperoniSausageTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 36,
+            "component": {
+              "known_negative": 244,
+              "positive": 17,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 37,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Pizza",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 38,
+            "component": {
+              "known_negative": 245,
+              "positive": 16,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PizzaBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 39,
+            "component": {
+              "known_negative": 27,
+              "positive": 234,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PizzaTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 40,
+            "component": {
+              "known_negative": 256,
+              "positive": 5,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PrawnTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 41,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ProteinPizza",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 42,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealAmericanPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 43,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealEnglishPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 44,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealFrenchPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 45,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealItalianPizza",
+            "pizza": {
+              "known_negative": 11,
+              "positive": 5,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 46,
+            "component": {
+              "known_negative": 256,
+              "positive": 5,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RocketTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 47,
+            "component": {
+              "known_negative": 236,
+              "positive": 25,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SeafoodTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 48,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Siciliana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 49,
+            "component": {
+              "known_negative": 252,
+              "positive": 9,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SlicedTomatoTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 50,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SloppyGiuseppe",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 51,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Soho",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 52,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 261
+            },
+            "fixed_positive": false,
+            "name": "Spiciness",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 53,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyPizza",
+            "pizza": {
+              "known_negative": 9,
+              "positive": 7,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 54,
+            "component": {
+              "known_negative": 229,
+              "positive": 32,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 55,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyVegePizza",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 56,
+            "component": {
+              "known_negative": 255,
+              "positive": 6,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpinachTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 57,
+            "component": {
+              "known_negative": 253,
+              "positive": 8,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SultanaTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 58,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ThickPizza",
+            "pizza": {
+              "known_negative": 13,
+              "positive": 3,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 59,
+            "component": {
+              "known_negative": 248,
+              "positive": 13,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ThinAndCrispyBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 60,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 261
+            },
+            "fixed_positive": false,
+            "name": "ValuePartition",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 61,
+            "component": {
+              "known_negative": 101,
+              "positive": 160,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetableTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 62,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetarianPizza",
+            "pizza": {
+              "known_negative": 10,
+              "positive": 6,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 63,
+            "component": {
+              "known_negative": 90,
+              "positive": 171,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetarianTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 64,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Veneziana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 65,
+            "component": {
+              "known_negative": 261,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VerySpicyPizza",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          }
+        ],
+        "component_instances": 261,
+        "pizza_instances": 16
+      },
+      "train": {
+        "classes": [
+          {
+            "class_id": 0,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "American",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 1,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "AmericanHot",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 2,
+            "component": {
+              "known_negative": 272,
+              "positive": 17,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "AnchovyTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 3,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Cajun",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 4,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Capricciosa",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 5,
+            "component": {
+              "known_negative": 286,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "CheeseTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 6,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "CheesyPizza",
+            "pizza": {
+              "known_negative": 13,
+              "positive": 3,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 7,
+            "component": {
+              "known_negative": 279,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Country",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 8,
+            "component": {
+              "known_negative": 285,
+              "positive": 4,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "DeepPanBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 9,
+            "component": {
+              "known_negative": 0,
+              "positive": 289,
+              "unknown": 0
+            },
+            "fixed_positive": true,
+            "name": "DomainThing",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": false,
+            "unsupported": false
+          },
+          {
+            "class_id": 10,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Fiorentina",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 11,
+            "component": {
+              "known_negative": 10,
+              "positive": 279,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Food",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 12,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "FourSeasons",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 13,
+            "component": {
+              "known_negative": 274,
+              "positive": 15,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "FruitTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 14,
+            "component": {
+              "known_negative": 277,
+              "positive": 12,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GarlicTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 15,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GenerousPizza",
+            "pizza": {
+              "known_negative": 10,
+              "positive": 6,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 16,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Giardiniera",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 17,
+            "component": {
+              "known_negative": 279,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GreenPepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 18,
+            "component": {
+              "known_negative": 276,
+              "positive": 13,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "HamTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 19,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 289
+            },
+            "fixed_positive": false,
+            "name": "Hot",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 20,
+            "component": {
+              "known_negative": 279,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "JalapenoPepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 21,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "LaReine",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 22,
+            "component": {
+              "known_negative": 258,
+              "positive": 31,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "MeatTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 23,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 289
+            },
+            "fixed_positive": false,
+            "name": "Medium",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 24,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 289
+            },
+            "fixed_positive": false,
+            "name": "Mild",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 25,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Mushroom",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 26,
+            "component": {
+              "known_negative": 245,
+              "positive": 44,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "MushroomTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 27,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "NamedPizza",
+            "pizza": {
+              "known_negative": 1,
+              "positive": 15,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 28,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Napoletana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 29,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "NonVegetarianPizza",
+            "pizza": {
+              "known_negative": 7,
+              "positive": 9,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 30,
+            "component": {
+              "known_negative": 211,
+              "positive": 78,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "OliveTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 31,
+            "component": {
+              "known_negative": 272,
+              "positive": 17,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "OnionTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 32,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Parmense",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 33,
+            "component": {
+              "known_negative": 286,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ParmesanTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 34,
+            "component": {
+              "known_negative": 286,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PeperonataTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 35,
+            "component": {
+              "known_negative": 271,
+              "positive": 18,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PeperoniSausageTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 36,
+            "component": {
+              "known_negative": 266,
+              "positive": 23,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 37,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Pizza",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 38,
+            "component": {
+              "known_negative": 273,
+              "positive": 16,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PizzaBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 39,
+            "component": {
+              "known_negative": 26,
+              "positive": 263,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PizzaTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 40,
+            "component": {
+              "known_negative": 282,
+              "positive": 7,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PrawnTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 41,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ProteinPizza",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 42,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealAmericanPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 43,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealEnglishPizza",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 44,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealFrenchPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 45,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealItalianPizza",
+            "pizza": {
+              "known_negative": 11,
+              "positive": 5,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 46,
+            "component": {
+              "known_negative": 287,
+              "positive": 2,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RocketTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 47,
+            "component": {
+              "known_negative": 265,
+              "positive": 24,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SeafoodTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 48,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Siciliana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 49,
+            "component": {
+              "known_negative": 278,
+              "positive": 11,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SlicedTomatoTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 50,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SloppyGiuseppe",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 51,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Soho",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 52,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 289
+            },
+            "fixed_positive": false,
+            "name": "Spiciness",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 53,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyPizza",
+            "pizza": {
+              "known_negative": 9,
+              "positive": 7,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 54,
+            "component": {
+              "known_negative": 258,
+              "positive": 31,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 55,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyVegePizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 56,
+            "component": {
+              "known_negative": 286,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpinachTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 57,
+            "component": {
+              "known_negative": 274,
+              "positive": 15,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SultanaTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 58,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ThickPizza",
+            "pizza": {
+              "known_negative": 12,
+              "positive": 4,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 59,
+            "component": {
+              "known_negative": 277,
+              "positive": 12,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ThinAndCrispyBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 60,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 289
+            },
+            "fixed_positive": false,
+            "name": "ValuePartition",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 61,
+            "component": {
+              "known_negative": 99,
+              "positive": 190,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetableTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 62,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetarianPizza",
+            "pizza": {
+              "known_negative": 9,
+              "positive": 7,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 63,
+            "component": {
+              "known_negative": 81,
+              "positive": 208,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetarianTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 64,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Veneziana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 65,
+            "component": {
+              "known_negative": 289,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VerySpicyPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          }
+        ],
+        "component_instances": 289,
+        "pizza_instances": 16
+      },
+      "validation": {
+        "classes": [
+          {
+            "class_id": 0,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "American",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 1,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "AmericanHot",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 2,
+            "component": {
+              "known_negative": 236,
+              "positive": 17,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "AnchovyTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 3,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Cajun",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 4,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Capricciosa",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 5,
+            "component": {
+              "known_negative": 250,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "CheeseTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 6,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "CheesyPizza",
+            "pizza": {
+              "known_negative": 13,
+              "positive": 3,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 7,
+            "component": {
+              "known_negative": 243,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Country",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 8,
+            "component": {
+              "known_negative": 249,
+              "positive": 4,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "DeepPanBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 9,
+            "component": {
+              "known_negative": 0,
+              "positive": 253,
+              "unknown": 0
+            },
+            "fixed_positive": true,
+            "name": "DomainThing",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": false,
+            "unsupported": false
+          },
+          {
+            "class_id": 10,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Fiorentina",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 11,
+            "component": {
+              "known_negative": 10,
+              "positive": 243,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Food",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 12,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "FourSeasons",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 13,
+            "component": {
+              "known_negative": 245,
+              "positive": 8,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "FruitTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 14,
+            "component": {
+              "known_negative": 241,
+              "positive": 12,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GarlicTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 15,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GenerousPizza",
+            "pizza": {
+              "known_negative": 11,
+              "positive": 5,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 16,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Giardiniera",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 17,
+            "component": {
+              "known_negative": 241,
+              "positive": 12,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "GreenPepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 18,
+            "component": {
+              "known_negative": 238,
+              "positive": 15,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "HamTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 19,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 253
+            },
+            "fixed_positive": false,
+            "name": "Hot",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 20,
+            "component": {
+              "known_negative": 247,
+              "positive": 6,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "JalapenoPepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 21,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "LaReine",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 22,
+            "component": {
+              "known_negative": 221,
+              "positive": 32,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "MeatTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 23,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 253
+            },
+            "fixed_positive": false,
+            "name": "Medium",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 24,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 253
+            },
+            "fixed_positive": false,
+            "name": "Mild",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 25,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Mushroom",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 26,
+            "component": {
+              "known_negative": 224,
+              "positive": 29,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "MushroomTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 27,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "NamedPizza",
+            "pizza": {
+              "known_negative": 1,
+              "positive": 15,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 28,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Napoletana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 29,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "NonVegetarianPizza",
+            "pizza": {
+              "known_negative": 7,
+              "positive": 9,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 30,
+            "component": {
+              "known_negative": 181,
+              "positive": 72,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "OliveTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 31,
+            "component": {
+              "known_negative": 243,
+              "positive": 10,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "OnionTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 32,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Parmense",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 33,
+            "component": {
+              "known_negative": 250,
+              "positive": 3,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ParmesanTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 34,
+            "component": {
+              "known_negative": 249,
+              "positive": 4,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PeperonataTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 35,
+            "component": {
+              "known_negative": 236,
+              "positive": 17,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PeperoniSausageTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 36,
+            "component": {
+              "known_negative": 231,
+              "positive": 22,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PepperTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 37,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Pizza",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 16,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 38,
+            "component": {
+              "known_negative": 237,
+              "positive": 16,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PizzaBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 39,
+            "component": {
+              "known_negative": 26,
+              "positive": 227,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PizzaTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 40,
+            "component": {
+              "known_negative": 248,
+              "positive": 5,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "PrawnTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 41,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ProteinPizza",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 42,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealAmericanPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 43,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealEnglishPizza",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 44,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealFrenchPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 45,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RealItalianPizza",
+            "pizza": {
+              "known_negative": 11,
+              "positive": 5,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 46,
+            "component": {
+              "known_negative": 249,
+              "positive": 4,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "RocketTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 47,
+            "component": {
+              "known_negative": 231,
+              "positive": 22,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SeafoodTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 48,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Siciliana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 49,
+            "component": {
+              "known_negative": 242,
+              "positive": 11,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SlicedTomatoTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 50,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SloppyGiuseppe",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 51,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Soho",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 52,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 253
+            },
+            "fixed_positive": false,
+            "name": "Spiciness",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 53,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyPizza",
+            "pizza": {
+              "known_negative": 9,
+              "positive": 7,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 54,
+            "component": {
+              "known_negative": 226,
+              "positive": 27,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 55,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpicyVegePizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 56,
+            "component": {
+              "known_negative": 251,
+              "positive": 2,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SpinachTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 57,
+            "component": {
+              "known_negative": 245,
+              "positive": 8,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "SultanaTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 58,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ThickPizza",
+            "pizza": {
+              "known_negative": 12,
+              "positive": 4,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 59,
+            "component": {
+              "known_negative": 241,
+              "positive": 12,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "ThinAndCrispyBase",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 60,
+            "component": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 253
+            },
+            "fixed_positive": false,
+            "name": "ValuePartition",
+            "pizza": {
+              "known_negative": 0,
+              "positive": 0,
+              "unknown": 16
+            },
+            "trainable": false,
+            "unsupported": true
+          },
+          {
+            "class_id": 61,
+            "component": {
+              "known_negative": 91,
+              "positive": 162,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetableTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 62,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetarianPizza",
+            "pizza": {
+              "known_negative": 9,
+              "positive": 7,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 63,
+            "component": {
+              "known_negative": 80,
+              "positive": 173,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VegetarianTopping",
+            "pizza": {
+              "known_negative": 16,
+              "positive": 0,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 64,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "Veneziana",
+            "pizza": {
+              "known_negative": 15,
+              "positive": 1,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          },
+          {
+            "class_id": 65,
+            "component": {
+              "known_negative": 253,
+              "positive": 0,
+              "unknown": 0
+            },
+            "fixed_positive": false,
+            "name": "VerySpicyPizza",
+            "pizza": {
+              "known_negative": 14,
+              "positive": 2,
+              "unknown": 0
+            },
+            "trainable": true,
+            "unsupported": false
+          }
+        ],
+        "component_instances": 253,
+        "pizza_instances": 16
+      }
+    },
+    "dataset_size": 48,
+    "generator_type_by_split": {
+      "test": {
+        "American": 1,
+        "AmericanHot": 1,
+        "Cajun": 1,
+        "Capricciosa": 1,
+        "Fiorentina": 1,
+        "FourSeasons": 1,
+        "Giardiniera": 1,
+        "LaReine": 1,
+        "Mushroom": 1,
+        "Napoletana": 1,
+        "Parmense": 1,
+        "Siciliana": 1,
+        "SloppyGiuseppe": 1,
+        "Soho": 1,
+        "Veneziana": 1,
+        "random": 1
+      },
+      "train": {
+        "American": 1,
+        "AmericanHot": 1,
+        "Cajun": 1,
+        "Capricciosa": 1,
+        "Fiorentina": 1,
+        "FourSeasons": 1,
+        "Giardiniera": 1,
+        "LaReine": 1,
+        "Mushroom": 1,
+        "Napoletana": 1,
+        "Parmense": 1,
+        "Siciliana": 1,
+        "SloppyGiuseppe": 1,
+        "Soho": 1,
+        "Veneziana": 1,
+        "random": 1
+      },
+      "validation": {
+        "American": 1,
+        "AmericanHot": 1,
+        "Cajun": 1,
+        "Capricciosa": 1,
+        "Fiorentina": 1,
+        "FourSeasons": 1,
+        "Giardiniera": 1,
+        "LaReine": 1,
+        "Mushroom": 1,
+        "Napoletana": 1,
+        "Parmense": 1,
+        "Siciliana": 1,
+        "SloppyGiuseppe": 1,
+        "Soho": 1,
+        "Veneziana": 1,
+        "random": 1
+      }
+    },
+    "generator_type_counts": {
+      "American": 3,
+      "AmericanHot": 3,
+      "Cajun": 3,
+      "Capricciosa": 3,
+      "Fiorentina": 3,
+      "FourSeasons": 3,
+      "Giardiniera": 3,
+      "LaReine": 3,
+      "Mushroom": 3,
+      "Napoletana": 3,
+      "Parmense": 3,
+      "Siciliana": 3,
+      "SloppyGiuseppe": 3,
+      "Soho": 3,
+      "Veneziana": 3,
+      "random": 3
+    },
+    "split_sizes": {
+      "test": 16,
+      "train": 16,
+      "validation": 16
+    }
+  },
+  "supervision_contract": {
+    "country_flags": "Four detector categories are OWL individuals; targets are Country and its class ancestors, never the individual names as classes",
+    "encoding": "ontology_targets and ontology_known_mask are integer 0/1 vectors with one entry for every OWL class",
+    "fixed_positive": "DomainThing is positive for all generated pizza and component entities and is not trainable",
+    "known_negative": "Validated complete pinned-generator ingredient, base, origin, and entity-type facts use a closed-world mask for the 61 supported ontology classes only",
+    "target_order": "ontology class_id ascending in vocabularies/ontology_classes.json",
+    "unknown": "Five value-partition/spiciness classes lacking point supervision have target 0 and known mask 0; malformed metadata is rejected, never converted to negative"
+  },
+  "validation_report_path": "reports/validation.json",
+  "vocabularies": {
+    "background_category_id": 0,
+    "detector_categories_path": "vocabularies/detector_categories.json",
+    "detector_categories_sha256": "48c980a33269b740352464c5c2d5f3a6fd9ed93f84ed58e5367f74664d806cea",
+    "detector_foreground_category_count": 22,
+    "ontology_class_count": 66,
+    "ontology_classes_path": "vocabularies/ontology_classes.json",
+    "ontology_classes_sha256": "e803479520664a5de823848c41a29f45a70f6d2a755049a9be14b52312cddd54",
+    "trainable_class_count": 60
+  },
+  "wire_format": "UTF-8 JSON Lines (one JSON object per sample)"
+}

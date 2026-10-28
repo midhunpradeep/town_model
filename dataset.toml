@@ -1,0 +1,18 @@
+# A small, all-type dataset suitable for exploring Phase 1 locally.
+# Larger reference datasets require explicit configuration changes.
+total_instances = 48
+pizza_types = [
+  "American", "AmericanHot", "Cajun", "Capricciosa", "Fiorentina",
+  "FourSeasons", "Giardiniera", "LaReine", "Mushroom", "Napoletana",
+  "Parmense", "Siciliana", "SloppyGiuseppe", "Soho", "Veneziana", "random"
+]
+generation_seed = 42
+split_seed = 42
+train_size = 0.6
+valid_size = 0.2
+test_size = 0.2
+
+# Optional custom counts. If present, counts must sum to total_instances.
+# [pizza_type_counts]
+# American = 3
+# random = 3

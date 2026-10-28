@@ -1,0 +1,340 @@
+{
+  "background_category_id": 0,
+  "categories": [
+    {
+      "category_id": 1,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#America",
+        "kind": "owl_individual"
+      },
+      "name": "America",
+      "ontology_target_class_ids": [
+        7,
+        9
+      ]
+    },
+    {
+      "category_id": 2,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#AnchovyTopping",
+        "kind": "owl_class"
+      },
+      "name": "AnchovyTopping",
+      "ontology_target_class_ids": [
+        2,
+        9,
+        11,
+        39,
+        47
+      ]
+    },
+    {
+      "category_id": 3,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#DeepPanBase",
+        "kind": "owl_class"
+      },
+      "name": "DeepPanBase",
+      "ontology_target_class_ids": [
+        8,
+        9,
+        11,
+        38
+      ]
+    },
+    {
+      "category_id": 4,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#England",
+        "kind": "owl_individual"
+      },
+      "name": "England",
+      "ontology_target_class_ids": [
+        7,
+        9
+      ]
+    },
+    {
+      "category_id": 5,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#France",
+        "kind": "owl_individual"
+      },
+      "name": "France",
+      "ontology_target_class_ids": [
+        7,
+        9
+      ]
+    },
+    {
+      "category_id": 6,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#GarlicTopping",
+        "kind": "owl_class"
+      },
+      "name": "GarlicTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        14,
+        39,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 7,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#GreenPepperTopping",
+        "kind": "owl_class"
+      },
+      "name": "GreenPepperTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        17,
+        36,
+        39,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 8,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#HamTopping",
+        "kind": "owl_class"
+      },
+      "name": "HamTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        18,
+        22,
+        39
+      ]
+    },
+    {
+      "category_id": 9,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#Italy",
+        "kind": "owl_individual"
+      },
+      "name": "Italy",
+      "ontology_target_class_ids": [
+        7,
+        9
+      ]
+    },
+    {
+      "category_id": 10,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#JalapenoPepperTopping",
+        "kind": "owl_class"
+      },
+      "name": "JalapenoPepperTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        20,
+        36,
+        39,
+        54,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 11,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#MushroomTopping",
+        "kind": "owl_class"
+      },
+      "name": "MushroomTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        26,
+        39,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 12,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#OliveTopping",
+        "kind": "owl_class"
+      },
+      "name": "OliveTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        30,
+        39,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 13,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#OnionTopping",
+        "kind": "owl_class"
+      },
+      "name": "OnionTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        31,
+        39,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 14,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#ParmesanTopping",
+        "kind": "owl_class"
+      },
+      "name": "ParmesanTopping",
+      "ontology_target_class_ids": [
+        5,
+        9,
+        11,
+        33,
+        39,
+        63
+      ]
+    },
+    {
+      "category_id": 15,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#PeperonataTopping",
+        "kind": "owl_class"
+      },
+      "name": "PeperonataTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        34,
+        36,
+        39,
+        54,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 16,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#PeperoniSausageTopping",
+        "kind": "owl_class"
+      },
+      "name": "PeperoniSausageTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        22,
+        35,
+        39,
+        54
+      ]
+    },
+    {
+      "category_id": 17,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#PrawnTopping",
+        "kind": "owl_class"
+      },
+      "name": "PrawnTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        39,
+        40,
+        47
+      ]
+    },
+    {
+      "category_id": 18,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#RocketTopping",
+        "kind": "owl_class"
+      },
+      "name": "RocketTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        39,
+        46,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 19,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#SlicedTomatoTopping",
+        "kind": "owl_class"
+      },
+      "name": "SlicedTomatoTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        39,
+        49,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 20,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#SpinachTopping",
+        "kind": "owl_class"
+      },
+      "name": "SpinachTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        39,
+        56,
+        61,
+        63
+      ]
+    },
+    {
+      "category_id": 21,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#SultanaTopping",
+        "kind": "owl_class"
+      },
+      "name": "SultanaTopping",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        13,
+        39,
+        57,
+        63
+      ]
+    },
+    {
+      "category_id": 22,
+      "identity": {
+        "iri": "https://www.univ-littoral.fr/lisic/sysreic/pizzaiolo.xml#ThinAndCrispyBase",
+        "kind": "owl_class"
+      },
+      "name": "ThinAndCrispyBase",
+      "ontology_target_class_ids": [
+        9,
+        11,
+        38,
+        59
+      ]
+    }
+  ],
+  "schema_version": "1.0.0"
+}

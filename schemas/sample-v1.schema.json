@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:town-embeddings:sample:v1",
+  "title": "Town Embeddings Phase 1 prepared dataset sample",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sample_id",
+    "split",
+    "generator_type",
+    "image",
+    "pizza",
+    "components",
+    "audit",
+    "source_annotations"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "sample_id": {"type": "string", "minLength": 1},
+    "split": {"enum": ["train", "validation", "test"]},
+    "generator_type": {"type": "string", "minLength": 1},
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "width", "height", "color_space"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "color_space": {"const": "RGB"}
+      }
+    },
+    "pizza": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ontology_targets", "ontology_known_mask", "source_inferred_labels"],
+      "properties": {
+        "ontology_targets": {"$ref": "#/$defs/targetVector"},
+        "ontology_known_mask": {"$ref": "#/$defs/targetVector"},
+        "source_inferred_labels": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "components": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/component"}
+    },
+    "audit": {
+      "type": "object",
+      "required": ["usage", "raw_generator"],
+      "properties": {
+        "usage": {"const": "audit_only_not_predictive_input"},
+        "raw_generator": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "source_annotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boxes", "contours", "segmentation"],
+      "properties": {
+        "boxes": {"type": "string", "minLength": 1},
+        "contours": {"type": "string", "minLength": 1},
+        "segmentation": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "$defs": {
+    "targetVector": {
+      "type": "array",
+      "minItems": 66,
+      "maxItems": 66,
+      "items": {"type": "integer", "enum": [0, 1]}
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "detector_category_id",
+        "detector_category",
+        "bbox_xyxy_original",
+        "ontology_targets",
+        "ontology_known_mask",
+        "annotation_path"
+      ],
+      "properties": {
+        "component_id": {"type": "string", "minLength": 1},
+        "detector_category_id": {"type": "integer", "minimum": 1, "maximum": 22},
+        "detector_category": {"type": "string", "minLength": 1},
+        "bbox_xyxy_original": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {"type": "number"}
+        },
+        "ontology_targets": {"$ref": "#/$defs/targetVector"},
+        "ontology_known_mask": {"$ref": "#/$defs/targetVector"},
+        "annotation_path": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
