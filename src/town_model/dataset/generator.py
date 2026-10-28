@@ -46,6 +46,20 @@ def _assert_clean_pinned_checkout(path: Path) -> None:
         raise ValueError(f"Pinned Pizzaïolo checkout must be clean; dirty files in {path}")
 
 
+def _is_unchecked_out_cache(path: Path) -> bool:
+    """Recognize the empty index left by a clone created with --no-checkout."""
+
+    committed = _git(path, "ls-tree", "-r", "--name-only", "HEAD").stdout.splitlines()
+    indexed = _git(path, "ls-files").stdout.splitlines()
+    status = _git(path, "status", "--porcelain").stdout.splitlines()
+    return (
+        bool(committed)
+        and not indexed
+        and len(status) == len(committed)
+        and all(line.startswith("D  ") for line in status)
+    )
+
+
 def ensure_pizzaiolo_repo(project_root: Path, source_repo: Path | None = None) -> Path:
     """Resolve source without changing user-supplied checkouts.
 
@@ -63,7 +77,8 @@ def ensure_pizzaiolo_repo(project_root: Path, source_repo: Path | None = None) -
 
     source = (project_root / "artifacts" / "sources" / "pizzaiolo").resolve()
     source.parent.mkdir(parents=True, exist_ok=True)
-    if not source.exists():
+    new_clone = not source.exists()
+    if new_clone:
         subprocess.run(
             ["git", "clone", "--no-checkout", GENERATOR_REPOSITORY, str(source)],
             check=True,
@@ -77,10 +92,15 @@ def ensure_pizzaiolo_repo(project_root: Path, source_repo: Path | None = None) -
 
     revision = _git(source, "rev-parse", "HEAD", check=False)
     current = revision.stdout.strip() if revision.returncode == 0 else ""
+    needs_checkout = new_clone
     if current != GENERATOR_COMMIT:
         fetched = _git(source, "cat-file", "-e", f"{GENERATOR_COMMIT}^{{commit}}", check=False)
         if fetched.returncode != 0:
             _git(source, "fetch", "origin", GENERATOR_COMMIT)
+        needs_checkout = True
+    elif not new_clone and _is_unchecked_out_cache(source):
+        needs_checkout = True
+    if needs_checkout:
         _git(source, "checkout", "--detach", GENERATOR_COMMIT)
     _assert_clean_pinned_checkout(source)
     return source
