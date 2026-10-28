@@ -173,28 +173,37 @@ def write_records(records: Iterable[DatasetRecord], path: Path) -> None:
     temporary.replace(path)
 
 
-def load_records(path: Path) -> list[DatasetRecord]:
+def load_records_bytes(data: bytes, *, source: str = SAMPLES_FILENAME) -> list[DatasetRecord]:
+    """Parse JSONL bytes already bound to a verified immutable artifact hash."""
+
     records: list[DatasetRecord] = []
-    with path.open(encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-                if not isinstance(value, dict):
-                    raise ValueError("record must be a JSON object")
-                record = DatasetRecord.from_dict(value)
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
-                raise ValueError(f"Invalid JSONL record at {path}:{line_number}: {error}") from error
-            if record.schema_version != SCHEMA_VERSION:
-                raise ValueError(
-                    f"Unsupported record schema {record.schema_version!r} at {path}:{line_number}; "
-                    f"expected {SCHEMA_VERSION!r}"
-                )
-            if record.split not in SPLIT_NAMES:
-                raise ValueError(f"Invalid split {record.split!r} at {path}:{line_number}")
-            records.append(record)
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"Invalid UTF-8 JSONL data at {source}: {error}") from error
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+            if not isinstance(value, dict):
+                raise ValueError("record must be a JSON object")
+            record = DatasetRecord.from_dict(value)
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            raise ValueError(f"Invalid JSONL record at {source}:{line_number}: {error}") from error
+        if record.schema_version != SCHEMA_VERSION:
+            raise ValueError(
+                f"Unsupported record schema {record.schema_version!r} at {source}:{line_number}; "
+                f"expected {SCHEMA_VERSION!r}"
+            )
+        if record.split not in SPLIT_NAMES:
+            raise ValueError(f"Invalid split {record.split!r} at {source}:{line_number}")
+        records.append(record)
     return records
+
+
+def load_records(path: Path) -> list[DatasetRecord]:
+    return load_records_bytes(path.read_bytes(), source=str(path))
 
 
 def write_split_manifest(records: Iterable[DatasetRecord], path: Path) -> None:

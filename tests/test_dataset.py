@@ -117,13 +117,88 @@ def test_malformed_or_unsupported_origin_values_fail_preparation(
 def test_blank_origin_remains_a_known_negative_and_random_generator_type_is_preserved(prepared_dataset: Path) -> None:
     records = load_records(prepared_dataset / "samples.jsonl")
     random_record = next(record for record in records if record.generator_type == "random")
+    named_record = next(record for record in records if record.generator_type == "American")
     assert random_record.audit["raw_generator"]["source_type"] is None
+    assert named_record.audit["raw_generator"]["source_type"] == "American"
     assert random_record.audit["raw_generator"]["country_of_origin"] is None
+    with (prepared_dataset / "audit" / "generator_master.csv").open(encoding="utf-8", newline="") as file:
+        raw_rows = list(csv.DictReader(file))
+    assert next(row["type"] for row in raw_rows if row["ref"] == random_record.sample_id) == "None"
     report = validate_dataset(prepared_dataset, write_report=False)
     assert report.valid
     real_america = _class_index("RealAmericanPizza")
     assert random_record.pizza_targets[real_america] == 0
     assert random_record.pizza_known_mask[real_america] == 1
+
+
+@pytest.mark.parametrize("source_type", ["", " ", "\\t", " None ", "none", "unspecified", "mystery"])
+def test_preparation_rejects_blank_or_unsupported_generator_types(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    small_config: DatasetConfig,
+    source_type: str,
+) -> None:
+    from town_model.dataset import preparation
+
+    def generate_with_type(dataset_dir, config, *, project_root, source_repo=None, progress=None):
+        result = fake_generate_raw_dataset(
+            dataset_dir, config, project_root=project_root, source_repo=source_repo, progress=progress
+        )
+        source_csv = dataset_dir / "csv" / "pizzaiolo_dataset.csv"
+        with source_csv.open(encoding="utf-8", newline="") as file:
+            rows = list(csv.DictReader(file))
+            fieldnames = list(rows[0])
+        random_row = next(row for row in rows if row["type"] == "None")
+        random_row["type"] = source_type
+        with source_csv.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        return result
+
+    monkeypatch.setattr(preparation, "generate_raw_dataset", generate_with_type)
+    with pytest.raises(ValueError, match="unsupported generator type"):
+        prepare_dataset(small_config, tmp_path / "invalid-type", project_root=tmp_path)
+
+
+@pytest.mark.parametrize("source_type", ["", " ", "None", "none", "unspecified", "mystery"])
+def test_validator_rejects_malformed_stored_generator_type(
+    prepared_dataset: Path, source_type: str
+) -> None:
+    random_index = next(
+        index for index, line in enumerate((prepared_dataset / "samples.jsonl").read_text().splitlines())
+        if json.loads(line)["generator_type"] == "random"
+    )
+
+    def change(record: dict) -> None:
+        record["audit"]["raw_generator"]["source_type"] = source_type
+
+    _rewrite_record(prepared_dataset, random_index, change)
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(
+        issue.code == "generator_type_metadata" and issue.sample_id
+        for issue in report.errors
+    )
+
+
+def test_validator_checks_literal_random_encoding_in_original_csv(prepared_dataset: Path) -> None:
+    raw_master = prepared_dataset / "audit" / "generator_master.csv"
+    with raw_master.open(encoding="utf-8", newline="") as file:
+        rows = list(csv.DictReader(file))
+        fieldnames = list(rows[0])
+    random_row = next(row for row in rows if row["type"] == "None")
+    random_row["type"] = ""
+    with raw_master.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    _refresh_manifest_asset(prepared_dataset, "audit/generator_master.csv")
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(
+        issue.code == "generator_type_source_metadata" and issue.sample_id
+        for issue in report.errors
+    )
 
 
 @pytest.mark.parametrize("origin", ["NaN", "nan", "None", "none", "Germany", " "])

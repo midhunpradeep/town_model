@@ -18,7 +18,7 @@ import pandas as pd
 from PIL import Image
 
 from .. import __version__
-from ..config import DatasetConfig
+from ..config import DEFAULT_PIZZA_TYPES, DatasetConfig
 from .constants import (
     AUDIT_DIR,
     BASE_CATEGORIES,
@@ -177,12 +177,20 @@ def _build_record(
             "the pinned generator renders America, England, France, and Italy only"
         )
 
-    # The pinned generator writes Python None as the literal ``None`` only for
-    # its type column; country-of-origin absence is serialized as an empty CSV
-    # field. Keep this source-specific convention out of optional normalization.
+    # The pinned source writes random recipe types as the literal string
+    # ``None``. Unlike origin, an empty type is not a documented absence.
     raw_source_type = row.get("type")
-    source_type = None if raw_source_type == "None" else _normalize_optional(raw_source_type)
-    generator_type = "random" if source_type in {None, "unspecified"} else source_type
+    named_generator_types = set(DEFAULT_PIZZA_TYPES) - {"random"}
+    if raw_source_type == "None":
+        source_type = None
+    elif isinstance(raw_source_type, str) and raw_source_type in named_generator_types:
+        source_type = raw_source_type
+    else:
+        raise ValueError(
+            f"sample {sample_id}: unsupported generator type {raw_source_type!r}; "
+            "expected a named Pizzaïolo type or the literal 'None' for random recipes"
+        )
+    generator_type = "random" if source_type is None else source_type
     raw_boxes_name = _source_relative_filename(row.get("boxes_name"), sample_id=sample_id, field="boxes_name")
     raw_contours_name = _source_relative_filename(row.get("contours_name"), sample_id=sample_id, field="contours_name")
     raw_segmentation_name = _source_relative_filename(row.get("segmentation_name"), sample_id=sample_id, field="segmentation_name")

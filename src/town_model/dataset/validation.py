@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import math
@@ -14,7 +15,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from ..config import DatasetConfig
+from ..config import DEFAULT_PIZZA_TYPES, DatasetConfig
 from .constants import (
     AUDIT_DIR,
     BASE_CATEGORIES,
@@ -415,8 +416,24 @@ def _validate_record(
     if audit.get("source_ref") != sample_id:
         _add_issue(errors, "sample_id_scheme", "sample_id must preserve the original generator ref", sample_id=sample_id, path=str(records_path), field="audit.raw_generator.source_ref")
     source_type = audit.get("source_type")
-    expected_generator_type = "random" if source_type in (None, "unspecified") else source_type
-    if audit.get("generator_type") != expected_generator_type or record.generator_type != expected_generator_type:
+    named_generator_types = set(DEFAULT_PIZZA_TYPES) - {"random"}
+    if source_type is None:
+        expected_generator_type = "random"
+    elif isinstance(source_type, str) and source_type in named_generator_types:
+        expected_generator_type = source_type
+    else:
+        expected_generator_type = None
+        _add_issue(
+            errors,
+            "generator_type_metadata",
+            "source_type must be a named pinned Pizzaïolo type or null after decoding the literal 'None' random encoding",
+            sample_id=sample_id,
+            path=str(records_path),
+            field="audit.raw_generator.source_type",
+        )
+    if expected_generator_type is not None and (
+        audit.get("generator_type") != expected_generator_type or record.generator_type != expected_generator_type
+    ):
         _add_issue(errors, "generator_type_metadata", "Sample generator_type does not match the recorded original type", sample_id=sample_id, path=str(records_path), field="generator_type")
     counts = audit.get("topping_counts", {})
     has_topping = audit.get("has_topping", [])
@@ -616,6 +633,30 @@ def _validate_record(
             _add_issue(errors, "segmentation_file", f"Cannot parse segmentation annotation: {error}", sample_id=sample_id, path=segmentation_relative, field="source_annotations.segmentation")
 
 
+def _load_raw_source_types(root: Path, errors: list[Diagnostic]) -> dict[str, str] | None:
+    """Read original CSV type cells so normalized audit values stay source-faithful."""
+
+    path = root / AUDIT_DIR / RAW_MASTER_FILENAME
+    try:
+        with path.open(encoding="utf-8", newline="") as file:
+            reader = csv.DictReader(file)
+            if not reader.fieldnames or not {"ref", "type"}.issubset(reader.fieldnames):
+                raise ValueError("raw generator CSV must contain ref and type columns")
+            values: dict[str, str] = {}
+            for line_number, row in enumerate(reader, start=2):
+                sample_id = row.get("ref")
+                source_type = row.get("type")
+                if not sample_id or source_type is None:
+                    raise ValueError(f"row {line_number} has an empty ref or missing type field")
+                if sample_id in values:
+                    raise ValueError(f"duplicate raw generator ref {sample_id!r}")
+                values[sample_id] = source_type
+            return values
+    except (OSError, csv.Error, ValueError) as error:
+        _add_issue(errors, "raw_master_source_type", f"Cannot read original generator type metadata: {error}", path=str(path))
+        return None
+
+
 def validate_dataset(
     dataset_path: Path,
     *,
@@ -673,6 +714,29 @@ def validate_dataset(
     except (OSError, ValueError) as error:
         _add_issue(errors, "samples_jsonl", str(error), path=str(records_path))
         records = []
+    raw_source_types = _load_raw_source_types(root, errors)
+    if raw_source_types is not None:
+        sample_ids_from_records = {record.sample_id for record in records}
+        if set(raw_source_types) != sample_ids_from_records:
+            _add_issue(
+                errors,
+                "raw_master_sample_ids",
+                "Original generator CSV refs do not match the prepared sample IDs",
+                path=str(root / AUDIT_DIR / RAW_MASTER_FILENAME),
+            )
+        for record in records:
+            raw_generator = record.audit.get("raw_generator")
+            source_type = raw_generator.get("source_type") if isinstance(raw_generator, dict) else object()
+            expected_cell = "None" if source_type is None else source_type
+            if not isinstance(expected_cell, str) or raw_source_types.get(record.sample_id) != expected_cell:
+                _add_issue(
+                    errors,
+                    "generator_type_source_metadata",
+                    "Stored generator source_type does not match the original CSV type cell",
+                    sample_id=record.sample_id,
+                    path=str(root / AUDIT_DIR / RAW_MASTER_FILENAME),
+                    field="type",
+                )
     if not records:
         _add_issue(errors, "empty_dataset", "Dataset must contain at least one sample", path=str(records_path))
 
@@ -761,6 +825,7 @@ def validate_dataset(
             } for issue in errors),
             "split_integrity": not any(issue.code.startswith("split_") or issue.code in {"split_overlap", "split_coverage", "split_reference"} for issue in errors),
             "semantic_targets": not any(issue.code in {"pizza_targets", "component_targets", "pizza_known_mask", "component_known_mask", "source_labels"} for issue in errors),
+            "generator_type_metadata": not any(issue.code in {"generator_type_metadata", "generator_type_source_metadata", "raw_master_source_type", "raw_master_sample_ids"} for issue in errors),
         }
     )
     report = ValidationReport(str(root), dataset_id, errors, warnings, statistics, checks)

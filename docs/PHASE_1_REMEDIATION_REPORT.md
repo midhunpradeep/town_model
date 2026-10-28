@@ -1,15 +1,18 @@
 # Phase 1 remediation report
 
-**Status:** Remediation implemented and staged for handoff. Phase 1 is **not approved**; this report makes no approval recommendation.
+**Status:** First remediation implemented, committed, and independently reviewed. Phase 1 is **not approved**; this report makes no approval recommendation.
 
 **Repository:** <https://github.com/midhunpradeep/town_model>
 
 **Working branch:** `remediation/phase-1-findings`
 
-**Base commit:** `e6f4050800e32b4c6d85b076b5a406a60f39398` (published `main` at start; includes the independent review)
+**Original implementation baseline:** `220318f914668cba914b504596dda49a298e006f`
+**First-remediation base:** `e6f4050800e32b4c6d85b076b5a406a60f39398`
+**First remediation commit:** `54a16c57280afed6accaf3837a7db8d112b0cd1b` (`fix: remediate Phase 1 validation and provenance findings`)
+**Independent review commit:** `a82b96cb89a2f6a4788c5d534182d72f42044baf` (`docs: add independent Phase 1 remediation review`)
+**Second-remediation implementation base:** `a82b96cb89a2f6a4788c5d534182d72f42044baf`. Its implementation commit does not yet exist because the handoff explicitly requests staging without committing; the author will create that commit after review.
 
-**Implementation baseline:** `220318f914668cba914b504596dda49a298e006f`
-**Remediation commit:** Not created, per the explicit handoff instruction to stage changes and not commit. A remediation SHA will exist only after the user commits.
+The original preparation-time SHA `99956608ac88fd5ab3011d28d57937c7b5e32983` remains a historical, unreachable identifier. The recorded reachable source-equivalent reference is `220318f914668cba914b504596dda49a298e006f`; it is not represented as the actual runtime revision.
 
 ## Executive summary
 
@@ -125,4 +128,4 @@ No 4,800-image run, training experiment, or manual graphical-browser session was
 - The historical execution commit `999566…` itself remains unreachable. The alternate provenance is a verified source-equivalent reference and does not prove the exact runtime checkout beyond the identical source trees.
 - No later-phase functionality was added. Phase 1 remains pending independent review; this report does not declare it approved.
 
-**Suggested commit message:** `fix: remediate Phase 1 validation and provenance findings`
+**First-remediation commit message (verifiable from Git):** `fix: remediate Phase 1 validation and provenance findings`.

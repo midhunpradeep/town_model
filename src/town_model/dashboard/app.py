@@ -10,7 +10,12 @@ from typing import Any
 import pandas as pd
 from PIL import Image, ImageDraw
 
-from town_model.application import validate_dataset_operation, validate_generation_request
+from town_model.application import (
+    DatasetSnapshotChangedError,
+    load_verified_sample_image,
+    validate_dataset_operation,
+    validate_generation_request,
+)
 from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
@@ -120,15 +125,11 @@ def _render_overview(st, dataset_path: Path) -> None:
 
     with st.expander("Provenance and resolved configuration"):
         st.json({"source": summary.provenance, "ontology": summary.ontology, "vocabularies": summary.vocabularies})
-        manifest_path = summary.path / "manifest.json"
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            if not verified and isinstance(manifest, dict):
-                manifest.pop("statistics", None)
-                st.caption("Manifest statistics are historical and withheld because current integrity did not pass.")
-            st.json(manifest)
-        except (OSError, json.JSONDecodeError) as error:
-            st.error(f"Could not read manifest: {error}")
+        manifest = dict(explorer.manifest)
+        if not verified:
+            manifest.pop("statistics", None)
+            st.caption("Manifest statistics are historical and withheld because current integrity did not pass.")
+        st.json(manifest)
     if summary.validation and summary.integrity_status == "current_pass":
         for issue in summary.validation.get("warnings", [])[:40]:
             st.warning(issue["message"])
@@ -184,13 +185,12 @@ def _render_explorer(st, dataset_path: Path) -> None:
     show_boxes = st.checkbox("Show ground-truth bounding boxes", value=True)
 
     try:
-        with Image.open(explorer.summary.path / record.image_path) as image:
-            image = image.convert("RGB")
-            if show_boxes:
-                image = _draw_annotations(image, record.components, selected_component.component_id if selected_component else None)
-            st.image(image, caption=f"{record.sample_id} · split={record.split} · type={record.generator_type}", width="stretch")
-    except OSError as error:
-        st.error(f"Could not open image for sample {record.sample_id}: {error}")
+        image = load_verified_sample_image(explorer, record)
+        if show_boxes:
+            image = _draw_annotations(image, record.components, selected_component.component_id if selected_component else None)
+        st.image(image, caption=f"{record.sample_id} · split={record.split} · type={record.generator_type}", width="stretch")
+    except (OSError, DatasetSnapshotChangedError) as error:
+        st.error(f"Could not open a consistent validated image for sample {record.sample_id}: {error}")
         return
 
     st.markdown("#### Whole-pizza ontology labels")
