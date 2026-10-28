@@ -108,7 +108,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "inspect":
             summary = inspect_dataset(args.dataset)
             print(json.dumps(summary.to_dict(), indent=2, sort_keys=True))
-            return 0
+            return 0 if summary.integrity_status == "current_pass" else 1
         if args.command == "dashboard":
             app_path = files("town_model.dashboard").joinpath("app.py")
             command = [

@@ -16,8 +16,11 @@ class DashboardLoadResult:
 
 
 def load_dashboard_data(path: Path | str) -> DashboardLoadResult:
+    candidate = Path(path)
+    if not candidate.is_dir():
+        return DashboardLoadResult(None, f"Could not load dataset at {path}: dataset directory does not exist")
     try:
-        return DashboardLoadResult(load_explorer(Path(path)), None)
+        return DashboardLoadResult(load_explorer(candidate), None)
     except (OSError, ValueError, KeyError, TypeError) as error:
         return DashboardLoadResult(None, f"Could not load dataset at {path}: {error}")
 

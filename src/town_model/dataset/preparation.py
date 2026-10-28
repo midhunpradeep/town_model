@@ -92,12 +92,13 @@ def _git_provenance(project_root: Path) -> tuple[str, bool]:
 
 
 def _normalize_optional(value: Any) -> str | None:
-    if value is None:
+    """Normalize only a genuinely absent CSV field; never treat text tokens as null."""
+
+    if value is None or value == "":
         return None
-    text = str(value).strip()
-    if text in {"", "None", "none", "nan", "NaN"}:
-        return None
-    return text
+    if not isinstance(value, str):
+        raise ValueError(f"Optional generator metadata must be text or blank, got {value!r}")
+    return value
 
 
 def _read_topping_list(value: Any, *, sample_id: str) -> list[str]:
@@ -176,7 +177,11 @@ def _build_record(
             "the pinned generator renders America, England, France, and Italy only"
         )
 
-    source_type = _normalize_optional(row.get("type"))
+    # The pinned generator writes Python None as the literal ``None`` only for
+    # its type column; country-of-origin absence is serialized as an empty CSV
+    # field. Keep this source-specific convention out of optional normalization.
+    raw_source_type = row.get("type")
+    source_type = None if raw_source_type == "None" else _normalize_optional(raw_source_type)
     generator_type = "random" if source_type in {None, "unspecified"} else source_type
     raw_boxes_name = _source_relative_filename(row.get("boxes_name"), sample_id=sample_id, field="boxes_name")
     raw_contours_name = _source_relative_filename(row.get("contours_name"), sample_id=sample_id, field="contours_name")

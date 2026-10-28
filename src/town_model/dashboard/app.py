@@ -52,21 +52,30 @@ def _render_overview(st, dataset_path: Path) -> None:
     explorer = loaded.explorer
     summary = explorer.summary
     st.subheader("Dataset overview")
+    verified = summary.integrity_status == "current_pass"
     columns = st.columns(4)
-    columns[0].metric("Samples", summary.sample_count)
-    columns[1].metric("Train", summary.split_sizes.get("train", 0))
-    columns[2].metric("Validation", summary.split_sizes.get("validation", 0))
-    columns[3].metric("Test", summary.split_sizes.get("test", 0))
+    columns[0].metric("Samples", summary.sample_count if verified else "unverified")
+    columns[1].metric("Train", summary.split_sizes.get("train", 0) if verified else "unverified")
+    columns[2].metric("Validation", summary.split_sizes.get("validation", 0) if verified else "unverified")
+    columns[3].metric("Test", summary.split_sizes.get("test", 0) if verified else "unverified")
     st.caption(f"Dataset `{summary.dataset_id}` · schema `{summary.schema_version}` · ontology SHA-256 `{summary.ontology.get('sha256', 'unknown')}`")
 
-    if summary.validation is None:
-        st.warning("No saved validation report is available. Run the independent integrity gate below.")
+    if summary.integrity_status == "current_pass":
+        validation = summary.validation or {}
+        st.success(
+            f"Current integrity validation: PASS · "
+            f"{validation.get('error_count', 0)} errors · {validation.get('warning_count', 0)} warnings"
+        )
+    elif summary.integrity_status == "current_fail":
+        st.error("Current integrity validation: FAIL. Historical manifest statistics are withheld.")
+        for issue in (summary.validation or {}).get("errors", [])[:30]:
+            st.error(f"{issue['code']}: {issue['message']}" + (f" · {issue['path']}" if issue.get("path") else ""))
     else:
-        status = summary.validation.get("valid", False)
-        (st.success if status else st.error)(
-            f"Latest validation: {'PASS' if status else 'FAIL'} · "
-            f"{summary.validation.get('error_count', 0)} errors · "
-            f"{summary.validation.get('warning_count', 0)} warnings"
+        st.error(f"Current integrity validation is UNAVAILABLE: {summary.validation_error or 'no report was produced'}")
+    if summary.saved_validation is not None:
+        saved_status = "PASS" if summary.saved_validation.get("valid") else "FAIL"
+        st.caption(
+            f"Saved validation report (historical only; not evidence about current files): {saved_status}"
         )
     if st.button("Run dataset integrity validation", key="overview_validate"):
         with st.spinner("Checking ontology, assets, annotations, targets, and splits…"):
@@ -82,40 +91,45 @@ def _render_overview(st, dataset_path: Path) -> None:
             st.warning(issue.message)
         st.rerun()
 
-    st.markdown("#### Generator-type distribution")
-    st.bar_chart(pd.Series(summary.generator_type_counts, name="samples").sort_index())
-    st.markdown("#### Per-class supervision support")
-    split = st.selectbox("Split", ("train", "validation", "test"), key="support_split")
-    level = st.radio("Supervision level", ("pizza", "component"), horizontal=True, key="support_level")
-    rows = summary.class_support_by_split.get(split, {}).get("classes", [])
-    support_rows = [
-        {
-            "class_id": item["class_id"],
-            "class": item["name"],
-            "status": "fixed positive" if item["fixed_positive"] else "trainable" if item["trainable"] else "unsupported",
-            "positive": item[level]["positive"],
-            "known negative": item[level]["known_negative"],
-            "unknown": item[level]["unknown"],
-        }
-        for item in rows
-    ]
-    if support_rows:
-        frame = pd.DataFrame(support_rows)
-        st.dataframe(frame, hide_index=True, width="stretch")
-        no_positive = frame[(frame["status"] == "trainable") & (frame["positive"] == 0)]
-        if not no_positive.empty:
-            st.warning("Trainable classes with no positive support at this level/split: " + ", ".join(no_positive["class"].tolist()))
+    if verified:
+        st.markdown("#### Generator-type distribution")
+        st.bar_chart(pd.Series(summary.generator_type_counts, name="samples").sort_index())
+        st.markdown("#### Per-class supervision support")
+        split = st.selectbox("Split", ("train", "validation", "test"), key="support_split")
+        level = st.radio("Supervision level", ("pizza", "component"), horizontal=True, key="support_level")
+        rows = summary.class_support_by_split.get(split, {}).get("classes", [])
+        support_rows = [
+            {
+                "class_id": item["class_id"],
+                "class": item["name"],
+                "status": "fixed positive" if item["fixed_positive"] else "trainable" if item["trainable"] else "unsupported",
+                "positive": item[level]["positive"],
+                "known negative": item[level]["known_negative"],
+                "unknown": item[level]["unknown"],
+            }
+            for item in rows
+        ]
+        if support_rows:
+            frame = pd.DataFrame(support_rows)
+            st.dataframe(frame, hide_index=True, width="stretch")
+            no_positive = frame[(frame["status"] == "trainable") & (frame["positive"] == 0)]
+            if not no_positive.empty:
+                st.warning("Trainable classes with no positive support at this level/split: " + ", ".join(no_positive["class"].tolist()))
+    else:
+        st.warning("Support counts and sample totals are withheld until current artifacts pass validation.")
 
     with st.expander("Provenance and resolved configuration"):
         st.json({"source": summary.provenance, "ontology": summary.ontology, "vocabularies": summary.vocabularies})
         manifest_path = summary.path / "manifest.json"
         try:
-            st.json(json.loads(manifest_path.read_text(encoding="utf-8")))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if not verified and isinstance(manifest, dict):
+                manifest.pop("statistics", None)
+                st.caption("Manifest statistics are historical and withheld because current integrity did not pass.")
+            st.json(manifest)
         except (OSError, json.JSONDecodeError) as error:
             st.error(f"Could not read manifest: {error}")
-    if summary.validation:
-        for issue in summary.validation.get("errors", []):
-            st.error(f"{issue['code']}: {issue['message']}")
+    if summary.validation and summary.integrity_status == "current_pass":
         for issue in summary.validation.get("warnings", [])[:40]:
             st.warning(issue["message"])
 
@@ -130,6 +144,14 @@ def _render_explorer(st, dataset_path: Path) -> None:
         return
     explorer = loaded.explorer
     st.subheader("Image and annotation explorer")
+    if explorer.summary.integrity_status != "current_pass":
+        st.error("Explorer disabled: current dataset integrity has not passed validation.")
+        if explorer.summary.integrity_status == "current_fail":
+            for issue in (explorer.summary.validation or {}).get("errors", [])[:30]:
+                st.error(f"{issue['code']}: {issue['message']}" + (f" · {issue['path']}" if issue.get("path") else ""))
+        elif explorer.summary.validation_error:
+            st.error(explorer.summary.validation_error)
+        return
     include_test = st.checkbox("Include test split for explicit final inspection", value=False)
     splits = ("train", "validation", "test") if include_test else ("train", "validation")
     split = st.selectbox("Split", splits)

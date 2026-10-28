@@ -1,7 +1,7 @@
 """Stable Phase 1 schema identifiers and supported generator vocabulary."""
 
 SCHEMA_VERSION = "1.0.0"
-VALIDATOR_VERSION = "1.0.0"
+VALIDATOR_VERSION = "1.1.0"
 GENERATOR_REPOSITORY = "https://github.com/SysReIC/pizzaiolo.git"
 GENERATOR_COMMIT = "6c0bcb221a957c184012beaf103bebcde4b1f793"
 GENERATOR_LICENSE = "CC BY-NC 4.0"

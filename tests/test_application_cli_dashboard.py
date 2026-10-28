@@ -10,6 +10,8 @@ from town_model.dashboard.data import find_sample, load_dashboard_data
 
 def test_cli_and_dashboard_use_the_same_dataset_service(prepared_dataset: Path, capsys) -> None:
     service_summary = inspect_dataset(prepared_dataset).to_dict()
+    assert service_summary["integrity_status"] == "current_pass"
+    assert service_summary["sample_count"] == 6
     assert main(["inspect", str(prepared_dataset)]) == 0
     cli_summary = json.loads(capsys.readouterr().out)
     assert cli_summary == service_summary
@@ -85,6 +87,84 @@ def test_dashboard_background_generation_reports_progress_and_errors(tmp_path: P
         assert "generator error fixture" in str(error)
     else:
         raise AssertionError("background generation failure was swallowed")
+
+
+def test_inspection_and_dashboard_do_not_trust_saved_validation_after_sample_mutation(
+    prepared_dataset: Path, capsys
+) -> None:
+    manifest_before = (prepared_dataset / "manifest.json").read_bytes()
+    saved_report_before = (prepared_dataset / "reports" / "validation.json").read_bytes()
+    samples_path = prepared_dataset / "samples.jsonl"
+    records = [json.loads(line) for line in samples_path.read_text(encoding="utf-8").splitlines()]
+    records[0]["pizza"]["ontology_targets"][0] = 1 - records[0]["pizza"]["ontology_targets"][0]
+    samples_path.write_text(
+        "".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records),
+        encoding="utf-8",
+    )
+
+    explicit_report = validate_dataset_operation(prepared_dataset, write_report=False)
+    assert not explicit_report.valid
+    assert any(issue.code in {"asset_checksum", "pizza_targets", "statistics_mismatch"} for issue in explicit_report.errors)
+
+    summary = inspect_dataset(prepared_dataset)
+    assert summary.integrity_status == "current_fail"
+    assert summary.validation is not None and summary.validation["valid"] is False
+    assert summary.validation["errors"]
+    assert summary.validation["validator_version"] == "1.1.0"
+    assert summary.saved_validation is not None and summary.saved_validation["valid"] is True
+    assert summary.to_dict()["validation_scope"] == "current_artifact_state"
+    assert summary.to_dict()["saved_validation_scope"] == "historical_only"
+    assert summary.class_support_by_split == {}
+    assert summary.sample_count is None
+    assert (prepared_dataset / "manifest.json").read_bytes() == manifest_before
+    assert (prepared_dataset / "reports" / "validation.json").read_bytes() == saved_report_before
+
+    assert main(["inspect", str(prepared_dataset), "--json"]) == 1
+    cli_summary = json.loads(capsys.readouterr().out)
+    assert cli_summary["integrity_status"] == "current_fail"
+    assert cli_summary["class_support_by_split"] == {}
+    assert cli_summary["saved_validation"]["valid"] is True
+    assert cli_summary["saved_validation_scope"] == "historical_only"
+    assert cli_summary["validation"]["valid"] is False
+    assert cli_summary["validation_scope"] == "current_artifact_state"
+
+    loaded = load_dashboard_data(prepared_dataset)
+    assert loaded.error is None
+    assert loaded.explorer is not None
+    assert loaded.explorer.summary.integrity_status == "current_fail"
+    assert loaded.explorer.records == ()
+
+
+def test_inspection_reuses_validation_only_while_declared_file_state_is_unchanged(
+    prepared_dataset: Path, monkeypatch
+) -> None:
+    import town_model.application as application
+
+    original = application.validate_dataset
+    calls = 0
+
+    def count_validation(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(application, "validate_dataset", count_validation)
+    assert inspect_dataset(prepared_dataset).integrity_status == "current_pass"
+    assert inspect_dataset(prepared_dataset).integrity_status == "current_pass"
+    assert calls == 1
+
+    samples_path = prepared_dataset / "samples.jsonl"
+    samples_path.write_text(samples_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    assert inspect_dataset(prepared_dataset).integrity_status == "current_fail"
+    assert calls == 2
+
+
+def test_inspection_distinguishes_current_and_saved_example_validation() -> None:
+    example = Path(__file__).parents[1] / "examples" / "pizza-48"
+    summary = inspect_dataset(example)
+    assert summary.integrity_status == "current_pass"
+    assert summary.validation is not None and summary.validation["validator_version"] == "1.1.0"
+    assert summary.saved_validation is not None and summary.saved_validation["validator_version"] == "1.0.0"
 
 
 def test_dashboard_inspection_is_framework_independent(prepared_dataset: Path) -> None:

@@ -4,7 +4,9 @@
 
 **Recorded:** 2026-10-28
 
-**Implementation commit:** `99956608ac88fd5ab3011d28d57937c7b5e32983`
+**Preparation-time HEAD recorded by the original build:** `99956608ac88fd5ab3011d28d57937c7b5e32983` (historical identifier; not reachable from published refs).
+
+**Fetchable code-equivalent reference:** [`220318f914668cba914b504596dda49a298e006f`](https://github.com/midhunpradeep/town_model/tree/220318f914668cba914b504596dda49a298e006f). The original runtime identifier is preserved in the example manifest. Git object inspection verified identical `src/`, `tests/`, `pyproject.toml`, and `README.md` trees at the historical identifier and this reachable revision; the latter identifies the preparation code without claiming it was the runtime HEAD.
 
 **Example dataset:** `examples/pizza-48/` (`pizza-dcc148789aecf8af86a3`)
 
@@ -17,6 +19,8 @@ The dashboard includes dataset overview/provenance/support, image and annotation
 No detector, embeddings, geometry, loss, training, evaluation, or experiment-comparison functionality was implemented. The provided implementation specification is committed unchanged as `pizzaiolo_thesis_implementation_spec_v1_1_expanded.md` for traceability.
 
 ## Data and provenance decisions
+
+The example was not regenerated to address provenance. Its manifest retains the original preparation-time commit record and adds the published source-equivalent revision and source tree hash. This is a traceable code reference, not a claim that the reachable commit was checked out at generation time. The remediation report records verification from a fresh clone.
 
 - The example contains 48 generated images: three each for 15 named Pizzaïolo types and `random`; the saved split sizes are 16 train, 16 validation, and 16 test.
 - The pinned ontology snapshot is SHA-256 `e349737f26aebd5b41c228043cdd35991775ecbacbc68a8f543c76466fe97253`. Its 66 OWL classes remain distinct from country individuals. The detector vocabulary has 22 foreground identities; ontology targets have 60 trainable classes, one fixed-positive class, and five unsupported classes with unknown masks.

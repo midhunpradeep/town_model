@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,7 +10,7 @@ import pytest
 from town_model.dataset.constants import FIXED_POSITIVE_CLASS, UNSUPPORTED_CLASS_NAMES
 from town_model.dataset.ontology import build_class_vocabulary
 from town_model.dataset.schema import load_records, write_records
-from town_model.dataset.validation import validate_dataset
+from town_model.dataset.validation import canonical_json_bytes, sha256_file, validate_dataset
 from town_model.dataset.preparation import prepare_dataset
 from town_model.config import DatasetConfig
 from conftest import fake_generate_raw_dataset
@@ -24,6 +26,24 @@ def _rewrite_record(dataset: Path, sample_index: int, change) -> None:
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     change(records[sample_index])
     path.write_text("".join(json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n" for item in records), encoding="utf-8")
+
+
+def _refresh_manifest_asset(dataset: Path, relative_path: str) -> None:
+    path = dataset / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["asset_checksums"][relative_path] = sha256_file(dataset / relative_path)
+    identity = {
+        "schema_version": manifest["schema_version"],
+        "resolved_config": manifest["resolved_config"],
+        "generator_commit": manifest["source"]["generator_commit"],
+        "ontology_sha256": manifest["ontology"]["sha256"],
+        "asset_checksums": manifest["asset_checksums"],
+    }
+    manifest["dataset_id"] = "pizza-" + hashlib.sha256(canonical_json_bytes(identity)).hexdigest()[:20]
+    manifest["manifest_id"] = hashlib.sha256(
+        canonical_json_bytes({key: value for key, value in manifest.items() if key != "manifest_id"})
+    ).hexdigest()
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def test_framework_neutral_jsonl_roundtrip_and_stable_ids(prepared_dataset: Path, tmp_path: Path) -> None:
@@ -59,10 +79,81 @@ def test_positive_negative_unknown_masks_and_flag_semantics(prepared_dataset: Pa
     assert not any(item.detector_category in {"America", "England", "France", "Italy"} for item in no_origin.components)
 
     flagged = next(record for record in records if record.audit["raw_generator"]["country_of_origin"] == "America")
+    real_america = _class_index("RealAmericanPizza")
+    assert flagged.pizza_targets[real_america] == flagged.pizza_known_mask[real_america] == 1
     flag = next(item for item in flagged.components if item.detector_category == "America")
     country = _class_index("Country")
     assert flag.ontology_targets[country] == flag.ontology_known_mask[country] == 1
     assert "America" not in {item["name"] for item in build_class_vocabulary()["classes"]}
+
+
+@pytest.mark.parametrize("origin", ["NaN", "nan", "None", "none", "Germany", " "])
+def test_malformed_or_unsupported_origin_values_fail_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, small_config: DatasetConfig, origin: str
+) -> None:
+    from town_model.dataset import preparation
+
+    def generate_with_origin(dataset_dir, config, *, project_root, source_repo=None, progress=None):
+        result = fake_generate_raw_dataset(
+            dataset_dir, config, project_root=project_root, source_repo=source_repo, progress=progress
+        )
+        source_csv = dataset_dir / "csv" / "pizzaiolo_dataset.csv"
+        with source_csv.open(encoding="utf-8", newline="") as file:
+            rows = list(csv.DictReader(file))
+            fieldnames = list(rows[0])
+        random_row = next(row for row in rows if row["type"] == "None")
+        random_row["hasCountryOfOrigin"] = origin
+        with source_csv.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        return result
+
+    monkeypatch.setattr(preparation, "generate_raw_dataset", generate_with_origin)
+    with pytest.raises(ValueError, match="unsupported country flag/origin"):
+        prepare_dataset(small_config, tmp_path / "invalid-origin", project_root=tmp_path)
+
+
+def test_blank_origin_remains_a_known_negative_and_random_generator_type_is_preserved(prepared_dataset: Path) -> None:
+    records = load_records(prepared_dataset / "samples.jsonl")
+    random_record = next(record for record in records if record.generator_type == "random")
+    assert random_record.audit["raw_generator"]["source_type"] is None
+    assert random_record.audit["raw_generator"]["country_of_origin"] is None
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert report.valid
+    real_america = _class_index("RealAmericanPizza")
+    assert random_record.pizza_targets[real_america] == 0
+    assert random_record.pizza_known_mask[real_america] == 1
+
+
+@pytest.mark.parametrize("origin", ["NaN", "nan", "None", "none", "Germany", " "])
+def test_validator_rejects_nonblank_origin_sentinels(prepared_dataset: Path, origin: str) -> None:
+    random_index = next(
+        index for index, line in enumerate((prepared_dataset / "samples.jsonl").read_text().splitlines())
+        if json.loads(line)["generator_type"] == "random"
+    )
+
+    def change(record: dict) -> None:
+        record["audit"]["raw_generator"]["country_of_origin"] = origin
+
+    _rewrite_record(prepared_dataset, random_index, change)
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "unsupported_origin" and item.sample_id for item in report.errors)
+
+
+def test_blank_origin_with_a_rendered_flag_fails_semantic_validation(prepared_dataset: Path) -> None:
+    america_index = next(
+        index for index, line in enumerate((prepared_dataset / "samples.jsonl").read_text().splitlines())
+        if json.loads(line)["audit"]["raw_generator"]["country_of_origin"] == "America"
+    )
+
+    def change(record: dict) -> None:
+        record["audit"]["raw_generator"]["country_of_origin"] = None
+
+    _rewrite_record(prepared_dataset, america_index, change)
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "missing_origin_flag" and item.sample_id for item in report.errors)
+    assert any(item.code == "component_category_metadata" and item.sample_id for item in report.errors)
 
 
 def test_component_target_self_class_and_corrected_ancestors(prepared_dataset: Path) -> None:
@@ -120,6 +211,101 @@ def test_prepared_dataset_is_non_overwriting_and_has_original_source_audit(prepa
     manifest = json.loads((prepared_dataset / "manifest.json").read_text())
     assert manifest["source"]["generator_commit"] == "6c0bcb221a957c184012beaf103bebcde4b1f793"
     assert manifest["ontology"]["class_count"] == 66
+
+
+def test_contour_occurrence_count_must_cover_each_source_box(prepared_dataset: Path) -> None:
+    relative = "labels/img_00000_contours.json"
+    path = prepared_dataset / relative
+    contours = json.loads(path.read_text(encoding="utf-8"))
+    category = next(iter(contours))
+    contours[category] = []
+    path.write_text(json.dumps(contours), encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "contour_occurrence_count" and item.path == relative for item in report.errors)
+
+
+def test_empty_contour_document_fails_even_with_coherent_manifest_hashes(prepared_dataset: Path) -> None:
+    relative = "labels/img_00000_contours.json"
+    (prepared_dataset / relative).write_text("{}\n", encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert not report.valid
+    assert any(item.code == "contour_category_mismatch" and item.path == relative for item in report.errors)
+
+
+def test_contour_points_require_pinned_shape_and_in_bounds_coordinates(prepared_dataset: Path) -> None:
+    relative = "labels/img_00000_contours.json"
+    path = prepared_dataset / relative
+    contours = json.loads(path.read_text(encoding="utf-8"))
+    category = next(iter(contours))
+    contours[category][0] = [[[224, 10]], [[223, 10]]]
+    path.write_text(json.dumps(contours), encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "contour_coordinate_bounds" and item.path == relative for item in report.errors)
+
+
+def test_contour_point_shape_is_validated(prepared_dataset: Path) -> None:
+    relative = "labels/img_00000_contours.json"
+    path = prepared_dataset / relative
+    contours = json.loads(path.read_text(encoding="utf-8"))
+    category = next(iter(contours))
+    contours[category][0][0] = [1, 2]
+    path.write_text(json.dumps(contours), encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "contour_structure" and item.path == relative for item in report.errors)
+
+
+def test_segmentation_categories_must_exist_in_sample_annotations(prepared_dataset: Path) -> None:
+    relative = "labels/img_00000_segmentation.txt"
+    concepts = json.loads((prepared_dataset / "labels" / "concepts.json").read_text(encoding="utf-8"))
+    boxes = json.loads((prepared_dataset / "labels" / "img_00000_bboxes.json").read_text(encoding="utf-8"))
+    unexpected_id = next(
+        int(concept_id) for concept_id, name in concepts.items()
+        if name != "None" and name not in boxes
+    )
+    path = prepared_dataset / relative
+    lines = path.read_text(encoding="utf-8").splitlines()
+    values = lines[0].split()
+    values[0] = str(unexpected_id)
+    lines[0] = " ".join(values)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "segmentation_category_mismatch" and item.path == relative for item in report.errors)
+
+
+def test_segmentation_dimensions_and_category_ids_are_validated(prepared_dataset: Path) -> None:
+    relative = "labels/img_00000_segmentation.txt"
+    path = prepared_dataset / relative
+    lines = path.read_text(encoding="utf-8").splitlines()
+    values = lines[0].split()
+    values[0] = "999"
+    lines[0] = " ".join(values)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "segmentation_category_id" and item.path == relative for item in report.errors)
+
+    lines = path.read_text(encoding="utf-8").splitlines()[:-1]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _refresh_manifest_asset(prepared_dataset, relative)
+    report = validate_dataset(prepared_dataset, write_report=False)
+    assert any(item.code == "segmentation_dimensions" and item.path == relative for item in report.errors)
+
+
+def test_pinned_generator_example_annotations_are_accepted() -> None:
+    example = Path(__file__).parents[1] / "examples" / "pizza-48"
+    report = validate_dataset(example, write_report=False)
+    assert report.valid, [item.to_dict() for item in report.errors]
 
 
 def test_has_topping_set_must_agree_with_positive_counts(prepared_dataset: Path) -> None:

@@ -14,6 +14,14 @@ from town_model.dataset.constants import TOPPING_COLUMNS
 from town_model.dataset.ontology import ASSET_ONTOLOGY_PATH
 from town_model.dataset.preparation import prepare_dataset
 
+_PINNED_CONCEPT_NAMES = (
+    "None", "DeepPanBase", "ThinAndCrispyBase", "ParmesanTopping", "SlicedTomatoTopping",
+    "GreenPepperTopping", "OnionTopping", "PeperoniSausageTopping", "HamTopping",
+    "PeperonataTopping", "RocketTopping", "SpinachTopping", "JalapenoPepperTopping",
+    "AnchovyTopping", "MushroomTopping", "PrawnTopping", "OliveTopping", "SultanaTopping",
+    "GarlicTopping", "America", "England", "France", "Italy",
+)
+
 
 def fake_generate_raw_dataset(
     dataset_dir: Path,
@@ -56,19 +64,22 @@ def fake_generate_raw_dataset(
             counts_by_topping.update(selected_counts)
             has_topping = [name for name in TOPPING_COLUMNS if counts_by_topping[name] > 0]
             boxes: dict[str, list[list[int]]] = {}
-            contours: dict[str, list[list[list[int]]]] = {}
+            contours: dict[str, list[list[list[list[int]]]]] = {}
             for category in has_topping:
                 quantity = counts_by_topping[category]
                 boxes[category] = [
                     [12 + occurrence * 22, 18 + local_index * 4, 16, 14]
                     for occurrence in range(quantity)
                 ]
-                contours[category] = [[] for _ in range(quantity)]
+                contours[category] = [
+                    [[[20 + occurrence, 20]], [[21 + occurrence, 20]], [[21 + occurrence, 21]], [[20 + occurrence, 21]]]
+                    for occurrence in range(quantity)
+                ]
             boxes[base] = [[1, 1, 222, 222]]
-            contours[base] = [[]]
+            contours[base] = [[[[1, 1]], [[2, 1]], [[2, 2]], [[1, 2]]]]
             if origin:
                 boxes[origin] = [[180, 12, 30, 24]]
-                contours[origin] = [[]]
+                contours[origin] = [[[[180, 12]], [[181, 12]], [[181, 13]], [[180, 13]]]]
 
             with Image.new("RGB", (224, 224), (242, 226, 190)) as image:
                 draw = ImageDraw.Draw(image)
@@ -79,7 +90,13 @@ def fake_generate_raw_dataset(
             segmentation_name = f"{sample_id}_segmentation.txt"
             (dataset_dir / "labels" / boxes_name).write_text(json.dumps(boxes, indent=2), encoding="utf-8")
             (dataset_dir / "labels" / contours_name).write_text(json.dumps(contours, indent=2), encoding="utf-8")
-            (dataset_dir / "labels" / segmentation_name).write_text("0\n", encoding="utf-8")
+            concept_ids = {name: index for index, name in enumerate(_PINNED_CONCEPT_NAMES)}
+            segmentation = [[0] * 224 for _ in range(224)]
+            for index, category in enumerate(boxes):
+                segmentation[0][index] = concept_ids[category]
+            (dataset_dir / "labels" / segmentation_name).write_text(
+                "".join(" ".join(map(str, row)) + "\n" for row in segmentation), encoding="utf-8"
+            )
 
             row = {
                 "ref": sample_id,
@@ -103,7 +120,10 @@ def fake_generate_raw_dataset(
         writer = csv.DictWriter(file, fieldnames=columns)
         writer.writeheader()
         writer.writerows(rows)
-    (dataset_dir / "labels" / "concepts.json").write_text("{}\n", encoding="utf-8")
+    (dataset_dir / "labels" / "concepts.json").write_text(
+        json.dumps({str(index): name for index, name in enumerate(_PINNED_CONCEPT_NAMES)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return {name: count for name, count in counts.items() if count}
 
 

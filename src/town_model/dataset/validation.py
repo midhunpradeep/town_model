@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import numpy as np
 from PIL import Image
 
 from ..config import DatasetConfig
@@ -279,6 +280,36 @@ def _validate_vocabulary(
         return None, None, None
 
 
+def _validate_concept_vocabulary(root: Path, errors: list[Diagnostic]) -> dict[int, str] | None:
+    """Load the pinned generator's segmentation-ID map (0 means background)."""
+
+    path = root / LABEL_DIR / "concepts.json"
+    try:
+        payload = _read_json(path)
+        concepts: dict[int, str] = {}
+        for raw_id, name in payload.items():
+            if not isinstance(raw_id, str) or not re.fullmatch(r"0|[1-9][0-9]*", raw_id):
+                raise ValueError(f"Concept ID {raw_id!r} is not a canonical nonnegative integer string")
+            if not isinstance(name, str):
+                raise ValueError(f"Concept {raw_id!r} must map to a string name")
+            concept_id = int(raw_id)
+            if concept_id in concepts:
+                raise ValueError(f"Duplicate concept ID {concept_id}")
+            concepts[concept_id] = name
+        expected_names = {"None", *DETECTOR_CATEGORIES}
+        if concepts.get(0) != "None" or set(concepts.values()) != expected_names:
+            raise ValueError(
+                "Pinned concepts.json must map background ID 0 to 'None' and contain exactly "
+                "the 22 supported detector identities"
+            )
+        if len(set(concepts.values())) != len(concepts):
+            raise ValueError("Concept names must map to unique segmentation IDs")
+        return concepts
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        _add_issue(errors, "concept_vocabulary", f"Cannot validate generator concepts.json: {error}", path=str(path))
+        return None
+
+
 def _validate_assets(root: Path, manifest: dict[str, Any], errors: list[Diagnostic]) -> None:
     checksums = manifest.get("asset_checksums")
     if not isinstance(checksums, dict):
@@ -305,6 +336,7 @@ def _validate_record(
     categories: list[dict[str, Any]],
     sample_ids: set[str],
     component_ids: set[str],
+    segmentation_concepts: dict[int, str] | None,
     errors: list[Diagnostic],
 ) -> None:
     sample_id = record.sample_id
@@ -488,11 +520,18 @@ def _validate_record(
     boxes_relative = record.source_annotations.get("boxes")
     contours_relative = record.source_annotations.get("contours")
     segmentation_relative = record.source_annotations.get("segmentation")
+    source_box_counts = {category: len(components) for category, components in by_category.items()}
+    raw_boxes: dict[str, Any] = {}
     if boxes_relative:
         try:
             box_file = _safe_asset_path(root, boxes_relative)
             if box_file.is_file():
                 raw_boxes = _read_json(box_file)
+                source_box_counts = {
+                    category: len(boxes)
+                    for category, boxes in raw_boxes.items()
+                    if isinstance(category, str) and isinstance(boxes, list)
+                }
                 if set(raw_boxes) - set(DETECTOR_CATEGORIES):
                     _add_issue(errors, "unsupported_annotation_category", f"Bounding-box file contains unsupported categories {sorted(set(raw_boxes) - set(DETECTOR_CATEGORIES))}", sample_id=sample_id, path=boxes_relative, field="categories")
                 for category, components in by_category.items():
@@ -510,18 +549,71 @@ def _validate_record(
             contours_path = _safe_asset_path(root, contours_relative)
             if contours_path.is_file():
                 contours = _read_json(contours_path)
-                unsupported = set(contours) - set(DETECTOR_CATEGORIES)
-                if unsupported:
-                    _add_issue(errors, "unsupported_contour_category", f"Contour file contains unsupported categories {sorted(unsupported)}", sample_id=sample_id, path=contours_relative, field="categories")
+                expected_categories = set(raw_boxes) if raw_boxes else set(by_category)
+                if set(contours) != expected_categories:
+                    _add_issue(
+                        errors, "contour_category_mismatch",
+                        f"Contour categories {sorted(contours)} must match bounding-box categories {sorted(expected_categories)}",
+                        sample_id=sample_id, path=contours_relative, field="categories",
+                    )
+                for category, category_contours in contours.items():
+                    if category not in DETECTOR_CATEGORIES:
+                        _add_issue(errors, "unsupported_contour_category", f"Unsupported contour category {category!r}", sample_id=sample_id, path=contours_relative, field="categories")
+                        continue
+                    expected_count = source_box_counts.get(category, 0)
+                    if not isinstance(category_contours, list):
+                        _add_issue(errors, "contour_structure", f"Contours for {category} must be an array", sample_id=sample_id, path=contours_relative, field=category)
+                        continue
+                    if len(category_contours) < expected_count:
+                        _add_issue(
+                            errors, "contour_occurrence_count",
+                            f"{category} has {expected_count} bounding-box occurrences but only {len(category_contours)} contours",
+                            sample_id=sample_id, path=contours_relative, field=category,
+                        )
+                    for contour_index, contour in enumerate(category_contours):
+                        if not isinstance(contour, list) or len(contour) < 2:
+                            _add_issue(errors, "contour_structure", f"{category} contour #{contour_index} must contain at least two OpenCV points", sample_id=sample_id, path=contours_relative, field=category)
+                            continue
+                        for point_index, point in enumerate(contour):
+                            if (
+                                not isinstance(point, list) or len(point) != 1
+                                or not isinstance(point[0], list) or len(point[0]) != 2
+                                or any(type(coordinate) is not int for coordinate in point[0])
+                            ):
+                                _add_issue(errors, "contour_structure", f"{category} contour #{contour_index} point #{point_index} must have pinned OpenCV shape [[x, y]] with integer coordinates", sample_id=sample_id, path=contours_relative, field=category)
+                                continue
+                            x, y = point[0]
+                            if not (0 <= x < record.image_width and 0 <= y < record.image_height):
+                                _add_issue(errors, "contour_coordinate_bounds", f"{category} contour #{contour_index} point {(x, y)} is outside the {record.image_width}x{record.image_height} image", sample_id=sample_id, path=contours_relative, field=category)
         except (OSError, json.JSONDecodeError, ValueError) as error:
             _add_issue(errors, "contour_file", f"Cannot validate contour annotation: {error}", sample_id=sample_id, path=contours_relative, field="source_annotations.contours")
     if segmentation_relative:
         try:
             segmentation_path = _safe_asset_path(root, segmentation_relative)
-            if segmentation_path.is_file() and segmentation_path.stat().st_size == 0:
-                _add_issue(errors, "empty_segmentation", "Segmentation reference exists but is empty", sample_id=sample_id, path=segmentation_relative, field="source_annotations.segmentation")
-        except (OSError, ValueError) as error:
-            _add_issue(errors, "segmentation_file", str(error), sample_id=sample_id, path=segmentation_relative, field="source_annotations.segmentation")
+            if segmentation_path.is_file():
+                if segmentation_path.stat().st_size == 0:
+                    _add_issue(errors, "empty_segmentation", "Segmentation reference exists but is empty", sample_id=sample_id, path=segmentation_relative, field="source_annotations.segmentation")
+                elif segmentation_concepts is not None:
+                    segmentation = np.loadtxt(segmentation_path, dtype=np.int64)
+                    if segmentation.ndim != 2 or segmentation.shape != (record.image_height, record.image_width):
+                        _add_issue(
+                            errors, "segmentation_dimensions",
+                            f"Segmentation shape {segmentation.shape} must match image shape {(record.image_height, record.image_width)}",
+                            sample_id=sample_id, path=segmentation_relative, field="dimensions",
+                        )
+                    else:
+                        used_ids = {int(value) for value in np.unique(segmentation)}
+                        unknown_ids = used_ids - set(segmentation_concepts)
+                        if unknown_ids:
+                            _add_issue(errors, "segmentation_category_id", f"Segmentation uses IDs absent from concepts.json: {sorted(unknown_ids)}", sample_id=sample_id, path=segmentation_relative, field="category_ids")
+                        else:
+                            annotated_categories = set(by_category)
+                            used_categories = {segmentation_concepts[value] for value in used_ids if value != 0}
+                            unexpected_categories = used_categories - annotated_categories
+                            if unexpected_categories:
+                                _add_issue(errors, "segmentation_category_mismatch", f"Segmentation categories {sorted(unexpected_categories)} have no corresponding prepared component/bounding box", sample_id=sample_id, path=segmentation_relative, field="category_ids")
+        except (OSError, ValueError, TypeError, OverflowError) as error:
+            _add_issue(errors, "segmentation_file", f"Cannot parse segmentation annotation: {error}", sample_id=sample_id, path=segmentation_relative, field="source_annotations.segmentation")
 
 
 def validate_dataset(
@@ -589,8 +681,12 @@ def validate_dataset(
         categories = detector_vocabulary.get("categories", [])
         sample_ids: set[str] = set()
         component_ids: set[str] = set()
+        segmentation_concepts = _validate_concept_vocabulary(root, errors)
         for record in records:
-            _validate_record(root, record, records_path, ontology, classes, categories, sample_ids, component_ids, errors)
+            _validate_record(
+                root, record, records_path, ontology, classes, categories,
+                sample_ids, component_ids, segmentation_concepts, errors,
+            )
 
         if sample_ids != set(manifest.get("sample_ids", [])):
             _add_issue(errors, "manifest_sample_ids", "Manifest sample_ids do not match JSONL records", path=str(manifest_path), field="sample_ids")
@@ -655,7 +751,14 @@ def validate_dataset(
             "pinned_ontology": ontology_info.get("sha256") == ONTOLOGY_SHA256,
             "asset_checksums": not any(issue.code in {"missing_asset", "asset_checksum", "unsafe_asset_path"} for issue in errors),
             "vocabulary": ontology is not None and class_vocabulary is not None and detector_vocabulary is not None,
-            "records_and_annotations": not any(issue.code in {"missing_image", "invalid_bbox", "bbox_file", "bbox_annotation_mismatch", "missing_annotation_asset"} for issue in errors),
+            "records_and_annotations": not any(issue.code in {
+                "missing_image", "invalid_bbox", "bbox_file", "bbox_annotation_mismatch",
+                "missing_annotation_asset", "contour_file", "contour_category_mismatch",
+                "unsupported_contour_category", "contour_structure", "contour_occurrence_count",
+                "contour_coordinate_bounds", "segmentation_file", "empty_segmentation",
+                "segmentation_dimensions", "segmentation_category_id", "segmentation_category_mismatch",
+                "concept_vocabulary",
+            } for issue in errors),
             "split_integrity": not any(issue.code.startswith("split_") or issue.code in {"split_overlap", "split_coverage", "split_reference"} for issue in errors),
             "semantic_targets": not any(issue.code in {"pizza_targets", "component_targets", "pizza_known_mask", "component_known_mask", "source_labels"} for issue in errors),
         }

@@ -214,7 +214,7 @@
     "wire": "original-image pixel xyxy; x2=x+width and y2=y+height; finite pixel-edge extents, no normalization or resize"
   },
   "dataset_id": "pizza-dcc148789aecf8af86a3",
-  "manifest_id": "39fdb93eecbfa81f7b6d22d0eebd9f1e7e69ad90636c99b4092ee8d814b53f3c",
+  "manifest_id": "562f28693c7df41f83455cd42a8057aa35d71078896940ce31ad4e0a67d0adbe",
   "ontology": {
     "class_count": 66,
     "country_individuals": [
@@ -333,8 +333,12 @@
     "generator_repository": "https://github.com/SysReIC/pizzaiolo.git",
     "image_label_inference": "audited fourth_attempt infer_pizzaiolo_label predicates; 32 overlapping image-level classes",
     "preparation_commit": "99956608ac88fd5ab3011d28d57937c7b5e32983",
+    "preparation_commit_reachability": "preparation_commit is retained as the original runtime HEAD record; it is not reachable from published refs. Use preparation_source_reference_commit to fetch the code-equivalent preparation source.",
     "preparation_dirty": false,
     "preparation_package_version": "0.1.0",
+    "preparation_source_reference_commit": "220318f914668cba914b504596dda49a298e006f",
+    "preparation_source_reference_role": "reachable code-equivalent reference, not the runtime HEAD recorded in preparation_commit; src/, tests/, pyproject.toml, and README.md trees match the historical commit exactly",
+    "preparation_source_reference_tree": "40aee3f823d20145f022bd65eb8b2eaf5fde490a",
     "raw_master_canonicalization": "hasTopping set values sorted lexicographically; source ordering is nondeterministic and semantically unordered",
     "raw_master_csv": "audit/generator_master.csv"
   },
