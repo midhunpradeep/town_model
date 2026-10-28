@@ -1,6 +1,6 @@
 # Phase 1 remediation report
 
-**Status:** First remediation implemented, committed, and independently reviewed. Phase 1 is **not approved**; this report makes no approval recommendation.
+**Status:** First remediation implemented, committed, and independently reviewed. The second-remediation implementation and its independent review are also committed and published on `remediation/phase-1-findings`. The second review issued **REQUEST CHANGES** solely because the handoff reports still misstated the second implementation's Git history. It verified D1–D4 and reported no outstanding application-code Critical or Major defects. Phase 1 has not been formally accepted; this documentation correction is not another technical review or an approval recommendation.
 
 **Repository:** <https://github.com/midhunpradeep/town_model>
 
@@ -10,7 +10,9 @@
 **First-remediation base:** `e6f4050800e32b4c6d85b076b5a406a60f39398`
 **First remediation commit:** `54a16c57280afed6accaf3837a7db8d112b0cd1b` (`fix: remediate Phase 1 validation and provenance findings`)
 **Independent review commit:** `a82b96cb89a2f6a4788c5d534182d72f42044baf` (`docs: add independent Phase 1 remediation review`)
-**Second-remediation implementation base:** `a82b96cb89a2f6a4788c5d534182d72f42044baf`. Its implementation commit does not yet exist because the handoff explicitly requests staging without committing; the author will create that commit after review.
+**Second-remediation implementation base:** `a82b96cb89a2f6a4788c5d534182d72f42044baf`
+**Second-remediation implementation commit:** `87d27b45eb29740bf167c5bf51964462e5074d96` (`fix: close remaining Phase 1 remediation findings`)
+**Second independent review commit:** `14121ad126eea5e467f7f54914aa99286b59506f` (`docs: add independent Phase 1 remediation 2 review`), verdict **REQUEST CHANGES** solely for the stale handoff/Git-history statements. Both commits are reachable from the published branch.
 
 The original preparation-time SHA `99956608ac88fd5ab3011d28d57937c7b5e32983` remains a historical, unreachable identifier. The recorded reachable source-equivalent reference is `220318f914668cba914b504596dda49a298e006f`; it is not represented as the actual runtime revision.
 
@@ -126,6 +128,6 @@ No 4,800-image run, training experiment, or manual graphical-browser session was
 - `DatasetSummary` adds current integrity/saved-report scope fields, and `sample_count` is `None` when current validation does not pass. `town inspect` now returns a nonzero status on failure/unavailability. Consumers of the CLI summary should read `integrity_status` before using counts.
 - The process-local inspection cache uses filesystem change metadata to avoid rehashing/revalidating every declared asset on every dashboard interaction. It is intended for ordinary changes, not an attacker able to alter bytes while defeating filesystem metadata. Explicit validation and each new CLI process perform full validation.
 - The historical execution commit `999566…` itself remains unreachable. The alternate provenance is a verified source-equivalent reference and does not prove the exact runtime checkout beyond the identical source trees.
-- No later-phase functionality was added. Phase 1 remains pending independent review; this report does not declare it approved.
+- No later-phase functionality was added. The second independent review verified D1–D4 but issued **REQUEST CHANGES** solely for the stale handoff/Git-history statements corrected here. Formal Phase 1 closure was conditional on this documentation correction; this correction is not another technical review, and this report does not declare Phase 1 accepted or approved.
 
 **First-remediation commit message (verifiable from Git):** `fix: remediate Phase 1 validation and provenance findings`.

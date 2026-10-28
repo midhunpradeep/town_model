@@ -1,16 +1,18 @@
 # Phase 1 — Second Remediation Report
 
-**Status:** D1–D5 implementation complete and staged for independent review. Phase 1 is **not approved**, and this report does not approve the implementation.
+**Status:** The second-remediation implementation is committed as `87d27b45eb29740bf167c5bf51964462e5074d96`, and its independent review is recorded in commit `14121ad126eea5e467f7f54914aa99286b59506f`. The review issued **REQUEST CHANGES** solely because the handoff reports incorrectly said the implementation commit did not exist and remained staged/unpublished. It verified D1–D4 and found no outstanding application-code Critical or Major defects. This report corrects that documentation/provenance inconsistency. Phase 1 has not been formally accepted; this correction is not another technical review and does not approve Phase 1.
 
 **Repository:** <https://github.com/midhunpradeep/town_model>
 
 **Branch:** `remediation/phase-1-findings`
 
-**Base commit / latest review HEAD:** `a82b96cb89a2f6a4788c5d534182d72f42044baf` (`docs: add independent Phase 1 remediation review`)
+**Second-remediation implementation base:** `a82b96cb89a2f6a4788c5d534182d72f42044baf` (`docs: add independent Phase 1 remediation review`)
 
-**Last reviewed implementation:** `54a16c57280afed6accaf3837a7db8d112b0cd1b` (`fix: remediate Phase 1 validation and provenance findings`)
+**Previous implementation:** `54a16c57280afed6accaf3837a7db8d112b0cd1b` (`fix: remediate Phase 1 validation and provenance findings`)
 
-**Implementation commit:** Not created, per the user's explicit instruction to stage changes without committing. The commit SHA will be assigned when the author commits. The complete implementation and this report are staged on the branch.
+**Second-remediation implementation commit:** `87d27b45eb29740bf167c5bf51964462e5074d96` (`fix: close remaining Phase 1 remediation findings`)
+
+**Independent second-review commit:** `14121ad126eea5e467f7f54914aa99286b59506f` (`docs: add independent Phase 1 remediation 2 review`), verdict **REQUEST CHANGES** solely for the stale handoff/Git-history statements. Both commits are reachable from the published `remediation/phase-1-findings` branch.
 
 The first remediation commit, its independent review commit, and the new second-remediation work are distinct. The historical preparation SHA `99956608ac88fd5ab3011d28d57937c7b5e32983` remains an unreachable historical identifier; the reachable source-equivalent reference `220318f914668cba914b504596dda49a298e006f` has matching `src/` tree `40aee3f823d20145f022bd65eb8b2eaf5fde490a`. The reference is not represented as the runtime revision. The first remediation's provenance claims are preserved.
 
@@ -22,7 +24,7 @@ The first remediation commit, its independent review commit, and the new second-
 | **D2 — blank generator type** | Accept exact upstream `"None"` for random and the pinned named types only; reject blank, whitespace, sentinel, and unsupported values in preparation and validation. Cross-check stored audit against the preserved raw CSV cell. |
 | **D3 — rerender cost** | Replace separate validation-only caching with one bounded process-local validated explorer bundle and Linux inotify invalidation; explicit validation remains a full integrity pass. |
 | **D4 — test isolation** | Exercise the historical/current validation distinction on the disposable `prepared_dataset` fixture, never the committed example report. |
-| **D5 — stale history** | Correct the first-remediation account and record the first-remediation and independent-review SHAs without changing the historical preparation provenance. |
+| **D5 — handoff/history accuracy** | Correct both handoff reports to record the actual second-remediation implementation and independent-review commits, accurately state their publication status and review verdict, and preserve the historical preparation provenance distinction. |
 
 No schema version or committed example dataset asset changed. Previously accepted origin, target, ontology, contour/segmentation, split, immutability, and provenance behavior was retained.
 
@@ -62,9 +64,9 @@ Initial watcher installation and initial/full invalidation validation remain dat
 
 **Correction.** The regression now changes the saved validator version only on the disposable `prepared_dataset` fixture and asserts that current validation is `1.1.0` while the saved report is marked historical. No test mutates committed example assets.
 
-### D5 — historical handoff accuracy
+### D5 — handoff history and review outcome
 
-`docs/PHASE_1_REMEDIATION_REPORT.md` now records the verifiable first-remediation commit `54a16c57280afed6accaf3837a7db8d112b0cd1b`, independent-review commit `a82b96cb89a2f6a4788c5d534182d72f42044baf`, original implementation baseline `220318f914668cba914b504596dda49a298e006f`, and the original preparation SHA/source-equivalent provenance distinction. It states that the second implementation commit does not yet exist because the user requested no commit.
+Both handoff reports now record the second-remediation implementation commit `87d27b45eb29740bf167c5bf51964462e5074d96` and independent-review commit `14121ad126eea5e467f7f54914aa99286b59506f`, which are reachable from the published branch. The review's verdict remains **REQUEST CHANGES**: it was issued solely because the reports incorrectly said the implementation commit did not exist and was still staged/unpublished. The reviewer verified D1–D4, reported 84 passing tests, and found no outstanding application-code Critical or Major defects. This correction addresses that documentation/provenance inconsistency only; it is not another technical review, does not revise the review verdict, and does not represent formal Phase 1 acceptance. The historical preparation SHA `99956608ac88fd5ab3011d28d57937c7b5e32983` remains distinct from the reachable source-equivalent reference `220318f914668cba914b504596dda49a298e006f`.
 
 ## Performance verification
 
@@ -121,7 +123,7 @@ Externally visible differences: malformed/blank type metadata now fails preparat
 
 ## Risks, limitations, and deviations
 
-- No implementation commit SHA exists yet because this handoff explicitly forbids committing. The implementation and report are staged on the existing remediation branch; the author must create and push the commit before the branch URL resolves to this report.
+- The second-remediation implementation commit `87d27b45eb29740bf167c5bf51964462e5074d96` and independent-review commit `14121ad126eea5e467f7f54914aa99286b59506f` are both published on `remediation/phase-1-findings`. The former preceded the latter; neither is uncommitted or unpublished.
 - Inotify is best-effort and Linux-specific; non-Linux or failed watcher initialization falls back to linear declared-file metadata checks. Network/remote filesystem notifications may be incomplete. Content hashes are checked for all explorer bytes and selected sample assets, but this is not a general atomic-filesystem or adversarial-security guarantee.
 - A full validation or detected large-dataset change is still expensive (about 41 s for this synthetic 4,800 fixture in this environment); unchanged interactions are fast. OS, filesystem, and synthetic-content differences affect absolute timings.
 - The larger benchmark is an explicitly synthetic scale fixture with duplicated source rows and background-only segmentation; it is not actual Pizzaïolo generation and does not establish full-reference generation or dashboard browser latency.
