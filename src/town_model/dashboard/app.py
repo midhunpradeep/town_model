@@ -7,8 +7,14 @@ import queue
 from pathlib import Path
 from typing import Any
 
+import matplotlib
+
+matplotlib.use("Agg", force=True)
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw
+import torch
 
 from town_model.application import (
     DatasetSnapshotChangedError,
@@ -20,6 +26,15 @@ from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
 from town_model.dashboard.runtime import submit_generation
+from town_model.dashboard.geometry import (
+    build_comparison_figure,
+    build_history_figure,
+    build_motion_figure,
+    build_region_figure,
+    comparison_rows,
+    discover_run_groups,
+    load_geometry_view,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_CONFIG = REPOSITORY_ROOT / "dataset.toml"
@@ -343,23 +358,167 @@ def _render_generation_monitor(st) -> None:
         st.error(failed)
 
 
+def _render_geometry_laboratory(st, runs_root: Path) -> None:
+    st.subheader("Geometry Laboratory")
+    st.caption("Saved CPU synthetic runs only. Widget changes load persisted checkpoints/snapshots; they never retrain a model. Region plots evaluate the actual classifier state.")
+    groups = discover_run_groups(runs_root)
+    if not groups:
+        st.info(f"No completed synthetic run groups were found in `{runs_root}`. Run `town experiment fixed --output {runs_root}` or `town experiment mapping --output {runs_root}` first.")
+        return
+    selected_group = st.selectbox("Saved synthetic experiment", groups, format_func=lambda path: path.name)
+    try:
+        fixture_metadata = json.loads((selected_group / "fixture.json").read_text(encoding="utf-8"))
+        class_names = tuple(fixture_metadata["class_names"])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        st.error(f"Invalid or incomplete saved experiment group: {error}")
+        return
+
+    control_columns = st.columns(4)
+    family = control_columns[0].selectbox("Classifier model", ("baseline", "box", "town"), key="geometry_family")
+    class_name = control_columns[1].selectbox("Concept / class", class_names, key="geometry_class")
+    split = control_columns[2].selectbox("Dataset split", ("train", "validation"), key="geometry_split")
+    run_path = selected_group / family
+    snapshot_names = ["initial"]
+    snapshot_names.extend(sorted(path.stem for path in (run_path / "snapshots").glob("step_*.pt")))
+    snapshot_names.append("final")
+    snapshot = control_columns[3].selectbox("Checkpoint / snapshot", snapshot_names, index=len(snapshot_names) - 1, key="geometry_snapshot")
+
+    try:
+        with np.load(selected_group / "fixture.npz", allow_pickle=False) as fixture_data:
+            split_indices = fixture_data[f"{split}_indices"].astype(np.int64).tolist()
+            split_count = len(split_indices)
+        model_config = json.loads((run_path / "resolved_config.json").read_text(encoding="utf-8"))
+        dimensions = int(model_config["model"]["latent_dimensions"])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        st.error(f"Could not read the saved fixture or model configuration: {error}")
+        return
+    position = st.selectbox(
+        "Sample / point",
+        list(range(split_count)),
+        format_func=lambda index: f"point-{split_indices[index]:05d} (split position {index})",
+        key="geometry_point",
+    )
+    anchor_mode = st.radio("Exact slice anchor", ("zero", "sample"), horizontal=True, key="geometry_anchor")
+    axes = (0, 1)
+    if dimensions > 2:
+        axis_columns = st.columns(2)
+        axis_x = axis_columns[0].selectbox("Horizontal latent coordinate", list(range(dimensions)), index=0, key="geometry_axis_x")
+        axis_y_choices = [index for index in range(dimensions) if index != axis_x]
+        axis_y = axis_columns[1].selectbox("Vertical latent coordinate", axis_y_choices, index=0, key="geometry_axis_y")
+        axes = (axis_x, axis_y)
+
+    view_result = load_geometry_view(run_path, split=split, sample_position=position, snapshot=snapshot)
+    if view_result.view is None:
+        st.error(view_result.error)
+        return
+    view = view_result.view
+    settings = view["config"]
+    train_config = settings["training"]
+    model_settings = settings["model"]
+    st.caption(
+        f"seed={settings['experiment']['seed']} · fixture={view['fixture']['fixture_id']} · "
+        f"d={model_settings['latent_dimensions']} · objective={train_config['objective']} · "
+        f"margin={train_config.get('margin')} · weighting={train_config.get('class_weighting')} · "
+        f"houses={model_settings.get('houses')} · "
+        f"windows/house={model_settings.get('windows_per_house')} · mode={model_settings.get('window_mode')} · "
+        f"min_width={model_settings.get('minimum_axis_width')} · snapshot={view['name']} step={view['step']}"
+    )
+    if dimensions > 2:
+        st.info("The colored region is an exact 2D slice through the full-dimensional set. Other coordinates are fixed to zero or the selected sample. Data-point markers are projections onto the displayed coordinates, not a region projection.")
+
+    tabs = st.tabs(("Selected model", "Compare three models", "Learning and activity", "Parameter / point motion"))
+    with tabs[0]:
+        figure, facts = build_region_figure(view, class_name=class_name, anchor_mode=anchor_mode, axes=axes)
+        st.pyplot(figure, clear_figure=True)
+        plt.close(figure)
+        if facts["slice_is_empty"]:
+            st.warning("This exact slice is empty at the selected anchor.")
+        result_columns = st.columns(4)
+        result_columns[0].metric("Exact membership", "inside" if facts["selected_membership"] else "outside")
+        result_columns[1].metric(f"Selected {facts['selected_score_name']}", f"{facts['selected_score']:.5g}")
+        result_columns[2].metric("Known target", str(facts["selected_target"]) if facts["selected_known"] else "unknown")
+        result_columns[3].metric("Selected point", facts["selected_sample_id"])
+        st.markdown("#### Actual physical geometry / classifier parameters")
+        model = view["model"]
+        class_index = view["class_names"].index(class_name)
+        if model.family == "box":
+            low, high = model.geometry.physical_boxes()
+            geometry_values = {"box_low": low[class_index].detach().cpu().tolist(), "box_high": high[class_index].detach().cpu().tolist()}
+        elif model.family == "town":
+            low, high, window_low, window_high = model.geometry.physical_geometry()
+            geometry_values = {
+                "frame_low": low[class_index].detach().cpu().tolist(),
+                "frame_high": high[class_index].detach().cpu().tolist(),
+                "window_low": window_low[class_index].detach().cpu().tolist(),
+                "window_high": window_high[class_index].detach().cpu().tolist(),
+                "window_mode": model.geometry.window_mode,
+                "initialization": model.geometry.initialization_info,
+                "activity": view["metrics"].get("geometry_activity", {}).get("activity"),
+            }
+        else:
+            geometry_values = {
+                "linear_weight": model.linear.weight[class_index].detach().cpu().tolist(),
+                "linear_bias": float(model.linear.bias[class_index].item()),
+                "decision_boundary": "logit == 0",
+            }
+        st.json(geometry_values)
+
+    with tabs[1]:
+        try:
+            comparison_figure, facts = build_comparison_figure(
+                selected_group,
+                class_name=class_name,
+                split=split,
+                sample_position=position,
+                snapshot=snapshot,
+                anchor_mode=anchor_mode,
+            )
+            st.pyplot(comparison_figure, clear_figure=True)
+            plt.close(comparison_figure)
+            st.dataframe(pd.DataFrame([
+                {"model": family_name, "membership": data["selected_membership"], data["selected_score_name"]: data["selected_score"], "slice empty": data["slice_is_empty"]}
+                for family_name, data in facts.items()
+            ]), hide_index=True, width="stretch")
+            st.caption("Each classifier was trained independently. Panels are side by side; latent coordinate frames are not superposed or aligned.")
+        except (OSError, ValueError, KeyError, RuntimeError) as error:
+            st.error(f"Could not compare saved model geometry: {error}")
+
+    with tabs[2]:
+        history_figure = build_history_figure(selected_group)
+        st.pyplot(history_figure, clear_figure=True)
+        plt.close(history_figure)
+        st.caption("BCE and signed-distance hinge values are different objectives and must not be compared as raw loss magnitudes.")
+        st.dataframe(pd.DataFrame(comparison_rows(selected_group)), hide_index=True, width="stretch")
+        st.markdown("#### Gradient and activity diagnostics")
+        st.json({"gradient_norms_last_step": view["metrics"].get("gradient_norms_last_step"), "geometry_activity": view["metrics"].get("geometry_activity")})
+
+    with tabs[3]:
+        motion_figure = build_motion_figure(view, class_name=class_name)
+        st.pyplot(motion_figure, clear_figure=True)
+        plt.close(motion_figure)
+        st.caption("Motion comes from persisted initialization/training snapshots. Fixed-point experiment coordinates are constant; classifier regions/parameters can still move.")
+
+
 def main() -> None:
     import streamlit as st
 
     st.set_page_config(page_title="Town Embeddings Research", layout="wide")
     st.title("Representing Ontologies Using Town Embeddings")
-    st.caption(f"Phase 1 · dataset preparation and exploration · wire schema {SCHEMA_VERSION}")
-    page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset"))
+    st.caption(f"Phase 1 dataset explorer + Phase 2 Geometry Laboratory · dataset wire schema {SCHEMA_VERSION}")
+    page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset", "Geometry Laboratory"))
     default_path = DEFAULT_EXAMPLE_DATASET if DEFAULT_EXAMPLE_DATASET.is_dir() else REPOSITORY_ROOT / "artifacts" / "datasets" / "pizza-48"
     dataset_path = Path(st.sidebar.text_input("Prepared dataset path", value=str(default_path))).expanduser()
     st.sidebar.caption("Generation is explicit. Opening or refreshing this dashboard never creates data.")
+    runs_root = Path(st.sidebar.text_input("Synthetic run directory", value=str(REPOSITORY_ROOT / "artifacts" / "phase2" / "runs"))).expanduser()
 
     if page == "Dataset overview":
         _render_overview(st, dataset_path)
     elif page == "Image explorer":
         _render_explorer(st, dataset_path)
-    else:
+    elif page == "Generate dataset":
         _generation_page(st)
+    else:
+        _render_geometry_laboratory(st, runs_root)
 
 
 if __name__ == "__main__":
