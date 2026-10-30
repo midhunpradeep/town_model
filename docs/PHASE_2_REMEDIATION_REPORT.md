@@ -141,3 +141,38 @@ The complete test suite includes Phase 1 dataset, CLI and dashboard regressions.
 - Experiments remain small synthetic diagnostics. No browser interaction test, image detector, image embedding, image-to-town pipeline, deferred reference loss, independent-window mode, relation proof, or independent review acceptance is claimed.
 
 No unresolved F1–F7 defect is known from the completed regression and verification work. A new independent closure review is still required; no acceptance verdict is pre-claimed.
+
+---
+
+## F4 configuration-preflight addendum
+
+**Scope:** This addendum records the remaining F4 correction identified by the independent Phase 2 remediation closure review. It does not edit or replace that review's historical **REQUEST CHANGES** verdict, and it does not claim independent acceptance.
+
+### Defect and correction
+
+The closure review found that direct `BoxGeometry` and `TownGeometry` constructors enforced their numerical limits, but `SyntheticConfig.validate()` did not. Since `run_experiment()` launches baseline, box, and contained-town families, an infeasible `min_width` could reach fixture construction and create a run group before the town constructor failed—leaving partial artifacts after the baseline and box had trained.
+
+A single `validate_min_width()` helper in `src/town_model/models/geometry.py` now owns numeric-type, finite/positive, parameterization and feasibility checks. Both geometry constructors use it, and `SyntheticConfig.validate()` invokes it against the actual `MODEL_FAMILIES` tuple and configured `window_mode`. Constructor-level checks remain in place as defense in depth. Invalid settings are rejected during `run_experiment()` preflight, before fixture construction, output-root/run-group creation, or any family training. The resolved-config and checkpoint schemas and identity fields are unchanged.
+
+For `R = 16 * torch.finfo(torch.float32).eps`, the shared rule is strict:
+
+- Pure box: `0 < min_width < 2 - 2R`.
+- Contained-window town: `0 < min_width < (2 - 5R) / 3`.
+- The composed synthetic harness includes both box and contained-town families, so it enforces the stricter contained-town limit. Unsupported window parameterizations remain rejected.
+
+The regression in `tests/test_phase2_min_width_preflight.py` uses `min_width=0.7`: both `SyntheticConfig.validate()` and `run_experiment()` reject it with an actionable contained-town constraint error. Spies confirm neither fixture construction nor the family-training entry point runs. The output root is not created, and no run group, metrics, or baseline/box/town checkpoint exists. Boundary tests cover the default `1e-5`, small positive widths, values below/at/above both family limits, invalid types, zero, negatives, NaN, and infinities; direct constructor and composed-config restrictions agree.
+
+### Verification after the correction
+
+- `.venv/bin/pytest -q` — **143 passed, 0 failed, 0 skipped**; five Streamlit/Pandas `DataFrame.reset_index(inplace=...)` deprecation warnings.
+- `.venv/bin/pytest -q tests/test_phase2_min_width_preflight.py` — **5 passed**, including rejection-before-fixture/training/artifacts and numerical boundary/type cases.
+- `.venv/bin/pytest -q tests/test_phase2_experiments.py::test_all_three_fixed_classifiers_train_reload_and_share_identical_fixture` — **1 passed**; baseline, box and town train, save checkpoints, reload, and evaluate.
+- `.venv/bin/pytest -q tests/test_phase2_geometry.py tests/test_phase2_experiments.py tests/test_phase2_resume.py tests/test_phase2_dashboard_geometry.py` — **33 passed**; exercises geometry bounds, fixed and trainable-encoder experiments, zero-margin persistence/resume, visualization, and snapshots.
+- `.venv/bin/python -m compileall -q src tests benchmarks` — passed.
+- `.venv/bin/python -m pip check` — no broken requirements.
+- `.venv/bin/town validate examples/pizza-48 --no-write-report --json` — valid, 48 samples, 0 errors, 178 expected low-support warnings.
+- `.venv/bin/town inspect examples/pizza-48 --json` — `integrity_status=current_pass`, no validation error.
+- `git diff --quiet 21dc68520a6983c3529f40fa0a97a0ca9911d065 -- examples/pizza-48` — passed; no dataset changes.
+- A disposable short valid run (seed 22, 30 points, one step, default `min_width=1e-5`) trained baseline, box and town; each schema-2 checkpoint loaded and evaluated, and its config identity matched the resolved config. No run-schema or identity change was introduced.
+
+No remaining F4 configuration-preflight defect is known from these checks. Limitations recorded above remain unchanged. Independent closure review is still required before Phase 2 can be accepted or Phase 3 authorized.

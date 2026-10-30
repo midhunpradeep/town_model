@@ -10,7 +10,13 @@ from .classifiers import (
     make_classifier,
     unreduced_penalties,
 )
-from .geometry import BoxGeometry, GeometryEvaluation, TownGeometry, evaluate_town_corners
+from .geometry import (
+    BoxGeometry,
+    GeometryEvaluation,
+    TownGeometry,
+    evaluate_town_corners,
+    validate_min_width,
+)
 from .losses import SupervisionReduction, reduce_supervision, validate_signed_distance_margin
 
 __all__ = [
@@ -28,5 +34,6 @@ __all__ = [
     "make_classifier",
     "reduce_supervision",
     "unreduced_penalties",
+    "validate_min_width",
     "validate_signed_distance_margin",
 ]

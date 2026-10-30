@@ -23,6 +23,7 @@ from town_model.models import (
     make_classifier,
     reduce_supervision,
     unreduced_penalties,
+    validate_min_width,
 )
 
 MODEL_FAMILIES = ("baseline", "box", "town")
@@ -66,6 +67,11 @@ class SyntheticConfig:
             raise ValueError("Phase 2 supports only window_mode='contained'")
         if not np.isfinite(self.window_target_volume) or not 0.0 < self.window_target_volume < 1.0:
             raise ValueError("window_target_volume must be finite and in (0,1)")
+        validate_min_width(
+            self.min_width,
+            model_families=MODEL_FAMILIES,
+            window_mode=self.window_mode,
+        )
 
 
 @dataclass(frozen=True, slots=True)
