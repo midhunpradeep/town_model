@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 import torch
 from torch import Tensor
@@ -137,6 +138,153 @@ def test_component_classifier_reshaping_preserves_box_parameters_and_reshapes_to
     assert town.diagnostics["frame_low"].shape == (2, 2, 2)
     assert town.diagnostics["house_margin"].shape == (2, 3, 2, 2)
     assert town.diagnostics["window_contains"].shape == (2, 3, 2, 2, 1)
+
+
+def test_snapshot_diagnostic_axes_roundtrip_preserve_class_geometry_and_instance_activity(tmp_path, image_examples, capsys):
+    import json
+    from town_model.experiments.image_config import DiagnosticsConfig, ImageExperimentConfig, ImageModelConfig, TrainingConfig, VisionConfig
+    from town_model.inspection.image_snapshots import load_image_snapshot, reference_panel, save_image_snapshot
+    from town_model.dashboard.image_embeddings import build_image_geometry_figure, point_rows
+    from town_model.vision.preprocessing import ImageNetLetterbox
+
+    dataset, _, _, visual = image_examples
+    train = deterministic_subset(dataset, "train", size=4, seed=301)
+    validation = deterministic_subset(dataset, "validation", size=2, seed=302)
+    names = dataset.class_names[:4]
+    ids = dataset.canonical_class_ids[:4]
+    town_config = ImageExperimentConfig(
+        vision=VisionConfig(visual_policy="frozen"),
+        model=ImageModelConfig(family="town", pizza_mode="hybrid", latent_dimensions=2, houses=2, windows=2),
+        training=TrainingConfig(epochs=1, physical_batch_size=4, accumulation_steps=1),
+        diagnostics=DiagnosticsConfig(max_reference_samples=4, max_component_traces_per_sample=64, include_roi_feature_means=False),
+        purpose="smoke",
+    ).validate()
+    town_model = ImageOntologyModel(2, names, family="town", pizza_mode="hybrid", houses=2, windows=2, seed=19)
+    checkpoint = tmp_path / "checkpoint.pt"
+    checkpoint.write_bytes(b"immutable-source-checkpoint")
+    town_snapshot = save_image_snapshot(
+        tmp_path / "town-b-equals-c", dataset=dataset, train_subset=train, validation_subset=validation,
+        visual=visual, model=town_model, config=town_config, class_ids=ids, class_indices=(0, 1, 2, 3),
+        epoch=1, optimizer_step=1, latest_checkpoint=checkpoint, identity_hash="town-b-equals-c",
+    )
+    loaded = load_image_snapshot(town_snapshot.path)
+    assert len(loaded.header["sample_ids"]) == 4  # B=C=4 in one physical batch.
+    assert loaded.header["family"] == "town"
+    assert loaded.arrays["classifier_geometry_frame_low"].shape == (4, 2, 2)
+    assert loaded.arrays["classifier_geometry_window_low"].shape == (4, 2, 2, 2)
+    assert loaded.arrays["classifier_geometry_window_high"].shape == (4, 2, 2, 2)
+    assert loaded.header["diagnostic_axes_schema"]["classifier_geometry_frame_low"] == ["class", "house", "coordinate"]
+    assert loaded.header["diagnostic_axes_schema"]["component_activity_house_margin"] == ["component_occurrence", "class", "house"]
+    expected_geometry = town_model.classifier.geometry.physical_geometry()[0].detach().cpu().numpy()
+    assert np.array_equal(loaded.arrays["classifier_geometry_frame_low"], expected_geometry)
+
+    panel = reference_panel(train, validation, 4)
+    by_id = {record.sample_id: record for record in (*train.records, *validation.records)}
+    batch = collate_image_records(dataset, [by_id[sample_id] for _, sample_id in panel], transform=ImageNetLetterbox(224))
+    town_model.eval()
+    with torch.no_grad():
+        source_features = visual(batch, diagnostics=False)
+        source_output = town_model(source_features, batch.sample_ids, diagnostics=True)
+    expected_component_activity = np.concatenate([
+        source_output.component_classifier.diagnostics["house_margin"][row, :int(source_output.component_valid_mask[row].sum())].detach().cpu().numpy()
+        for row in range(len(panel))
+    ], axis=0)
+    expected_pizza_activity = source_output.pizza_classifier.diagnostics["frame_margin"].detach().cpu().numpy()
+    assert np.array_equal(loaded.arrays["component_activity_house_margin"], expected_component_activity)
+    assert np.array_equal(loaded.arrays["pizza_activity_frame_margin"], expected_pizza_activity)
+    assert loaded.arrays["component_activity_house_margin"].shape[1:] == (4, 2)
+    assert loaded.arrays["pizza_activity_frame_margin"].shape == (4, 4, 2)
+    from town_model.cli import main as cli_main
+    result_path = tmp_path / "town-relation.json"
+    assert cli_main([
+        "experiment", "image", "relations", str(loaded.path),
+        "--source-class-id", str(ids[0]), "--target-class-id", str(ids[1]),
+        "--relation", "containment", "--sample-count", "50", "--seed", "9",
+        "--output", str(result_path),
+    ]) == 0
+    relation_output = json.loads(capsys.readouterr().out)
+    assert relation_output["status"] == "saved"
+    persisted_relation = json.loads(result_path.read_text())
+    assert persisted_relation["decision_scope"] == "sampled_empirical"
+    assert persisted_relation["geometry_references"]["source"]["arrays_sha256"] == loaded.header["arrays_sha256"]
+    assert point_rows(loaded, 0, level="pizza", class_index=0)
+    import matplotlib.pyplot as plt
+    figure = build_image_geometry_figure(loaded, sample_index=0, level="pizza", class_index=0)
+    plt.close(figure)
+
+    # B=2,C=1 exercises a different first-axis collision shape with exact box
+    # parameters retained as [C,d], not reshaped into image dimensions.
+    box_config = replace(
+        town_config,
+        model=ImageModelConfig(family="box", pizza_mode="global", latent_dimensions=2),
+        diagnostics=DiagnosticsConfig(max_reference_samples=2, include_roi_feature_means=False),
+    ).validate()
+    box_model = ImageOntologyModel(2, dataset.class_names[:1], family="box", pizza_mode="global", seed=23)
+    box_snapshot = save_image_snapshot(
+        tmp_path / "box-b-not-c", dataset=dataset, train_subset=train, validation_subset=validation,
+        visual=visual, model=box_model, config=box_config, class_ids=(dataset.canonical_class_ids[0],),
+        class_indices=(0,), epoch=1, optimizer_step=1, latest_checkpoint=checkpoint, identity_hash="box-b-not-c",
+    )
+    box_loaded = load_image_snapshot(box_snapshot.path)
+    assert len(box_loaded.header["sample_ids"]) == 2
+    assert len(box_loaded.header["class_ids"]) == 1
+    assert box_loaded.arrays["classifier_geometry_box_low"].shape == (1, 2)
+    assert np.array_equal(
+        box_loaded.arrays["classifier_geometry_box_low"],
+        box_model.classifier.geometry.physical_boxes()[0].detach().cpu().numpy(),
+    )
+
+    # One image/one class with an explicitly empty component set retains empty
+    # occurrence axes while still storing per-pizza activity and class geometry.
+    empty_record = replace(train.records[0], components=())
+    empty_train = replace(train, records=(empty_record,))
+    empty_config = replace(
+        town_config,
+        model=ImageModelConfig(family="town", pizza_mode="compositional", latent_dimensions=2, houses=2, windows=2),
+        training=TrainingConfig(epochs=1, physical_batch_size=1, accumulation_steps=1),
+        diagnostics=DiagnosticsConfig(max_reference_samples=1, max_component_traces_per_sample=64, include_roi_feature_means=False),
+    ).validate()
+    one_class_model = ImageOntologyModel(2, dataset.class_names[:1], family="town", pizza_mode="compositional", houses=2, windows=2, seed=29)
+    empty_snapshot = save_image_snapshot(
+        tmp_path / "town-empty-components", dataset=dataset, train_subset=empty_train, validation_subset=validation,
+        visual=visual, model=one_class_model, config=empty_config, class_ids=(dataset.canonical_class_ids[0],),
+        class_indices=(0,), epoch=1, optimizer_step=1, latest_checkpoint=checkpoint, identity_hash="town-empty-components",
+    )
+    empty_loaded = load_image_snapshot(empty_snapshot.path)
+    assert len(empty_loaded.header["sample_ids"]) == len(empty_loaded.header["class_ids"]) == 1
+    assert empty_loaded.arrays["component_offsets"].tolist() == [0, 0]
+    assert empty_loaded.arrays["component_activity_house_margin"].shape == (0, 1, 2)
+    assert empty_loaded.arrays["pizza_activity_frame_margin"].shape == (1, 1, 2)
+
+
+def test_old_snapshot_without_explicit_diagnostic_axes_is_rejected_clearly(tmp_path, image_examples):
+    import json
+    from town_model.inspection.image_snapshots import load_image_snapshot
+
+    dataset, _, _, visual = image_examples
+    from town_model.experiments.image_config import DiagnosticsConfig, ImageExperimentConfig, ImageModelConfig
+    from town_model.inspection.image_snapshots import save_image_snapshot
+
+    train = deterministic_subset(dataset, "train", size=1, seed=331)
+    validation = deterministic_subset(dataset, "validation", size=1, seed=332)
+    model = ImageOntologyModel(2, dataset.class_names[:1], family="box", pizza_mode="global")
+    config = ImageExperimentConfig(
+        model=ImageModelConfig(family="box", pizza_mode="global", latent_dimensions=2),
+        diagnostics=DiagnosticsConfig(max_reference_samples=1, include_roi_feature_means=False),
+    ).validate()
+    checkpoint = tmp_path / "checkpoint.pt"
+    checkpoint.write_bytes(b"checkpoint")
+    snapshot = save_image_snapshot(
+        tmp_path / "versioned-snapshot", dataset=dataset, train_subset=train, validation_subset=validation,
+        visual=visual, model=model, config=config, class_ids=(dataset.canonical_class_ids[0],), class_indices=(0,),
+        epoch=0, optimizer_step=0, latest_checkpoint=checkpoint, identity_hash="versioned",
+    )
+    header_path = snapshot.path / "header.json"
+    header = json.loads(header_path.read_text())
+    header["schema_version"] = "image-research-snapshot-v1"
+    header_path.write_text(json.dumps(header))
+    with pytest.raises(ValueError, match="expected image-research-snapshot-v2 with explicit diagnostic axes"):
+        load_image_snapshot(snapshot.path)
 
 
 def test_common_neural_modules_are_byte_identical_and_classifiers_are_independent(image_examples):

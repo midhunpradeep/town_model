@@ -17,13 +17,14 @@ import torch
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset
 from town_model.experiments.image_config import ImageExperimentConfig
 from town_model.models.classifiers import BoxClassifier, NeuralBaseline, TownClassifier
+from town_model.models.geometry import GEOMETRY_DIAGNOSTIC_AXES
 from town_model.models.image_embeddings import ImageOntologyModel
 from town_model.vision.batching import collate_image_records
 from town_model.vision.features import SharedVisualFeatureExtractor
 from town_model.vision.preprocessing import ImageNetLetterbox
 from town_model.vision.roi import GroundTruthROIProvider
 
-SNAPSHOT_SCHEMA = "image-research-snapshot-v1"
+SNAPSHOT_SCHEMA = "image-research-snapshot-v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,8 +152,7 @@ def save_image_snapshot(
         }
         arrays_out["component_offsets"].append(np.asarray([0], dtype=np.int64))
         component_count_total = 0
-        component_diag_keys: set[str] = set()
-        pizza_diag_keys: set[str] = set()
+        classifier_geometry_values: dict[str, np.ndarray] = {}
         diag_component_values: dict[str, list[np.ndarray]] = {}
         diag_pizza_values: dict[str, list[np.ndarray]] = {}
         torch_device = next(model.parameters()).device
@@ -196,6 +196,17 @@ def save_image_snapshot(
                         batch, GroundTruthROIProvider(), diagnostics=config.diagnostics.include_roi_feature_means
                     )
                 output = model(features, batch.sample_ids, diagnostics=True)
+            for scoped_output in (output.component_classifier, output.pizza_classifier):
+                for name, value in (scoped_output.diagnostics or {}).items():
+                    axes = GEOMETRY_DIAGNOSTIC_AXES.get(name)
+                    if axes is None:
+                        raise ValueError(f"classifier diagnostic {name!r} has no declared semantic axes")
+                    if axes[0] == "class":
+                        parameter = _numpy(value)
+                        previous = classifier_geometry_values.get(name)
+                        if previous is not None and not np.array_equal(previous, parameter):
+                            raise ValueError(f"class-level geometry diagnostic {name!r} changed across snapshot batches")
+                        classifier_geometry_values[name] = parameter
             for row, split in enumerate(batch.split_identity):
                 count_total = int(output.component_valid_mask[row].sum().item())
                 cap = config.diagnostics.max_component_traces_per_sample
@@ -236,15 +247,14 @@ def save_image_snapshot(
                     arrays_out["global_spatial_features"].append(_numpy(features.global_spatial_features[row], dtype=np.float32))
                 component_count_total += count
                 arrays_out["component_offsets"].append(np.asarray([component_count_total], dtype=np.int64))
-                if model.family == "town":
-                    for name, value in (output.component_classifier.diagnostics or {}).items():
-                        component_diag_keys.add(name)
-                        if value.ndim >= 3 and value.shape[0] == len(batch.sample_ids):
-                            diag_component_values.setdefault(name, []).extend(_numpy(value[row, :count]))
-                    for name, value in (output.pizza_classifier.diagnostics or {}).items():
-                        pizza_diag_keys.add(name)
-                        if value.ndim >= 2 and value.shape[0] == len(batch.sample_ids):
-                            diag_pizza_values.setdefault(name, []).append(_numpy(value[row]))
+                for name, value in (output.component_classifier.diagnostics or {}).items():
+                    axes = GEOMETRY_DIAGNOSTIC_AXES[name]
+                    if axes[0] == "point":
+                        diag_component_values.setdefault(name, []).append(_numpy(value[row, :count]))
+                for name, value in (output.pizza_classifier.diagnostics or {}).items():
+                    axes = GEOMETRY_DIAGNOSTIC_AXES[name]
+                    if axes[0] == "point":
+                        diag_pizza_values.setdefault(name, []).append(_numpy(value[row]))
         arrays: dict[str, np.ndarray] = {}
         for key, values in arrays_out.items():
             if not values:
@@ -256,12 +266,19 @@ def save_image_snapshot(
             else:
                 arrays[key] = np.asarray(values)
         arrays["component_count_total"] = np.asarray(component_count_total, dtype=np.int64)
-        for name in component_diag_keys:
-            if name in diag_component_values:
-                arrays[f"component_geometry_{name}"] = np.asarray(diag_component_values[name])
-        for name in pizza_diag_keys:
-            if name in diag_pizza_values:
-                arrays[f"pizza_geometry_{name}"] = np.asarray(diag_pizza_values[name])
+        diagnostic_axes: dict[str, list[str]] = {}
+        for name, value in classifier_geometry_values.items():
+            key = f"classifier_geometry_{name}"
+            arrays[key] = value
+            diagnostic_axes[key] = list(GEOMETRY_DIAGNOSTIC_AXES[name])
+        for name, values in diag_component_values.items():
+            key = f"component_activity_{name}"
+            arrays[key] = np.concatenate(values, axis=0)
+            diagnostic_axes[key] = ["component_occurrence", *GEOMETRY_DIAGNOSTIC_AXES[name][1:]]
+        for name, values in diag_pizza_values.items():
+            key = f"pizza_activity_{name}"
+            arrays[key] = np.stack(values, axis=0)
+            diagnostic_axes[key] = ["image", *GEOMETRY_DIAGNOSTIC_AXES[name][1:]]
         _atomic_save_npz(staging / "arrays.npz", arrays)
         checkpoint = Path(latest_checkpoint).expanduser().resolve()
         header = {
@@ -293,6 +310,7 @@ def save_image_snapshot(
             "component_feature_means_included": config.diagnostics.include_roi_feature_means,
             "training_protocol": "pre-detector exploratory GT-ROI; not detector-pretrained Pizzaïolo model",
             "geometry": _classifier_geometry(model),
+            "diagnostic_axes_schema": diagnostic_axes,
             "arrays_sha256": hashlib.sha256((staging / "arrays.npz").read_bytes()).hexdigest(),
             "feature_cache_id": getattr(feature_cache, "cache_id", None),
         }
@@ -319,7 +337,10 @@ def load_image_snapshot(path: Path | str) -> ImageResearchSnapshot:
         header = json.loads((root / "header.json").read_text(encoding="utf-8"))
         arrays_path = root / "arrays.npz"
         if header.get("schema_version") != SNAPSHOT_SCHEMA:
-            raise ValueError("unsupported snapshot schema")
+            raise ValueError(
+                f"unsupported snapshot schema {header.get('schema_version')!r}; "
+                f"expected {SNAPSHOT_SCHEMA} with explicit diagnostic axes"
+            )
         digest = hashlib.sha256(arrays_path.read_bytes()).hexdigest()
         if digest != header.get("arrays_sha256"):
             raise ValueError("snapshot numeric array checksum mismatch")
@@ -335,6 +356,20 @@ def load_image_snapshot(path: Path | str) -> ImageResearchSnapshot:
         raise ValueError("image snapshot component offsets do not match traced occurrence count")
     if tuple(arrays.get("sample_ids", ())) != tuple(header.get("sample_ids", ())):
         raise ValueError("snapshot sample IDs do not match the validated header")
+    axis_schema = header.get("diagnostic_axes_schema", {})
+    if not isinstance(axis_schema, dict):
+        raise ValueError("snapshot diagnostic axis schema is malformed")
+    for key, axes in axis_schema.items():
+        if key not in arrays or not isinstance(axes, list) or arrays[key].ndim != len(axes):
+            raise ValueError(f"snapshot diagnostic {key!r} does not match its declared axes")
+    for diagnostic_name, header_name in (
+        ("box_low", "box_low"), ("box_high", "box_high"),
+        ("frame_low", "frame_low"), ("frame_high", "frame_high"),
+        ("window_low", "window_low"), ("window_high", "window_high"),
+    ):
+        array_key = f"classifier_geometry_{diagnostic_name}"
+        if array_key in arrays and not np.array_equal(arrays[array_key], np.asarray(header["geometry"][header_name])):
+            raise ValueError(f"snapshot class geometry diagnostic {diagnostic_name!r} differs from saved geometry")
     return ImageResearchSnapshot(root, header, arrays)
 
 

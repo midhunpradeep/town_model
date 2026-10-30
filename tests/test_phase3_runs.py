@@ -24,7 +24,6 @@ from town_model.experiments.image_runs import (
     RunWriterLock,
     inspect_run,
     launch_image_experiment,
-    release_launch_reservation,
     request_stop,
     resolve_image_experiment,
     run_image_experiment,
@@ -58,7 +57,7 @@ def test_run_resolution_persists_original_split_ids_and_ignores_visual_preferenc
     assert weights["policy"] == "none"
     assert set(weights["component_positive"]) == {1.0}
     assert set(weights["pizza_positive"]) == {1.0}
-    assert "sum of known class weights" in weights["normalization"]
+    assert "sum of active class weights" in weights["normalization"]
 
 
 def test_run_service_lifecycle_stop_and_faithful_resume(tmp_path):
@@ -178,7 +177,12 @@ def test_detached_worker_graceful_stop_and_compatible_resume(tmp_path):
     while time.monotonic() < deadline and not (first.run_directory / "manifest.json").is_file():
         time.sleep(0.05)
     assert (first.run_directory / "manifest.json").is_file()
-    assert inspect_run(first.run_directory)["state"] == "running"
+    deadline = time.monotonic() + 30
+    run_manifest = inspect_run(first.run_directory)
+    while run_manifest["state"] == "draft" and time.monotonic() < deadline:
+        time.sleep(0.02)
+        run_manifest = inspect_run(first.run_directory)
+    assert run_manifest["state"] == "running"
     request_stop(first.run_directory)
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
@@ -204,12 +208,122 @@ def test_detached_worker_graceful_stop_and_compatible_resume(tmp_path):
     assert manifest["optimizer_step"] > 0
 
 
-def test_invalid_dashboard_launch_fails_preflight_without_creating_output(tmp_path):
-    config = _config(vision=VisionConfig(roi_source="predicted"))
+@pytest.mark.parametrize(
+    "invalid_config, message",
+    [
+        (_config(vision=VisionConfig(roi_source="predicted")), "GT ROIs only"),
+        (_config(model=ImageModelConfig(family="town", windows=0)), "positive integer counts"),
+        (_config(vision=VisionConfig(visual_policy="trainable_fpn_last_blocks", trainable_backbone_blocks=(3.5,))), "integer feature indices"),
+    ],
+)
+def test_invalid_dashboard_launch_fails_preflight_without_creating_output(tmp_path, invalid_config, message):
     output = tmp_path / "invalid-worker-runs"
-    with pytest.raises(ValueError, match="GT ROIs only"):
-        launch_image_experiment(config, output, repository_root=Path(__file__).parents[1])
+    with pytest.raises(ValueError, match=message):
+        launch_image_experiment(invalid_config, output, repository_root=Path(__file__).parents[1])
     assert not output.exists()
+    assert not (output / ".image-workers").exists()
+    assert not (output / ".image-launch-locks").exists()
+
+
+def test_invalid_model_and_vision_preflight_has_no_run_cache_or_cli_side_effects(tmp_path):
+    import json
+    from dataclasses import asdict
+    from town_model.cli import main
+
+    repository = Path(__file__).parents[1]
+    invalids = (
+        _config(model=ImageModelConfig(family="town", windows=0)),
+        _config(vision=VisionConfig(visual_policy="trainable_fpn_last_blocks", trainable_backbone_blocks=(3.5,))),
+    )
+    for index, config in enumerate(invalids):
+        run_root = tmp_path / f"direct-{index}"
+        with pytest.raises(ValueError):
+            run_image_experiment(config, run_root, repository_root=repository)
+        assert not run_root.exists()
+        cache = tmp_path / f"cache-{index}"
+        cached_config = replace(config, execution=ExecutionConfig(device="cpu", cpu_threads=2, feature_cache_directory=str(cache)))
+        # Frozen cache is intentionally disabled by this model policy combination;
+        # invalid config rejection must precede cache preparation.
+        with pytest.raises(ValueError):
+            run_image_experiment(cached_config, tmp_path / f"cached-run-{index}", repository_root=repository)
+        assert not cache.exists()
+        assert not (tmp_path / f"cached-run-{index}").exists()
+
+        config_path = tmp_path / f"invalid-{index}.json"
+        config_path.write_text(json.dumps(asdict(config)))
+        cli_output = tmp_path / f"cli-{index}"
+        with pytest.raises(SystemExit):
+            main(["experiment", "image", "preflight", "--config", str(config_path)])
+        with pytest.raises(SystemExit):
+            main(["experiment", "image", "run", "--config", str(config_path), "--output", str(cli_output)])
+        assert not cli_output.exists()
+
+
+def test_forced_worker_death_reconciles_status_preserves_checkpoint_and_resumes(tmp_path):
+    from town_model.experiments.image_runs import RunWriterLock, reconcile_worker_status
+
+    repository = Path(__file__).parents[1]
+    config = _config(training=TrainingConfig(
+        seed=77, epochs=2, physical_batch_size=2, accumulation_steps=1,
+        schedule="constant", warmup_steps=0,
+    ))
+    output = tmp_path / "forced-death-runs"
+    launch = launch_image_experiment(config, output, repository_root=repository)
+    latest = launch.run_directory / "checkpoints" / "latest.pt"
+    deadline = time.monotonic() + 90
+    payload = None
+    while time.monotonic() < deadline:
+        if latest.is_file():
+            try:
+                candidate = __import__("torch").load(latest, map_location="cpu", weights_only=False)
+            except (OSError, EOFError, RuntimeError):
+                candidate = None
+            if candidate and candidate.get("optimizer_step", 0) >= 1:
+                payload = candidate
+                break
+        time.sleep(0.02)
+    assert payload is not None, _log(launch.log_path)
+    checkpoint_before = __import__("hashlib").sha256(latest.read_bytes()).hexdigest()
+    os.kill(launch.pid, 9)
+
+    deadline = time.monotonic() + 30
+    manifest = None
+    while time.monotonic() < deadline:
+        manifest = inspect_run(launch.run_directory, refresh_interrupted=True)
+        if manifest["state"] == "interrupted":
+            break
+        time.sleep(0.05)
+    assert manifest is not None and manifest["state"] == "interrupted"
+    assert manifest["exit_code"] is None
+    assert "unknown" in manifest["process_exit_status"]
+    status = reconcile_worker_status(launch.run_directory)
+    assert status is not None
+    assert status["state"] == "interrupted"
+    assert status["exit_code"] is None
+    assert "unknown" in status["exit_status"]
+    assert __import__("hashlib").sha256(latest.read_bytes()).hexdigest() == checkpoint_before
+    recovered_checkpoint = __import__("torch").load(latest, map_location="cpu", weights_only=False)
+    assert recovered_checkpoint["optimizer_step"] == payload["optimizer_step"]
+
+    # Persistent orphan reservation files are safe: kernel flock ownership was
+    # released by SIGKILL, so one compatible resumer may take it.
+    reservation = output / ".image-launch-locks" / f"{launch.run_directory.name}.lock"
+    reservation_lock = RunWriterLock(reservation)
+    reservation_lock.acquire()
+    reservation_lock.release()
+
+    resumed = launch_image_experiment(config, output, repository_root=repository, resume=True)
+    deadline = time.monotonic() + 180
+    while time.monotonic() < deadline:
+        worker_status = json.loads(resumed.status_path.read_text(encoding="utf-8"))
+        if worker_status.get("state") in ("completed", "failed", "stopped"):
+            break
+        time.sleep(0.1)
+    assert worker_status["state"] == "completed", _log(resumed.log_path)
+    final_manifest = inspect_run(resumed.run_directory)
+    assert final_manifest["state"] == "completed"
+    final_checkpoint = __import__("torch").load(latest, map_location="cpu", weights_only=False)
+    assert final_checkpoint["optimizer_step"] > payload["optimizer_step"]
 
 
 def test_stop_api_rejects_nonrunning_state_and_writes_only_a_graceful_request(tmp_path):
@@ -258,8 +372,8 @@ def test_dashboard_resume_uses_only_compatible_stopped_checkpoint_and_detached_c
     assert calls["kwargs"]["start_new_session"] is True
     assert calls["kwargs"]["stdin"] is image_runs.subprocess.DEVNULL
     reservation = output / ".image-launch-locks" / f"{run_path.name}.lock"
-    owner = json.loads(reservation.read_text(encoding="utf-8"))
-    release_launch_reservation(reservation, owner["token"])
+    assert reservation.exists()
+    assert calls["kwargs"]["pass_fds"]
 
     incompatible = _config(objective=replace(config.objective, geometry_loss="signed_bce"))
     with pytest.raises((FileNotFoundError, RunLifecycleError), match="exist|identity"):
@@ -280,8 +394,7 @@ def test_worker_persists_nonzero_subprocess_exit_code_and_command_context(tmp_pa
 
     code = run_worker([
         "--config", str(tmp_path / "config.json"), "--output", str(tmp_path / "runs"),
-        "--status", str(status_path), "--reservation", str(tmp_path / "reservation"),
-        "--reservation-token", "token",
+        "--status", str(status_path),
     ], command_main=failing_cli)
     status = json.loads(status_path.read_text(encoding="utf-8"))
     assert code == 17
@@ -314,4 +427,89 @@ def test_one_writer_per_run_lock(tmp_path):
             second.acquire()
     finally:
         first.release()
-    assert not path.exists()
+    assert path.exists()  # Persistent inode; flock, not pathname deletion, owns exclusivity.
+    lock = RunWriterLock(path)
+    lock.acquire()
+    lock.release()
+
+
+def test_worker_liveness_uses_host_and_pid_start_identity_conservatively():
+    from town_model.experiments.image_runs import _process_identity_is_alive, _process_start_token
+
+    pid = os.getpid()
+    token = _process_start_token(pid)
+    assert token is not None
+    assert _process_identity_is_alive({
+        "pid": pid, "hostname": socket.gethostname(), "process_start_token": token,
+    })
+    assert not _process_identity_is_alive({
+        "pid": pid, "hostname": socket.gethostname(), "process_start_token": "different-start-time",
+    })  # PID reuse is a dead owner, not proof of the recorded process.
+    assert _process_identity_is_alive({
+        "pid": 1, "hostname": "another-host", "process_start_token": None,
+    })  # Remote owners remain uncertain and are never displaced by local PID probes.
+
+
+def test_inspection_uses_live_kernel_lock_not_a_reused_or_stale_manifest_pid(tmp_path):
+    from town_model.experiments.image_runs import _atomic_json
+
+    run = tmp_path / "lock-authority-run"
+    run.mkdir()
+    _atomic_json(run / "manifest.json", {
+        "schema_version": "image-run-manifest-v1", "run_id": run.name, "state": "running",
+        "pid": 2**30, "hostname": socket.gethostname(), "process_start_token": "stale-start-token",
+    })
+    lock = RunWriterLock(run / ".writer.lock")
+    lock.acquire()
+    try:
+        assert inspect_run(run)["state"] == "running"  # active lock is not displaced by stale metadata
+    finally:
+        lock.release()
+    recovered = inspect_run(run)
+    assert recovered["state"] == "interrupted"
+    assert recovered["exit_code"] is None
+
+
+def test_malformed_writer_lock_metadata_does_not_block_safe_recovery(tmp_path):
+    path = tmp_path / ".writer.lock"
+    path.write_text('{"pid":', encoding="utf-8")
+    lock = RunWriterLock(path)
+    lock.acquire()
+    owner = json.loads(path.read_text(encoding="utf-8"))
+    assert owner["protocol"] == "local-flock-v1"
+    lock.release()
+    # Crash-safe metadata may remain; an unlocked kernel flock is recoverable.
+    lock.acquire()
+    lock.release()
+
+
+def test_live_writer_in_another_process_cannot_be_displaced_and_crash_releases_lock(tmp_path):
+    import subprocess
+    import sys
+
+    path = tmp_path / ".writer.lock"
+    script = (
+        "import time; from pathlib import Path; "
+        "from town_model.experiments.image_runs import RunWriterLock; "
+        f"lock=RunWriterLock(Path({str(path)!r})); lock.acquire(); "
+        "print('LOCKED', flush=True); time.sleep(60)"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        cwd=Path(__file__).parents[1],
+    )
+    try:
+        assert process.stdout is not None and process.stdout.readline().strip() == "LOCKED"
+        with pytest.raises(RunLifecycleError, match="another process owns"):
+            RunWriterLock(path).acquire()
+        process.kill()
+        process.wait(timeout=10)
+        # The OS releases flock on forced process death, irrespective of its
+        # persisted owner metadata; the next local writer may safely resume.
+        recovered = RunWriterLock(path)
+        recovered.acquire()
+        recovered.release()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)

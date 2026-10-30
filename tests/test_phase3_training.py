@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import math
 
 import pytest
 import torch
@@ -11,6 +12,7 @@ from town_model.experiments.image_config import (
     ExecutionConfig,
     ImageExperimentConfig,
     ImageModelConfig,
+    ObjectiveConfig,
     TrainingConfig,
     VisionConfig,
 )
@@ -130,21 +132,130 @@ def test_nine_real_image_training_smokes_update_save_reload_and_evaluate(tmp_pat
     assert payload["identity"]["visual_initial_state_hash"]
 
 
-def test_inverse_frequency_weights_upweight_only_known_positive_observations(tiny_real_subsets):
+def test_experimental_inverse_frequency_is_explicit_and_capped(tiny_real_subsets):
     from town_model.training.image_trainer import _positive_weights
 
     dataset, train, _ = tiny_real_subsets
     class_ids = (0, 2)
     component = _positive_weights(
-        train, dataset, class_ids, level="component", weighting="inverse_frequency", cap=20.0,
+        train, dataset, class_ids, level="component", weighting="experimental_inverse_frequency", cap=20.0,
         beta=0.99, require_coverage=False,
     )
     pizza = _positive_weights(
-        train, dataset, class_ids, level="pizza", weighting="inverse_frequency", cap=20.0,
+        train, dataset, class_ids, level="pizza", weighting="experimental_inverse_frequency", cap=20.0,
         beta=0.99, require_coverage=False,
     )
     assert component[1] >= 1.0 and pizza[0] >= 1.0
     assert max(component + pizza) <= 20.0
+
+
+def test_exploratory_training_persists_initial_metrics_in_checkpoint_and_run_result(tmp_path, tiny_real_subsets):
+    dataset, train, validation = tiny_real_subsets
+    class_ids = (0, 2, 22, 29)
+    config = _tiny_config(
+        dataset=DatasetSubsetConfig(
+            dataset_path="examples/pizza-48", train_size=4, validation_size=2,
+            selection_seed=31, trainable_class_ids=class_ids,
+        ),
+        purpose="exploratory",
+        training=TrainingConfig(seed=23, epochs=1, physical_batch_size=2, accumulation_steps=1, schedule="constant", warmup_steps=0),
+    )
+    result = train_image_model(dataset, train, validation, config, tmp_path / "initial-metrics-run")
+    assert result.initial_metrics is not None
+    assert result.initial_metrics["training"]["objective_losses"]["total"] is not None
+    assert result.initial_metrics["validation"]["objective_losses"]["component"] is not None
+    assert result.initial_metrics["validation"]["objective_losses"]["pizza"] is not None
+    checkpoint = torch.load(result.latest_checkpoint, map_location="cpu", weights_only=False)
+    assert checkpoint["initial_metrics"] == result.initial_metrics
+
+
+def test_weight_normalization_is_stable_against_the_selected_class_subset(tiny_real_subsets):
+    from town_model.training.image_trainer import _positive_weights
+
+    dataset, train, _ = tiny_real_subsets
+    selected = _positive_weights(
+        train, dataset, (2,), level="component", weighting="inverse_sqrt", cap=10.0,
+        beta=0.99, require_coverage=False,
+    )
+    support = train.class_support
+    in_scope = set(dataset.component_supervision_class_ids)
+    all_counts = [
+        count for class_id, count in zip(support["class_ids"], support["component"]["known_positive"], strict=True)
+        if class_id in in_scope and count > 0
+    ]
+    expected = math.sqrt(max(all_counts) / support["component"]["known_positive"][support["class_ids"].index(2)])
+    assert selected[0] == pytest.approx(expected)
+    assert selected[0] > 1.0  # not renormalized to one merely because the run selects one class
+
+
+def test_positive_weights_ignore_negative_and_unknown_support_counts(tiny_real_subsets):
+    from copy import deepcopy
+    from dataclasses import replace
+    from town_model.training.image_trainer import _positive_weights
+
+    dataset, train, _ = tiny_real_subsets
+    ids = (2, 22)
+    original = _positive_weights(
+        train, dataset, ids, level="component", weighting="inverse_sqrt", cap=10.0,
+        beta=0.99, require_coverage=False,
+    )
+    with pytest.raises(ValueError, match="training subset only"):
+        _positive_weights(
+            deterministic_subset(dataset, "validation", size=2, seed=77), dataset, ids,
+            level="component", weighting="inverse_sqrt", cap=10.0, beta=0.99,
+            require_coverage=False,
+        )
+    support = deepcopy(train.class_support)
+    support["component"]["known_negative"] = [10_000_000] * len(support["class_ids"])
+    support["component"]["unknown"] = [9_000_000] * len(support["class_ids"])
+    mutated = replace(train, class_support=support)
+    assert _positive_weights(
+        mutated, dataset, ids, level="component", weighting="inverse_sqrt", cap=10.0,
+        beta=0.99, require_coverage=False,
+    ) == original
+
+
+def test_training_loop_uses_resolved_positive_weight_vectors_and_versions_checkpoint(tmp_path, tiny_real_subsets, monkeypatch):
+    import town_model.training.image_objectives as image_objectives
+    from town_model.training.image_trainer import _positive_weights
+
+    dataset, train, validation = tiny_real_subsets
+    class_ids = (0, 2, 22, 42)
+    config = _tiny_config(
+        dataset=DatasetSubsetConfig(
+            dataset_path="examples/pizza-48", train_size=4, validation_size=2,
+            selection_seed=31, trainable_class_ids=class_ids,
+        ),
+        objective=ObjectiveConfig(positive_weighting="inverse_sqrt", positive_weight_cap=10.0),
+        training=TrainingConfig(seed=23, epochs=1, physical_batch_size=2, accumulation_steps=1, schedule="constant", warmup_steps=0),
+    )
+    calls = []
+    original = image_objectives._instance_terms
+
+    def record_weights(penalties, targets, known, *, positive_weights):
+        calls.append(tuple(positive_weights.detach().cpu().tolist()) if positive_weights is not None else None)
+        return original(penalties, targets, known, positive_weights=positive_weights)
+
+    monkeypatch.setattr(image_objectives, "_instance_terms", record_weights)
+    result = train_image_model(dataset, train, validation, config, tmp_path / "weighted-run")
+    checkpoint = torch.load(result.latest_checkpoint, map_location="cpu", weights_only=False)
+    resolved = checkpoint["resolved_config"]["resolved_data"]["class_weight_vectors"]
+    expected_component = _positive_weights(
+        train, dataset, class_ids, level="component", weighting="inverse_sqrt", cap=10.0,
+        beta=0.99, require_coverage=False,
+    )
+    expected_pizza = _positive_weights(
+        train, dataset, class_ids, level="pizza", weighting="inverse_sqrt", cap=10.0,
+        beta=0.99, require_coverage=False,
+    )
+    assert tuple(resolved["component_positive"]) == pytest.approx(expected_component)
+    assert tuple(resolved["pizza_positive"]) == pytest.approx(expected_pizza)
+    assert "positive-count-proportional-v2" in resolved["semantics_version"]
+    assert "most-supported in-scope class has weight 1" in resolved["normalization"]
+    assert any(call is not None and call == pytest.approx(expected_component, abs=1e-6) for call in calls)
+    assert any(call is not None and call == pytest.approx(expected_pizza, abs=1e-6) for call in calls)
+    assert checkpoint["identity"]["config_hash"] == config.identity_hash()
+    assert config.objective_identity()["positive_weighting_semantics"] == resolved["semantics_version"]
 
 
 def test_snapshot_capture_does_not_change_training_trajectory(tmp_path, tiny_real_subsets):

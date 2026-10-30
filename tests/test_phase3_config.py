@@ -77,6 +77,7 @@ def test_default_and_selectable_image_objective_identities_and_scientific_hashes
         assert config.objective_identity()["reduction"] == "known-weight-sum-normalized-per-instance-v2"
         assert config.identity_dict()["objective_semantics"] == "known-weight-sum-normalized-per-instance-v2"
         assert config.identity_dict()["vision_feature_contract"] == "original_extent_roi_letterbox_padding_v2"
+        assert config.objective_identity()["positive_weighting_semantics"] == "positive-count-proportional-v2-all-in-scope-most-supported-class-unit-scaled"
 
     hinge = ImageExperimentConfig(model=ImageModelConfig(family="box"), objective=ObjectiveConfig(hinge_margin=0.0)).validate()
     assert hinge.objective_identity()["component_loss"]["parameters"] == {"margin": 0.0}
@@ -93,12 +94,14 @@ def test_default_and_selectable_image_objective_identities_and_scientific_hashes
         model=ImageModelConfig(family="box"), objective=ObjectiveConfig(hinge_margin=0.2)
     ).validate()
     assert changed_margin.identity_hash() != configs["box"].identity_hash()
+    with pytest.raises(ValueError, match="legacy inverse_frequency is unsupported"):
+        ImageExperimentConfig(objective=ObjectiveConfig(positive_weighting="inverse_frequency")).validate()
 
 
 def test_explicit_trainable_ids_must_be_nonempty_unique_and_valid():
-    with pytest.raises(ValueError, match="nonempty and unique"):
+    with pytest.raises(ValueError, match="nonempty"):
         DatasetSubsetConfig(trainable_class_ids=()).validate()
-    with pytest.raises(ValueError, match="nonempty and unique"):
+    with pytest.raises(ValueError, match="unique"):
         DatasetSubsetConfig(trainable_class_ids=(2, 2)).validate()
     with pytest.raises(ValueError, match="nonnegative"):
         DatasetSubsetConfig(trainable_class_ids=(-1,)).validate()

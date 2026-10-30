@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from itertools import combinations
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,7 @@ class OntologySnapshot:
     direct_parents: dict[str, frozenset[str]]
     individual_types: dict[str, frozenset[str]]
     class_elements: dict[str, ET.Element]
+    disjoint_pairs: frozenset[tuple[str, str]]
 
     @classmethod
     def load(cls, path: Path = ASSET_ONTOLOGY_PATH, *, require_pinned_hash: bool = False) -> "OntologySnapshot":
@@ -91,6 +93,7 @@ class OntologySnapshot:
         }
 
         direct_parents: dict[str, frozenset[str]] = {}
+        disjoint_pairs: set[tuple[str, str]] = set()
         for name, element in class_elements.items():
             parents = {
                 parent
@@ -98,6 +101,17 @@ class OntologySnapshot:
                 if (parent := _local_name(child.get(f"{{{RDF}}}resource"))) in class_iris
             }
             direct_parents[name] = frozenset(parents)
+            for child in element.findall("owl:disjointWith", NS):
+                other = _local_name(child.get(f"{{{RDF}}}resource"))
+                if other in class_iris:
+                    disjoint_pairs.add(tuple(sorted((name, other))))
+        for group in root.findall("owl:AllDisjointClasses/owl:members", NS):
+            names = {
+                name
+                for member in group
+                if (name := _local_name(member.get(f"{{{RDF}}}about"))) in class_iris
+            }
+            disjoint_pairs.update(tuple(sorted(pair)) for pair in combinations(names, 2))
 
         if len(class_iris) != EXPECTED_OWL_CLASS_COUNT:
             raise ValueError(
@@ -114,6 +128,7 @@ class OntologySnapshot:
             direct_parents=direct_parents,
             individual_types={key: frozenset(value) for key, value in individual_types.items()},
             class_elements=class_elements,
+            disjoint_pairs=frozenset(disjoint_pairs),
         )
 
     @property
@@ -136,6 +151,41 @@ class OntologySnapshot:
             found.add(parent)
             pending.extend(self.direct_parents.get(parent, ()))
         return frozenset(found)
+
+    def disjointness_status(self, first: str, second: str) -> str:
+        """Return asserted/entailed/unknown using only named subclass/disjoint axioms."""
+        if first not in self.class_iris or second not in self.class_iris:
+            return "unknown"
+        pair = tuple(sorted((first, second)))
+        if pair in self.disjoint_pairs:
+            return "asserted"
+        first_ancestors = self.ancestors(first)
+        second_ancestors = self.ancestors(second)
+        if any(tuple(sorted((left, right))) in self.disjoint_pairs for left in first_ancestors for right in second_ancestors):
+            return "entailed"
+        return "unknown"
+
+    def geometric_relation_metadata(self, source_class: str, target_class: str, relation: str) -> dict[str, str]:
+        """Describe represented ontology metadata without treating absence as false."""
+        if source_class not in self.class_iris or target_class not in self.class_iris:
+            return {"status": "unknown", "basis": "one or both class IDs are absent from the pinned ontology"}
+        if relation == "containment":
+            if target_class in self.direct_parents.get(source_class, frozenset()):
+                return {"status": "asserted", "basis": "direct named rdfs:subClassOf axiom"}
+            if target_class in self.ancestors(source_class):
+                return {"status": "entailed", "basis": "transitive closure of named rdfs:subClassOf axioms"}
+            return {"status": "unknown", "basis": "no asserted/entailed named subclass relationship found"}
+        if relation == "disjointness":
+            status = self.disjointness_status(source_class, target_class)
+            basis = {
+                "asserted": "named owl:disjointWith or owl:AllDisjointClasses axiom",
+                "entailed": "subclass closure under an asserted named disjointness axiom",
+                "unknown": "no asserted/entailed named disjointness relationship found",
+            }[status]
+            return {"status": status, "basis": basis}
+        if relation == "intersection":
+            return {"status": "unknown", "basis": "the pinned ontology metadata does not assert named region-overlap existence"}
+        raise ValueError(f"unsupported geometric relation {relation!r}")
 
     def _vegetarian_equivalence_sources(self) -> frozenset[str]:
         element = self.class_elements["VegetarianTopping"]

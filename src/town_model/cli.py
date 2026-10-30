@@ -75,6 +75,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     image = experiment_commands.add_parser("image", help="Run/resume/inspect real-image Phase 3 embeddings; all runs are pre-detector GT-ROI exploratory work")
     image_commands = image.add_subparsers(dest="image_command", required=True)
+    image_preflight = image_commands.add_parser("preflight", help="Validate config, dataset, model, support, and resolved weights without creating a run")
+    image_preflight.add_argument("--config", type=Path, required=True, help="JSON image experiment configuration")
+
     image_run = image_commands.add_parser("run", help="Run one validated image experiment configuration")
     image_run.add_argument("--config", type=Path, required=True, help="JSON image experiment configuration")
     image_run.add_argument("--output", type=Path, required=True, help="Parent directory for immutable image runs")
@@ -97,6 +100,14 @@ def build_parser() -> argparse.ArgumentParser:
     image_stop.add_argument("run", type=Path)
     image_inspect = image_commands.add_parser("inspect", help="Read JSON run lifecycle and metrics without loading checkpoint optimizer state")
     image_inspect.add_argument("run", type=Path)
+    image_relations = image_commands.add_parser("relations", help="Run reproducible exact-box or sampled-town relation diagnostics from a saved snapshot")
+    image_relations.add_argument("snapshot", type=Path)
+    image_relations.add_argument("--source-class-id", type=int, required=True)
+    image_relations.add_argument("--target-class-id", type=int, required=True)
+    image_relations.add_argument("--relation", choices=("containment", "intersection", "disjointness"), required=True)
+    image_relations.add_argument("--sample-count", type=int, default=10000, help="Town draws per sampling stratum; box queries are exact")
+    image_relations.add_argument("--seed", type=int, default=0)
+    image_relations.add_argument("--output", type=Path, help="Optional immutable JSON result path")
 
     evaluate = commands.add_parser("evaluate", help="Evaluate a saved Phase 2 checkpoint without training")
     evaluate.add_argument("run", type=Path)
@@ -195,6 +206,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "experiment":
             repository_root = Path(__file__).resolve().parents[2]
             if args.experiment_kind == "image":
+                if args.image_command == "preflight":
+                    image_config = _load_image_config(args.config)
+                    resolved = resolve_image_experiment(image_config, repository_root=repository_root)
+                    print(json.dumps({
+                        "status": "preflight_passed",
+                        "run_id": resolved.run_id,
+                        "identity_hash": resolved.identity_hash,
+                        "class_weight_vectors": resolved.class_weight_vectors(),
+                        "training_protocol": "pre-detector exploratory GT-ROI; no run artifacts created",
+                    }, indent=2, sort_keys=True))
+                    return 0
+                if args.image_command == "relations":
+                    from town_model.dataset.ontology import OntologySnapshot
+                    from town_model.inspection.image_snapshots import load_image_snapshot
+                    from town_model.inspection.relation_diagnostics import diagnose_region_relation, region_from_snapshot, save_relation_diagnostic
+
+                    snapshot = load_image_snapshot(args.snapshot)
+                    ontology = OntologySnapshot.load(require_pinned_hash=True)
+                    class_ids = tuple(snapshot.header["class_ids"])
+                    if args.source_class_id not in class_ids or args.target_class_id not in class_ids:
+                        raise ValueError("requested class IDs are not both present in the saved geometry snapshot")
+                    source = region_from_snapshot(snapshot, class_ids.index(args.source_class_id), ontology=ontology)
+                    target = region_from_snapshot(snapshot, class_ids.index(args.target_class_id), ontology=ontology)
+                    result = diagnose_region_relation(
+                        source, target, args.relation, sample_count=args.sample_count, seed=args.seed, ontology=ontology
+                    )
+                    if args.output:
+                        save_relation_diagnostic(result, args.output)
+                        print(json.dumps({"status": "saved", "path": str(args.output.resolve()), "result": result}, indent=2, sort_keys=True))
+                    else:
+                        print(json.dumps(result, indent=2, sort_keys=True))
+                    return 0
                 if args.image_command in ("run", "matrix"):
                     image_config = _load_image_config(args.config)
                     if args.image_command == "run":

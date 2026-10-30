@@ -24,8 +24,11 @@ from town_model.experiments.image_runs import (
     launch_image_experiment,
     request_stop,
     resolve_image_experiment,
+    reconcile_worker_status,
 )
+from town_model.dataset.ontology import OntologySnapshot
 from town_model.inspection.image_snapshots import ImageResearchSnapshot, load_image_snapshot
+from town_model.inspection.relation_diagnostics import diagnose_region_relation, region_from_snapshot
 from town_model.models.geometry import BoxGeometry, evaluate_town_corners
 
 
@@ -290,6 +293,14 @@ def _worker_records(runs_root: Path) -> list[dict[str, Any]]:
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(value, dict) and value.get("run_id"):
+            run_directory = value.get("run_directory")
+            if run_directory:
+                try:
+                    reconciled = reconcile_worker_status(run_directory)
+                except (OSError, ValueError, RunLifecycleError):
+                    reconciled = None
+                if reconciled is not None:
+                    value = reconciled
             records.append(value)
     return records
 
@@ -491,6 +502,45 @@ def render_image_embeddings(st, runs_root: Path, dataset_path: Path) -> None:
         format_func=lambda index: f"{classes[index][1]} · class_id={classes[index][0]}",
         key="image_embedding_class",
     )
+    st.markdown("#### Ontology relation diagnostics · separate from predictive quality")
+    st.caption("Box relations are exact closed-interval results. Town relations are seeded samples verified by exact house/window membership; no missing sampled counterexample is reported as proof.")
+    source_index = st.selectbox(
+        "Source region A",
+        list(range(len(classes))),
+        index=selected_class_index,
+        format_func=lambda index: f"{classes[index][1]} · class_id={classes[index][0]}",
+        key="relation_source_class",
+    )
+    target_index = st.selectbox(
+        "Target region B",
+        list(range(len(classes))),
+        index=(selected_class_index + 1) % len(classes),
+        format_func=lambda index: f"{classes[index][1]} · class_id={classes[index][0]}",
+        key="relation_target_class",
+    )
+    relation = st.selectbox("Region relation", ("containment", "intersection", "disjointness"), key="relation_query")
+    sampling_count = st.number_input("Town samples per strategy", min_value=100, max_value=100000, value=10000, step=100, key="relation_sample_count")
+    sampling_seed = st.number_input("Deterministic sample seed", min_value=0, value=0, step=1, key="relation_seed")
+    if st.button("Run read-only relation diagnostic", key="relation_run"):
+        try:
+            ontology = OntologySnapshot.load(require_pinned_hash=True)
+            source = region_from_snapshot(snapshot, source_index, ontology=ontology)
+            target = region_from_snapshot(snapshot, target_index, ontology=ontology)
+            relation_result = diagnose_region_relation(
+                source, target, relation, sample_count=int(sampling_count), seed=int(sampling_seed), ontology=ontology
+            )
+            st.json(relation_result)
+            if relation_result["outcome"] is None:
+                st.warning("No decisive sampled witness was found. This result is inconclusive, not a proof.")
+            st.download_button(
+                "Download reproducible relation result JSON",
+                data=json.dumps(relation_result, indent=2, sort_keys=True),
+                file_name=f"relation-{source.class_id}-{target.class_id}-{relation}.json",
+                mime="application/json",
+                key="relation_download",
+            )
+        except (OSError, ValueError, IndexError, RuntimeError) as error:
+            st.error(f"Relation diagnostic unavailable: {error}")
     level = st.radio("Embedding/classifier level", ("pizza", "component"), horizontal=True, key="image_embedding_level")
     rows = point_rows(snapshot, position, level=level, class_index=selected_class_index)
     projection_default = config.get("training_config", {}).get("visualization", {}).get("point_projection", "none")

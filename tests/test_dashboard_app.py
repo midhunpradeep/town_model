@@ -120,8 +120,10 @@ def test_image_embeddings_launch_button_uses_validated_detached_worker_service(t
     assert worker["state"] == "launching"
     assert not Path(worker["run_directory"]).exists()
     reservation = runs_root / ".image-launch-locks" / f"{worker['run_id']}.lock"
-    owner = json.loads(reservation.read_text(encoding="utf-8"))
-    image_runs.release_launch_reservation(reservation, owner["token"])
+    assert json.loads(reservation.read_text(encoding="utf-8"))["protocol"] == "local-flock-v1"
+    lock = image_runs.RunWriterLock(reservation)
+    lock.acquire()
+    lock.release()
 
 
 def test_image_embeddings_displays_worker_subprocess_failure_and_captured_log(tmp_path):
@@ -152,7 +154,11 @@ def test_dashboard_image_embeddings_inspects_a_saved_run_without_loading_checkpo
 
     repository = Path(__file__).parents[1]
     example = repository / "examples" / "pizza-48"
-    config = repository / "configs" / "phase3_image_smoke.json"
+    base_config = json.loads((repository / "configs" / "phase3_image_smoke.json").read_text())
+    base_config["model"]["family"] = "town"
+    base_config["model"]["windows"] = 2
+    config = tmp_path / "town-smoke-config.json"
+    config.write_text(json.dumps(base_config))
     runs_root = tmp_path / "image-runs"
     assert main(["experiment", "image", "run", "--config", str(config), "--output", str(runs_root)]) == 0
     result = json.loads(capsys.readouterr().out)
@@ -172,7 +178,16 @@ def test_dashboard_image_embeddings_inspects_a_saved_run_without_loading_checkpo
     assert any(item.label == "Historical epoch snapshot" for item in app.selectbox)
     assert any(item.label == "GT component occurrence" for item in app.selectbox)
     assert any(item.label == "Trainable ontology class" for item in app.selectbox)
+    assert any(item.label == "Source region A" for item in app.selectbox)
+    assert any(item.label == "Target region B" for item in app.selectbox)
     assert len(app.image) >= 1
+    next(item for item in app.number_input if item.label == "Town samples per strategy").set_value(100)
+    relation_button = next(item for item in app.button if item.label == "Run read-only relation diagnostic")
+    relation_button.click()
+    app.run()
+    assert not app.exception
+    assert any(item.label == "Download reproducible relation result JSON" for item in app.download_button)
+    assert not any("relation diagnostic unavailable" in item.value.lower() for item in app.error)
     assert not any("checkpoint" in item.value.lower() and "error" in item.value.lower() for item in app.error)
 
 

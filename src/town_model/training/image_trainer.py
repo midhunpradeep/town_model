@@ -52,6 +52,7 @@ class ImageTrainingResult:
     history: tuple[dict[str, Any], ...]
     best_primary_monitor: float | None
     stopped_reason: str | None
+    initial_metrics: dict[str, Any] | None = None
 
 
 def _hash_state(state: dict[str, Tensor]) -> str:
@@ -131,8 +132,8 @@ def build_image_modules(
     visual = SharedVisualFeatureExtractor(visual_backbone)
     selected_class_ids = tuple(class_ids if class_ids is not None else config.dataset.trainable_class_ids or dataset.canonical_class_ids)
     canonical_columns = {class_id: index for index, class_id in enumerate(dataset.canonical_class_ids)}
-    if not selected_class_ids or any(class_id not in canonical_columns for class_id in selected_class_ids):
-        raise ValueError("selected class IDs must be a nonempty subset of authoritative trainable ontology IDs")
+    if not selected_class_ids or len(set(selected_class_ids)) != len(selected_class_ids) or any(type(class_id) is not int or class_id not in canonical_columns for class_id in selected_class_ids):
+        raise ValueError("selected class IDs must be a unique nonempty subset of authoritative trainable ontology IDs")
     if tuple(sorted(selected_class_ids)) != selected_class_ids:
         raise ValueError("explicit class IDs must preserve canonical ontology ordering")
     names_by_id = dict(zip(dataset.canonical_class_ids, dataset.class_names, strict=True))
@@ -540,6 +541,7 @@ def _checkpoint_payload(
     history: list[dict[str, Any]],
     class_ids: tuple[int, ...],
     parents: list[dict[str, Any]],
+    initial_metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "schema_version": "image-training-checkpoint-v1",
@@ -559,6 +561,7 @@ def _checkpoint_payload(
         "best_epoch": best_epoch,
         "early_stopping_patience_count": patience_count,
         "history": history,
+        "initial_metrics": initial_metrics,
         "class_ids": list(class_ids),
         "environment": _environment(),
         "parents": parents,
@@ -581,6 +584,68 @@ def _load_checkpoint(path: Path, expected_identity: dict[str, Any], device: torc
     return payload
 
 
+def _positive_weights_from_counts(
+    positive_counts: tuple[int, ...] | list[int],
+    *,
+    weighting: str,
+    cap: float,
+    beta: float,
+    require_coverage: bool,
+    required_mask: tuple[bool, ...] | None = None,
+) -> tuple[float, ...]:
+    """Resolve positive weights from known-positive training support only.
+
+    For proportional policies, raw values are scaled so the most-supported
+    class has weight 1, then upper-capped. This transparent common scale leaves
+    all uncapped class-to-class ratios unchanged and keeps the positive weight
+    of the best-supported class aligned with the fixed known-negative weight.
+    A zero-support class gets neutral weight 1 only in exploratory handling;
+    it has no positive observations to reweight, and comparison runs fail.
+    """
+    if weighting == "none":
+        return tuple(1.0 for _ in positive_counts)
+    if weighting not in ("inverse_sqrt", "effective_number", "experimental_inverse_frequency"):
+        raise ValueError(f"unsupported positive weighting policy {weighting!r}")
+    if not math.isfinite(cap) or cap < 1:
+        raise ValueError("positive weight cap must be finite and at least one")
+    if not math.isfinite(beta) or not 0 <= beta < 1:
+        raise ValueError("effective-number beta must be finite in [0,1)")
+    if any(type(count) is not int or count < 0 for count in positive_counts):
+        raise ValueError("known-positive support counts must be nonnegative integers")
+
+    required = required_mask if required_mask is not None else tuple(True for _ in positive_counts)
+    if len(required) != len(positive_counts):
+        raise ValueError("required_mask must align with positive support counts")
+    supported = [index for index, count in enumerate(positive_counts) if count > 0]
+    if require_coverage:
+        missing = [index for index, (count, needed) in enumerate(zip(positive_counts, required, strict=True)) if needed and count == 0]
+        if missing:
+            raise ValueError(f"comparison run has zero known-positive support at class positions {missing}")
+    if not supported:
+        return tuple(1.0 for _ in positive_counts)
+
+    raw: dict[int, float] = {}
+    for index in supported:
+        count = positive_counts[index]
+        if weighting == "inverse_sqrt":
+            raw[index] = 1.0 / math.sqrt(count)
+        elif weighting == "experimental_inverse_frequency":
+            raw[index] = 1.0 / count
+        elif beta == 0.0:
+            raw[index] = 1.0
+        else:
+            # -expm1(n*log(beta)) is stable when beta is near one.
+            raw[index] = (1.0 - beta) / (-math.expm1(count * math.log(beta)))
+
+    common_scale = 1.0 / min(raw.values())
+    maximum_support = max(positive_counts[index] for index in supported)
+    weights = [1.0] * len(positive_counts)
+    for index, raw_weight in raw.items():
+        normalized = 1.0 if positive_counts[index] == maximum_support else raw_weight * common_scale
+        weights[index] = min(cap, normalized)
+    return tuple(weights)
+
+
 def _positive_weights(
     subset: DatasetSubset,
     dataset: PreparedDataset,
@@ -592,10 +657,13 @@ def _positive_weights(
     beta: float,
     require_coverage: bool,
 ) -> tuple[float, ...]:
+    if subset.split != "train" or subset.dataset.dataset_id != dataset.dataset_id:
+        raise ValueError("positive class weights must be resolved from this dataset's original training subset only")
+    if level not in ("pizza", "component"):
+        raise ValueError("positive class weights require pizza or component supervision level")
     support_ids = tuple(subset.class_support["class_ids"])
     support_index = {class_id: index for index, class_id in enumerate(support_ids)}
     positive_counts = subset.class_support[level]["known_positive"]
-    negative_counts = subset.class_support[level]["known_negative"]
     supervised_ids = set(
         dataset.pizza_supervision_class_ids if level == "pizza" else dataset.component_supervision_class_ids
     )
@@ -606,27 +674,26 @@ def _positive_weights(
     if require_coverage and missing:
         names = {class_id: dataset.class_names[dataset.canonical_class_ids.index(class_id)] for class_id in missing}
         raise ValueError(f"comparison run lacks known-positive {level} training support for classes: {names}")
-    if weighting == "none":
-        return tuple(1.0 for _ in class_ids)
-    weights: list[float] = []
-    for class_id in class_ids:
-        index = support_index[class_id]
-        positive = positive_counts[index]
-        negative = negative_counts[index]
-        if positive <= 0 or negative <= 0:
-            weights.append(1.0)
-            continue
-        if weighting in ("inverse_sqrt", "inverse_frequency"):
-            imbalance_ratio = negative / positive
-        elif weighting == "effective_number":
-            positive_effective = (1.0 - beta**positive) / (1.0 - beta) if beta else float(positive)
-            negative_effective = (1.0 - beta**negative) / (1.0 - beta) if beta else float(negative)
-            imbalance_ratio = negative_effective / positive_effective
-        else:
-            raise ValueError(f"unsupported positive weighting policy {weighting!r}")
-        raw_weight = math.sqrt(imbalance_ratio) if weighting == "inverse_sqrt" else imbalance_ratio
-        weights.append(min(cap, max(1.0, raw_weight)))
-    return tuple(weights)
+    selected_ids = set(class_ids)
+    # Resolve the common normalization scale over the complete canonical
+    # in-scope training vocabulary, then project weights to the selected model
+    # classes. This keeps run weights stable when class-selection subsets vary.
+    canonical_ids = dataset.canonical_class_ids
+    scoped_counts = tuple(
+        positive_counts[support_index[class_id]] if class_id in supervised_ids else 0
+        for class_id in canonical_ids
+    )
+    required = tuple(class_id in selected_ids and class_id in supervised_ids for class_id in canonical_ids)
+    all_weights = _positive_weights_from_counts(
+        scoped_counts,
+        weighting=weighting,
+        cap=cap,
+        beta=beta,
+        require_coverage=require_coverage,
+        required_mask=required,
+    )
+    weight_by_id = dict(zip(canonical_ids, all_weights, strict=True))
+    return tuple(weight_by_id[class_id] for class_id in class_ids)
 
 
 def validate_image_training_data(
@@ -785,7 +852,9 @@ def train_image_model(
             "component_positive": list(component_weights),
             "pizza_positive": list(pizza_weights),
             "policy": config.objective.positive_weighting,
-            "normalization": "positive-only max(1, sqrt(known-negative/known-positive)) for inverse_sqrt, raw ratio for inverse_frequency, or ratio of effective counts for effective_number; capped at the configured maximum; known negatives remain weight 1",
+            "semantics_version": config.objective_identity()["positive_weighting_semantics"],
+            "formula": config.objective_identity()["positive_weighting_formula"],
+            "normalization": "raw positive-count-proportional values are scaled over all positive-supported canonical classes in each level so the most-supported in-scope class has weight 1, then capped and projected to selected classes; known negatives remain exactly 1; unknowns are excluded",
             "cap": config.objective.positive_weight_cap,
         },
     }
@@ -812,6 +881,7 @@ def train_image_model(
     best_epoch: int | None = None
     patience_count = 0
     checkpoint_parents: list[dict[str, Any]] = []
+    initial_metrics: dict[str, Any] | None = None
     latest_path = checkpoints / "latest.pt"
     best_path = checkpoints / "best-validation.pt"
     if resume_from is not None:
@@ -822,6 +892,7 @@ def train_image_model(
         optimizer.load_state_dict(payload["optimizer_state"])
         scheduler.load_state_dict(payload["scheduler_state"])
         history = list(payload.get("history", []))
+        initial_metrics = payload.get("initial_metrics")
         global_step = int(payload["optimizer_step"])
         epoch_start = int(payload["epoch"])
         batch_cursor_resume = int(payload["batch_cursor"])
@@ -836,6 +907,23 @@ def train_image_model(
             "resume_source": str(resume_path),
         }]
     else:
+        if config.purpose != "smoke":
+            component_weight_tensor = torch.tensor(component_weights, dtype=torch.float32, device=device)
+            pizza_weight_tensor = torch.tensor(pizza_weights, dtype=torch.float32, device=device)
+            initial_metrics = {
+                "training": evaluate_image_model(
+                    visual, model, train_subset, config, class_indices=class_indices, device=device,
+                    feature_cache=feature_cache,
+                    component_positive_weights=component_weight_tensor,
+                    pizza_positive_weights=pizza_weight_tensor,
+                ),
+                "validation": evaluate_image_model(
+                    visual, model, validation_subset, config, class_indices=class_indices, device=device,
+                    feature_cache=feature_cache,
+                    component_positive_weights=component_weight_tensor,
+                    pizza_positive_weights=pizza_weight_tensor,
+                ),
+            }
         initial_order = [record.sample_id for record in train_subset.records]
         random.Random(config.training.seed).shuffle(initial_order)
         epoch_order_resume = initial_order
@@ -843,7 +931,7 @@ def train_image_model(
             visual, model, optimizer, scheduler, identity, resolved_config,
             epoch=0, batch_cursor=0, epoch_order=initial_order, global_step=0,
             best_primary=None, best_epoch=None, patience_count=0, history=[], class_ids=class_ids,
-            parents=checkpoint_parents,
+            parents=checkpoint_parents, initial_metrics=initial_metrics,
         )
         _atomic_torch_save(initial_checkpoint, latest_path)
 
@@ -947,6 +1035,7 @@ def train_image_model(
                 epoch=epoch, batch_cursor=next_cursor, epoch_order=order, global_step=global_step,
                 best_primary=best_primary, best_epoch=best_epoch, patience_count=patience_count,
                 history=history, class_ids=class_ids, parents=checkpoint_parents,
+                initial_metrics=initial_metrics,
             )
             _atomic_torch_save(checkpoint, latest_path)
             if progress_callback is not None:
@@ -1004,6 +1093,7 @@ def train_image_model(
             epoch=epoch + 1, batch_cursor=0, epoch_order=next_order, global_step=global_step,
             best_primary=best_primary, best_epoch=best_epoch, patience_count=patience_count,
             history=history, class_ids=class_ids, parents=checkpoint_parents,
+            initial_metrics=initial_metrics,
         )
         _atomic_torch_save(checkpoint, latest_path)
         if improved and not config.training.exploratory_latest_only:
@@ -1024,6 +1114,7 @@ def train_image_model(
         history=tuple(history),
         best_primary_monitor=best_primary,
         stopped_reason=stopped_reason,
+        initial_metrics=initial_metrics,
     )
 
 

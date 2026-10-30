@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
+import errno
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows uses byte-range locking below
+    fcntl = None
 import hashlib
 import json
 import os
@@ -15,9 +20,12 @@ import tempfile
 import uuid
 from typing import Any, Callable, Iterable
 
+if fcntl is None:  # pragma: no cover - exercised on Windows CI only
+    import msvcrt
+
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset, deterministic_subset, load_prepared_dataset
 from town_model.experiments.feature_cache import FrozenFeatureCache, prepare_frozen_feature_cache
-from town_model.experiments.image_config import ImageExperimentConfig
+from town_model.experiments.image_config import IMAGE_POSITIVE_WEIGHTING_POLICY, ImageExperimentConfig
 from town_model.inspection.image_snapshots import save_image_snapshot
 from town_model.training.image_trainer import (
     ImageTrainingResult,
@@ -72,7 +80,9 @@ class ResolvedImageExperiment:
             "policy": weighting,
             "cap": self.config.objective.positive_weight_cap,
             "effective_number_beta": self.config.objective.effective_number_beta,
-            "normalization": "known_mask * positive_class_weight * penalty divided by sum of known class weights per instance; known negatives weight one; unknowns excluded",
+            "semantics_version": IMAGE_POSITIVE_WEIGHTING_POLICY,
+            "formula": self.config.objective_identity()["positive_weighting_formula"],
+            "normalization": "raw positive-count-proportional values are scaled over all positive-supported canonical classes in this level so the most-supported in-scope class has weight 1, then capped and projected to selected classes; per-instance loss divides by the sum of active class weights; known negatives are exactly 1 and unknowns are excluded",
         }
 
     def resolved_config(self) -> dict[str, Any]:
@@ -150,8 +160,27 @@ def resolve_image_experiment(
     if train_ids & validation_ids:
         raise ValueError("original train and validation partitions unexpectedly share sample IDs")
     class_ids = tuple(config.dataset.trainable_class_ids or dataset.canonical_class_ids)
-    if tuple(sorted(class_ids)) != class_ids or any(class_id not in dataset.canonical_class_ids for class_id in class_ids):
-        raise ValueError("explicit class IDs must be a canonical-order subset of trainable ontology class IDs")
+    if len(set(class_ids)) != len(class_ids) or tuple(sorted(class_ids)) != class_ids or any(class_id not in dataset.canonical_class_ids for class_id in class_ids):
+        raise ValueError("explicit class IDs must be a unique canonical-order subset of trainable ontology class IDs")
+    from town_model.models.image_embeddings import ImageOntologyModel
+
+    names_by_id = dict(zip(dataset.canonical_class_ids, dataset.class_names, strict=True))
+    # Constructor-equivalent model preflight is cheap and has no filesystem or
+    # Torchvision-model side effects. It catches drift between config and model
+    # requirements before caches, run manifests, reservations, or workers exist.
+    ImageOntologyModel(
+        config.model.latent_dimensions,
+        tuple(names_by_id[class_id] for class_id in class_ids),
+        family=config.model.family,
+        pizza_mode=config.model.pizza_mode,
+        seed=config.training.seed,
+        classifier_seed=config.model.classifier_seed,
+        houses=config.model.houses,
+        windows=config.model.windows,
+        min_width=config.model.min_width,
+        window_mode=config.model.window_mode,
+        window_target_volume=config.model.window_target_volume,
+    )
     validate_image_training_data(
         dataset,
         train_subset,
@@ -194,60 +223,64 @@ class ImageWorkerLaunch:
     log_path: Path
 
 
-def _pid_is_alive(owner: dict[str, Any]) -> bool:
-    if owner.get("hostname") != socket.gethostname():
-        return True
+def _process_record(pid: int) -> tuple[str | None, str | None]:
+    """Read Linux start-time token and state, safely handling spaces in comm."""
     try:
-        os.kill(int(owner["pid"]), 0)
-        return True
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+        fields_after_comm = stat[stat.rfind(")") + 2 :].split()
+        return fields_after_comm[19], fields_after_comm[0]  # fields 22 and 3
+    except (OSError, IndexError, ValueError):
+        return None, None
+
+
+def _try_file_lock(descriptor: int) -> None:
+    if fcntl is not None:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    if os.fstat(descriptor).st_size == 0:
+        os.write(descriptor, b"\\0")
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    try:
+        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+    except OSError as error:
+        if error.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+            raise BlockingIOError(error.errno, error.strerror) from error
+        raise
+
+
+def _unlock_file_lock(descriptor: int) -> None:
+    if fcntl is not None:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    else:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+
+
+def _process_start_token(pid: int) -> str | None:
+    return _process_record(pid)[0]
+
+
+def _process_identity_is_alive(owner: dict[str, Any]) -> bool:
+    if owner.get("hostname") != socket.gethostname():
+        return True  # remote/uncertain owners are never declared dead from local PID state
+    try:
+        pid = int(owner["pid"])
+        if pid <= 0:
+            return True
+        os.kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
         return True
     except (OSError, ValueError, TypeError, KeyError):
+        return True
+    observed, state = _process_record(pid)
+    if state in ("Z", "X"):
         return False
-
-
-def release_launch_reservation(path: Path | str | None, token: str | None) -> None:
-    """Release one worker reservation only when its unguessable token matches."""
-    if not path or not token:
-        return
-    reservation = Path(path)
-    try:
-        owner = json.loads(reservation.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return
-    if owner.get("token") == token:
-        try:
-            reservation.unlink()
-        except FileNotFoundError:
-            pass
-
-
-def _acquire_launch_reservation(path: Path, token: str, run_id: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    owner = {"pid": os.getpid(), "hostname": socket.gethostname(), "token": token, "run_id": run_id}
-    for attempt in range(2):
-        try:
-            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError as error:
-            try:
-                previous = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                previous = {"pid": -1, "hostname": socket.gethostname()}
-            if attempt == 0 and not _pid_is_alive(previous):
-                try:
-                    path.unlink()
-                except FileNotFoundError:
-                    pass
-                continue
-            raise RunLifecycleError(f"another image worker launch is active for run {run_id}") from error
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            json.dump(owner, stream)
-            stream.flush()
-            os.fsync(stream.fileno())
-        return
-    raise RunLifecycleError(f"could not reserve image worker launch for run {run_id}")
+    expected = owner.get("process_start_token")
+    if expected is not None and observed is not None:
+        return expected == observed
+    return True  # unable to disambiguate PID reuse: conservatively report uncertain/live
 
 
 def launch_image_experiment(
@@ -262,6 +295,8 @@ def launch_image_experiment(
     base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
     output = Path(output_root).expanduser().resolve()
     run_directory = output / resolved.run_id
+    if os.name != "posix":
+        raise RunLifecycleError("detached image workers require POSIX file-descriptor inheritance; use the synchronous CLI on this platform")
     if resume:
         if not run_directory.is_dir():
             raise FileNotFoundError(f"cannot resume an image run that does not exist: {run_directory}")
@@ -279,7 +314,8 @@ def launch_image_experiment(
     worker_root = output / ".image-workers"
     token = uuid.uuid4().hex
     reservation = output / ".image-launch-locks" / f"{resolved.run_id}.lock"
-    _acquire_launch_reservation(reservation, token, resolved.run_id)
+    reservation_lock = RunWriterLock(reservation)
+    reservation_lock.acquire()
     status_path = worker_root / f"{resolved.run_id}.json"
     config_path = worker_root / f"{resolved.run_id}-{token}.config.json"
     log_path = worker_root / f"{resolved.run_id}-{token}.log"
@@ -304,10 +340,8 @@ def launch_image_experiment(
             str(output),
             "--status",
             str(status_path),
-            "--reservation",
-            str(reservation),
-            "--reservation-token",
-            token,
+            "--reservation-fd",
+            str(reservation_lock.fileno()),
         ]
         if resume:
             command.append("--resume")
@@ -322,23 +356,26 @@ def launch_image_experiment(
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
                 close_fds=True,
+                pass_fds=(reservation_lock.fileno(),),
             )
-        # Transfer the reservation to the child. It is released by its wrapper
-        # on every exit path, not by the browser/session that requested launch.
-        _atomic_json(reservation, {
-            "pid": process.pid,
-            "hostname": socket.gethostname(),
-            "token": token,
-            "run_id": resolved.run_id,
-        })
+        reservation_lock.detach()  # child inherited the same flock open-file description
+        current = json.loads(status_path.read_text(encoding="utf-8"))
+        if current.get("state") == "launching":
+            current.update({
+                "pid": process.pid,
+                "hostname": socket.gethostname(),
+                "process_start_token": _process_start_token(process.pid),
+            })
+            _atomic_json(status_path, current)
         return ImageWorkerLaunch(run_directory, process.pid, status_path, log_path)
     except Exception as error:
-        release_launch_reservation(reservation, token)
+        reservation_lock.release()
         _atomic_json(status_path, {
             "run_id": resolved.run_id,
             "run_directory": str(run_directory),
             "state": "failed",
             "exit_code": None,
+            "exit_status": "unknown; launch failed before a worker outcome was observed",
             "error": f"{type(error).__name__}: {error}",
             "log_path": str(log_path),
             "finished_at": _now(),
@@ -347,54 +384,67 @@ def launch_image_experiment(
 
 
 class RunWriterLock:
-    """Exclusive local run writer; stale same-host locks are safely recoverable."""
+    """Crash-released local advisory lock; metadata never determines ownership."""
 
     def __init__(self, path: Path) -> None:
-        self.path = path
+        self.path = Path(path)
         self.acquired = False
-
-    def _owner_is_alive(self) -> bool:
-        try:
-            owner = json.loads(self.path.read_text(encoding="utf-8"))
-            if owner.get("hostname") != socket.gethostname():
-                return True
-            os.kill(int(owner["pid"]), 0)
-            return True
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
-            # An incomplete/malformed owner record cannot be proven stale safely.
-            return True
+        self._descriptor: int | None = None
 
     def acquire(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        for attempt in range(2):
-            try:
-                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            except FileExistsError as error:
-                if attempt == 0 and not self._owner_is_alive():
-                    try:
-                        self.path.unlink()
-                    except FileNotFoundError:
-                        pass
-                    continue
-                raise RunLifecycleError(f"another process owns this image run lock: {self.path}") from error
-            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                json.dump({"pid": os.getpid(), "hostname": socket.gethostname(), "created_at": _now()}, stream)
-                stream.flush()
-                os.fsync(stream.fileno())
-            self.acquired = True
-            return
-        raise RunLifecycleError(f"could not acquire image run writer lock {self.path}")
+        descriptor = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            _try_file_lock(descriptor)
+        except BlockingIOError as error:
+            os.close(descriptor)
+            if self.path.parent.name == ".image-launch-locks":
+                message = f"another image worker launch is active for this run: {self.path}"
+            else:
+                message = f"another process owns this image run lock: {self.path}"
+            raise RunLifecycleError(message) from error
+        except OSError:
+            os.close(descriptor)
+            raise
+        owner = {
+            "protocol": "local-flock-v1",
+            "pid": os.getpid(),
+            "hostname": socket.gethostname(),
+            "process_start_token": _process_start_token(os.getpid()),
+            "acquired_at": _now(),
+        }
+        try:
+            encoded = json.dumps(owner, sort_keys=True).encode("utf-8")
+            os.ftruncate(descriptor, 0)
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            view = memoryview(encoded)
+            while view:
+                view = view[os.write(descriptor, view):]
+            os.fsync(descriptor)
+        except Exception:
+            _unlock_file_lock(descriptor)
+            os.close(descriptor)
+            raise
+        self._descriptor = descriptor
+        self.acquired = True
+
+    def fileno(self) -> int:
+        if not self.acquired or self._descriptor is None:
+            raise RunLifecycleError("writer lock is not acquired")
+        return self._descriptor
+
+    def detach(self) -> None:
+        """Close the parent handle without unlocking a descriptor inherited by a child."""
+        if self.acquired and self._descriptor is not None:
+            os.close(self._descriptor)
+            self._descriptor = None
+            self.acquired = False
 
     def release(self) -> None:
-        if self.acquired:
-            try:
-                self.path.unlink()
-            except FileNotFoundError:
-                pass
+        if self.acquired and self._descriptor is not None:
+            _unlock_file_lock(self._descriptor)
+            os.close(self._descriptor)
+            self._descriptor = None
             self.acquired = False
 
     def __enter__(self) -> "RunWriterLock":
@@ -436,26 +486,123 @@ def transition_run(run_directory: Path | str, new_state: str, *, details: dict[s
 
 
 def _process_alive(manifest: dict[str, Any]) -> bool:
-    if manifest.get("hostname") != socket.gethostname():
+    return _process_identity_is_alive(manifest)
+
+
+def _reconcile_worker_status_file(root: Path, manifest: dict[str, Any]) -> dict[str, Any] | None:
+    status_path = root.parent / ".image-workers" / f"{root.name}.json"
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(status, dict):
+        return None
+    state = status.get("state")
+    if state in ("launching", "running", "draft"):
+        if manifest["state"] == "running":
+            # The run manifest is authoritative for the writer process. Worker
+            # JSON alone is never treated as proof of liveness.
+            status.update({
+                "state": "running",
+                "pid": manifest.get("pid"),
+                "hostname": manifest.get("hostname"),
+                "process_start_token": manifest.get("process_start_token"),
+                "reconciled_from_manifest": True,
+            })
+        elif manifest["state"] == "draft":
+            reservation = root.parent / ".image-launch-locks" / f"{root.name}.lock"
+            if _advisory_lock_is_held(reservation) or _process_identity_is_alive(status):
+                status.update({"state": "launching", "reconciled_from_manifest": True})
+            else:
+                status.update({
+                    "state": "interrupted", "exit_code": None,
+                    "exit_status": "unknown; worker ended before run startup completed",
+                    "finished_at": status.get("finished_at") or _now(),
+                    "reconciled_from_manifest": True,
+                })
+        else:
+            mapped = manifest["state"]
+            status.update({
+                "state": mapped,
+                "exit_code": status.get("exit_code"),
+                "exit_status": status.get("exit_status") or "unknown; no worker exit code was observed",
+                "interruption_reason": manifest.get("interruption_reason"),
+                "reconciled_from_manifest": True,
+                "finished_at": status.get("finished_at") or _now(),
+            })
+    _atomic_json(status_path, status)
+    return status
+
+
+def _advisory_lock_is_held(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        descriptor = os.open(path, os.O_RDWR)
+    except OSError:
         return True
     try:
-        os.kill(int(manifest["pid"]), 0)
-        return True
-    except ProcessLookupError:
+        try:
+            _try_file_lock(descriptor)
+        except BlockingIOError:
+            return True
+        _unlock_file_lock(descriptor)
         return False
-    except PermissionError:
+    except OSError:
         return True
-    except (OSError, ValueError, TypeError, KeyError):
-        return False
+    finally:
+        os.close(descriptor)
+
+
+def reconcile_worker_status(run_directory: Path | str) -> dict[str, Any] | None:
+    """Return worker status reconciled against process identity and run manifest."""
+    root = Path(run_directory).expanduser().resolve()
+    if (root / "manifest.json").is_file():
+        manifest = inspect_run(root, refresh_interrupted=True)
+        return _reconcile_worker_status_file(root, manifest)
+    status_path = root.parent / ".image-workers" / f"{root.name}.json"
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    reservation = root.parent / ".image-launch-locks" / f"{root.name}.lock"
+    reservation_active = _advisory_lock_is_held(reservation)
+    if status.get("state") in ("launching", "running") and not reservation_active and not _process_identity_is_alive(status):
+        status.update({
+            "state": "interrupted",
+            "exit_code": None,
+            "exit_status": "unknown; worker died before publishing a run manifest",
+            "finished_at": _now(),
+            "reconciled_from_process_liveness": True,
+        })
+        _atomic_json(status_path, status)
+    return status
 
 
 def inspect_run(run_directory: Path | str, *, refresh_interrupted: bool = True) -> dict[str, Any]:
     root = Path(run_directory).expanduser().resolve()
     manifest = _read_manifest(root)
-    if refresh_interrupted and manifest["state"] == "running" and not _process_alive(manifest):
-        manifest = transition_run(root, "interrupted", details={
-            "interruption_reason": "writer process is no longer alive; latest atomic checkpoint remains authoritative"
-        })
+    if refresh_interrupted and manifest["state"] == "running":
+        recovery_lock = RunWriterLock(root / ".writer.lock")
+        try:
+            recovery_lock.acquire()
+        except RunLifecycleError:
+            # A live flock owner is authoritative even if a stale status/manifest
+            # PID could have been reused. Never update state beneath a writer.
+            manifest = _read_manifest(root)
+        else:
+            try:
+                manifest = _read_manifest(root)
+                if manifest["state"] == "running" and not _process_alive(manifest):
+                    manifest = transition_run(root, "interrupted", details={
+                        "interruption_reason": "writer process is no longer alive; latest atomic checkpoint remains authoritative",
+                        "process_exit_status": "unknown; abrupt termination prevented wrapper exit-code observation",
+                        "exit_code": None,
+                    })
+            finally:
+                recovery_lock.release()
+            manifest = _read_manifest(root)
+    _reconcile_worker_status_file(root, manifest)
     return manifest
 
 
@@ -540,13 +687,14 @@ def run_image_experiment(
             if not checkpoint.is_file():
                 raise RunLifecycleError("run has no valid latest checkpoint to resume")
             transition_run(root, "running", details={
-                "pid": os.getpid(), "hostname": socket.gethostname(), "resumed_at": _now(), "error": None
+                "pid": os.getpid(), "hostname": socket.gethostname(),
+                "process_start_token": _process_start_token(os.getpid()), "resumed_at": _now(), "error": None
             })
             resume_from = checkpoint
         else:
             if state != "draft":
                 raise RunLifecycleError(f"new run must be draft, found {state!r}")
-            transition_run(root, "running", details={"pid": os.getpid(), "hostname": socket.gethostname(), "started_at": _now()})
+            transition_run(root, "running", details={"pid": os.getpid(), "hostname": socket.gethostname(), "process_start_token": _process_start_token(os.getpid()), "started_at": _now()})
             resume_from = None
         should_stop = stop_requested or (lambda: (root / "stop.request").exists())
         snapshot_paths: list[str] = []
@@ -605,6 +753,7 @@ def run_image_experiment(
                 "completed_epochs": result.completed_epochs,
                 "best_primary_monitor": result.best_primary_monitor,
                 "stopped_reason": result.stopped_reason,
+                "initial_metrics": result.initial_metrics,
                 "history": list(result.history),
                 "snapshots": snapshot_paths,
             }

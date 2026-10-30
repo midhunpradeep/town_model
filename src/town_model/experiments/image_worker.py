@@ -13,7 +13,7 @@ import traceback
 from typing import Callable, Sequence
 
 from town_model.cli import main as cli_main
-from town_model.experiments.image_runs import _atomic_json, release_launch_reservation
+from town_model.experiments.image_runs import _atomic_json, _process_start_token
 
 
 def _now() -> str:
@@ -25,8 +25,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--status", type=Path, required=True)
-    parser.add_argument("--reservation", type=Path, required=True)
-    parser.add_argument("--reservation-token", required=True)
+    parser.add_argument("--reservation-fd", type=int)
     parser.add_argument("--resume", action="store_true")
     return parser
 
@@ -42,6 +41,7 @@ def run_worker(argv: Sequence[str] | None = None, *, command_main: Callable[[Seq
         "state": "running",
         "pid": os.getpid(),
         "hostname": socket.gethostname(),
+        "process_start_token": _process_start_token(os.getpid()),
         "started_at": _now(),
     })
     _atomic_json(args.status, current)
@@ -67,11 +67,16 @@ def run_worker(argv: Sequence[str] | None = None, *, command_main: Callable[[Seq
         current.update({
             "state": "completed" if code == 0 else "failed",
             "exit_code": code,
+            "exit_status": "observed wrapper/CLI exit code",
             "error": error_message,
             "finished_at": _now(),
         })
         _atomic_json(args.status, current)
-        release_launch_reservation(args.reservation, args.reservation_token)
+        if args.reservation_fd is not None:
+            try:
+                os.close(args.reservation_fd)
+            except OSError:
+                pass
     return code
 
 

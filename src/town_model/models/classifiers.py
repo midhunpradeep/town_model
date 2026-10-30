@@ -31,8 +31,8 @@ class PointClassifier(nn.Module):
 
     def __init__(self, dimensions: int, class_names: tuple[str, ...], *, fixed_classes: tuple[str, ...] = ("DomainThing",)):
         super().__init__()
-        if dimensions < 1:
-            raise ValueError("dimensions must be positive")
+        if type(dimensions) is not int or dimensions < 1:
+            raise ValueError("dimensions must be a positive integer")
         if not class_names or len(set(class_names)) != len(class_names):
             raise ValueError("class_names must be nonempty and unique")
         if set(class_names) & set(fixed_classes):
@@ -192,8 +192,8 @@ class SyntheticPointEncoder(nn.Module):
 
     def __init__(self, input_dimensions: int, latent_dimensions: int, *, seed: int, hidden_dimensions: int = 16):
         super().__init__()
-        if input_dimensions < 1 or latent_dimensions < 1 or hidden_dimensions < 1:
-            raise ValueError("encoder dimensions must be positive")
+        if any(type(value) is not int for value in (input_dimensions, latent_dimensions, hidden_dimensions)) or input_dimensions < 1 or latent_dimensions < 1 or hidden_dimensions < 1:
+            raise ValueError("encoder dimensions must be positive integers")
         with torch.random.fork_rng(devices=[]):
             torch.manual_seed(seed)
             self.network = nn.Sequential(

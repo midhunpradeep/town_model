@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import Literal
+import math
+from numbers import Real
 
 import torch
 from torch import Tensor, nn
@@ -10,8 +12,50 @@ from torch import Tensor, nn
 from town_model.contracts import ImageModelResult, VisionFeatureBatch
 
 from .classifiers import ClassifierOutput, PointClassifier, make_classifier
+from .geometry import GEOMETRY_DIAGNOSTIC_AXES, validate_min_width
 
 PizzaMode = Literal["global", "compositional", "hybrid"]
+
+
+def validate_image_model_parameters(
+    dimensions: object,
+    class_names: object,
+    *,
+    family: object,
+    pizza_mode: object,
+    houses: object,
+    windows: object,
+    min_width: object,
+    window_mode: object,
+    window_target_volume: object,
+) -> None:
+    """Pure constructor-equivalent model validation shared with config preflight."""
+    if type(dimensions) is not int or dimensions < 1:
+        raise ValueError("latent dimensions must be a positive integer")
+    if family not in ("baseline", "box", "town"):
+        raise ValueError(f"unsupported classifier family {family!r}")
+    if pizza_mode not in ("global", "compositional", "hybrid"):
+        raise ValueError(f"unsupported pizza composition mode {pizza_mode!r}")
+    if class_names is not None:
+        if not isinstance(class_names, tuple) or not class_names or any(not isinstance(name, str) or not name for name in class_names):
+            raise ValueError("class_names must be a nonempty ordered tuple of names")
+        if len(set(class_names)) != len(class_names):
+            raise ValueError("class_names must be unique")
+    if type(houses) is not int or type(windows) is not int or houses < 1 or windows < 1:
+        raise ValueError("town houses and windows must be positive integer counts")
+    if window_mode != "contained":
+        raise ValueError("Phase 3 currently supports the contained town window parameterization")
+    if isinstance(window_target_volume, bool) or not isinstance(window_target_volume, Real):
+        raise ValueError("window_target_volume must be finite and between zero and one")
+    try:
+        target_volume = float(window_target_volume)
+    except (OverflowError, TypeError, ValueError) as error:
+        raise ValueError("window_target_volume must be finite and between zero and one") from error
+    if not math.isfinite(target_volume) or not 0 < target_volume < 1:
+        raise ValueError("window_target_volume must be finite and between zero and one")
+    if family != "town" and (houses != 2 or windows != 1 or window_mode != "contained" or window_target_volume != 0.25):
+        raise ValueError("town geometry settings are incompatible with non-town classifier families")
+    validate_min_width(min_width, model_families=(family,), window_mode=window_mode)
 
 
 class ComponentPointProjection(nn.Module):
@@ -111,13 +155,16 @@ def _reshape_classifier_output(output: ClassifierOutput, batch: int, count: int)
         diagnostics = {}
         point_count, class_count = output.contains.shape
         for name, value in output.diagnostics.items():
-            # Geometry corners are class parameters; town activity tensors
-            # are point outputs [N,C,...] and follow the component batch reshape.
-            if name in ("box_low", "box_high", "frame_low", "frame_high", "window_low", "window_high"):
-                diagnostics[name] = value
-            elif value.ndim >= 2 and value.shape[:2] == (point_count, class_count):
+            axes = GEOMETRY_DIAGNOSTIC_AXES.get(name)
+            if axes is None:
+                raise ValueError(f"classifier diagnostic {name!r} has no declared semantic axes")
+            if axes[0] == "point":
+                if value.shape[:2] != (point_count, class_count):
+                    raise ValueError(f"point diagnostic {name!r} does not match [point,class,...] contract")
                 diagnostics[name] = value.reshape(batch, count, *value.shape[1:])
             else:
+                if value.shape[0] != class_count:
+                    raise ValueError(f"class-level diagnostic {name!r} does not match classifier class count")
                 diagnostics[name] = value
     return ClassifierOutput(
         contains=output.contains.reshape(batch, count, output.contains.shape[-1]),
@@ -152,10 +199,17 @@ class ImageOntologyModel(nn.Module):
         window_target_volume: float = 0.25,
     ) -> None:
         super().__init__()
-        if type(dimensions) is not int or dimensions < 1:
-            raise ValueError("latent dimensions must be a positive integer")
-        if pizza_mode not in ("global", "compositional", "hybrid"):
-            raise ValueError(f"unsupported pizza composition mode {pizza_mode!r}")
+        validate_image_model_parameters(
+            dimensions,
+            class_names,
+            family=family,
+            pizza_mode=pizza_mode,
+            houses=houses,
+            windows=windows,
+            min_width=min_width,
+            window_mode=window_mode,
+            window_target_volume=window_target_volume,
+        )
         # Common point/composition module states are seed-controlled and can be
         # copied exactly across classifier families. Geometry initialization is
         # separately seeded/documented by classifier_seed.

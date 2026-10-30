@@ -6,14 +6,30 @@ from dataclasses import asdict, dataclass, field
 import hashlib
 import json
 import math
+from numbers import Real
 from pathlib import Path
 from typing import Literal
 
-from town_model.models.geometry import validate_min_width
+from town_model.models.image_embeddings import validate_image_model_parameters
+from town_model.vision_validation import validate_mobilenet_block_indices, validate_mobilenet_runtime
 
 
 IMAGE_OBJECTIVE_REDUCTION = "known-weight-sum-normalized-per-instance-v2"
 IMAGE_FEATURE_EXTRACTION_CONTRACT = "original_extent_roi_letterbox_padding_v2"
+IMAGE_POSITIVE_WEIGHTING_POLICY = "positive-count-proportional-v2-all-in-scope-most-supported-class-unit-scaled"
+
+
+def _finite_real(name: str, value: object, *, minimum: float, inclusive: bool) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ValueError(f"{name} must be a finite numeric value")
+    try:
+        resolved = float(value)
+    except (OverflowError, TypeError, ValueError) as error:
+        raise ValueError(f"{name} must be a finite numeric value") from error
+    if not math.isfinite(resolved) or (resolved < minimum if inclusive else resolved <= minimum):
+        comparator = "at least" if inclusive else "greater than"
+        raise ValueError(f"{name} must be finite and {comparator} {minimum}")
+    return resolved
 
 
 def _loss_identity(name: str, *, temperature: float, hinge_margin: float) -> dict[str, object]:
@@ -49,8 +65,8 @@ class DatasetSubsetConfig:
     trainable_class_ids: tuple[int, ...] | None = None
 
     def validate(self) -> None:
-        if not self.dataset_path:
-            raise ValueError("dataset_path must not be empty")
+        if not isinstance(self.dataset_path, str) or not self.dataset_path:
+            raise ValueError("dataset_path must be a nonempty string")
         for name, value in (("train_size", self.train_size), ("validation_size", self.validation_size)):
             if value is not None and (type(value) is not int or value < 1):
                 raise ValueError(f"{name} must be a positive integer or None")
@@ -59,10 +75,12 @@ class DatasetSubsetConfig:
         if (self.train_split, self.validation_split) != ("train", "validation"):
             raise ValueError("image experiments must select from original train and validation partitions")
         if self.trainable_class_ids is not None:
-            if not self.trainable_class_ids or len(set(self.trainable_class_ids)) != len(self.trainable_class_ids):
-                raise ValueError("explicit trainable class IDs must be nonempty and unique")
+            if not isinstance(self.trainable_class_ids, tuple) or not self.trainable_class_ids:
+                raise ValueError("explicit trainable class IDs must be a nonempty ordered tuple")
             if any(type(class_id) is not int or class_id < 0 for class_id in self.trainable_class_ids):
                 raise ValueError("explicit trainable class IDs must be nonnegative integers")
+            if len(set(self.trainable_class_ids)) != len(self.trainable_class_ids):
+                raise ValueError("explicit trainable class IDs must be unique")
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +95,9 @@ class VisionConfig:
     trainable_backbone_blocks: tuple[int, ...] = ()
 
     def validate(self) -> None:
+        validate_mobilenet_runtime()
+        if type(self.pretrained_imagenet) is not bool:
+            raise ValueError("pretrained_imagenet must be a boolean")
         if self.backbone != "mobilenet_v3_large_fpn":
             raise ValueError("Phase 3 currently supports only the shared MobileNetV3-Large/FPN backbone")
         if type(self.resolution) is not int or self.resolution < 32:
@@ -87,10 +108,11 @@ class VisionConfig:
             raise ValueError("Phase 3 permits GT ROIs only; predicted ROI integration belongs to the future detector stage")
         if self.visual_policy not in ("frozen", "trainable_fpn", "trainable_fpn_last_blocks"):
             raise ValueError(f"unsupported visual feature policy {self.visual_policy!r}")
+        blocks = validate_mobilenet_block_indices(self.trainable_backbone_blocks)
         if self.visual_policy == "trainable_fpn_last_blocks":
-            if not self.trainable_backbone_blocks or any(i < 0 or i > 16 for i in self.trainable_backbone_blocks):
+            if not blocks:
                 raise ValueError("trainable_fpn_last_blocks requires explicit MobileNet block indices in [0,16]")
-        elif self.trainable_backbone_blocks:
+        elif blocks:
             raise ValueError("backbone block selections require visual_policy='trainable_fpn_last_blocks'")
 
 
@@ -113,15 +135,19 @@ class ImageModelConfig:
             raise ValueError(f"unsupported pizza composition mode {self.pizza_mode!r}")
         if type(self.latent_dimensions) is not int or self.latent_dimensions < 1:
             raise ValueError("latent_dimensions must be a positive integer")
-        if type(self.houses) is not int or self.houses < 1 or type(self.windows) is not int or self.windows < 0:
-            raise ValueError("houses must be positive and windows nonnegative integers")
-        if self.window_mode != "contained":
-            raise ValueError("Phase 3 uses the accepted contained town parameterization")
-        if not math.isfinite(self.window_target_volume) or not 0 < self.window_target_volume < 1:
-            raise ValueError("window_target_volume must be finite and between zero and one")
         if type(self.classifier_seed) is not int or self.classifier_seed < 0:
             raise ValueError("classifier_seed must be a nonnegative integer")
-        validate_min_width(self.min_width, model_families=(self.family,), window_mode=self.window_mode)
+        validate_image_model_parameters(
+            self.latent_dimensions,
+            None,
+            family=self.family,
+            pizza_mode=self.pizza_mode,
+            houses=self.houses,
+            windows=self.windows,
+            min_width=self.min_width,
+            window_mode=self.window_mode,
+            window_target_volume=self.window_target_volume,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +156,7 @@ class ObjectiveConfig:
     geometry_loss: str = "signed_distance"
     temperature: float = 0.1
     hinge_margin: float = 0.1
-    positive_weighting: Literal["none", "inverse_sqrt", "inverse_frequency", "effective_number"] = "none"
+    positive_weighting: Literal["none", "inverse_sqrt", "experimental_inverse_frequency", "effective_number"] = "none"
     positive_weight_cap: float = 10.0
     effective_number_beta: float = 0.99
     component_coefficient: float = 1.0
@@ -143,19 +169,18 @@ class ObjectiveConfig:
             raise ValueError("baseline ignores geometric losses; select signed_bce or signed_distance as the configured geometric reference")
         if family != "baseline" and self.geometry_loss not in ("signed_bce", "signed_distance"):
             raise ValueError("Phase 3 geometric classifiers support signed_bce or signed_distance")
-        if not math.isfinite(self.temperature) or self.temperature <= 0:
-            raise ValueError("signed BCE temperature must be finite and positive")
-        if not math.isfinite(self.hinge_margin) or self.hinge_margin < 0:
-            raise ValueError("hinge margin must be finite and nonnegative")
-        if self.positive_weighting not in ("none", "inverse_sqrt", "inverse_frequency", "effective_number"):
+        _finite_real("signed BCE temperature", self.temperature, minimum=0.0, inclusive=False)
+        _finite_real("hinge margin", self.hinge_margin, minimum=0.0, inclusive=True)
+        if self.positive_weighting == "inverse_frequency":
+            raise ValueError("legacy inverse_frequency is unsupported; use the explicitly experimental experimental_inverse_frequency policy")
+        if self.positive_weighting not in ("none", "inverse_sqrt", "experimental_inverse_frequency", "effective_number"):
             raise ValueError("unsupported positive class-weight policy")
-        if not math.isfinite(self.positive_weight_cap) or self.positive_weight_cap < 1:
-            raise ValueError("positive_weight_cap must be finite and at least one")
-        if not math.isfinite(self.effective_number_beta) or not 0 <= self.effective_number_beta < 1:
+        _finite_real("positive_weight_cap", self.positive_weight_cap, minimum=1.0, inclusive=True)
+        beta = _finite_real("effective_number_beta", self.effective_number_beta, minimum=0.0, inclusive=True)
+        if beta >= 1.0:
             raise ValueError("effective_number_beta must be finite in [0,1)")
         for name, value in (("component_coefficient", self.component_coefficient), ("pizza_coefficient", self.pizza_coefficient)):
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and nonnegative")
+            _finite_real(name, value, minimum=0.0, inclusive=True)
         if self.component_coefficient == 0 and self.pizza_coefficient == 0:
             raise ValueError("at least one task coefficient must be positive")
 
@@ -191,17 +216,17 @@ class TrainingConfig:
         if self.checkpoint_latest_every_steps != 1:
             raise ValueError("latest checkpoint writes are currently restricted to every optimizer step for faithful resume")
         for name, value in (("learning_rate_pretrained", self.learning_rate_pretrained), ("learning_rate_fpn", self.learning_rate_fpn), ("learning_rate_projection", self.learning_rate_projection), ("learning_rate_classifier", self.learning_rate_classifier), ("gradient_clip_norm", self.gradient_clip_norm)):
-            if not math.isfinite(value) or value <= 0:
-                raise ValueError(f"{name} must be finite and positive")
+            _finite_real(name, value, minimum=0.0, inclusive=False)
         for name, value in (("weight_decay_pretrained", self.weight_decay_pretrained), ("weight_decay_fpn", self.weight_decay_fpn), ("weight_decay_projection", self.weight_decay_projection), ("weight_decay_classifier", self.weight_decay_classifier)):
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and nonnegative")
+            _finite_real(name, value, minimum=0.0, inclusive=True)
         if self.schedule not in ("warmup_cosine", "constant"):
             raise ValueError("unsupported learning-rate schedule")
         if type(self.warmup_steps) is not int or self.warmup_steps < 0:
             raise ValueError("warmup_steps must be a nonnegative integer")
         if self.precision != "float32":
             raise ValueError("Phase 3 currently supports float32 only")
+        if type(self.exploratory_latest_only) is not bool:
+            raise ValueError("exploratory_latest_only must be a boolean")
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,8 +246,8 @@ class ExecutionConfig:
             raise ValueError("allow_cpu_smoke must be a boolean")
         if type(self.cpu_threads) is not int or self.cpu_threads < 1:
             raise ValueError("cpu_threads must be a positive integer")
-        if self.feature_cache_directory is not None and not self.feature_cache_directory:
-            raise ValueError("feature_cache_directory must be a nonempty path or None")
+        if self.feature_cache_directory is not None and (not isinstance(self.feature_cache_directory, str) or not self.feature_cache_directory):
+            raise ValueError("feature_cache_directory must be a nonempty path string or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,6 +258,10 @@ class DiagnosticsConfig:
     include_roi_feature_means: bool = True
 
     def validate(self) -> None:
+        if type(self.include_roi_feature_means) is not bool:
+            raise ValueError("include_roi_feature_means must be a boolean")
+        if any(type(value) is not int for value in (self.snapshot_every_epochs, self.max_reference_samples, self.max_component_traces_per_sample)):
+            raise ValueError("snapshot frequencies and caps must be integers")
         if self.snapshot_every_epochs < 1 or self.max_reference_samples < 1 or self.max_component_traces_per_sample < 0:
             raise ValueError("snapshot frequencies/caps are invalid")
 
@@ -249,7 +278,8 @@ class VisualizationPreferences:
     def validate(self) -> None:
         if self.point_projection not in ("none", "pca"):
             raise ValueError("unsupported point visualization projection")
-        if not math.isfinite(self.image_overlay_alpha) or not 0 <= self.image_overlay_alpha <= 1:
+        alpha = _finite_real("image_overlay_alpha", self.image_overlay_alpha, minimum=0.0, inclusive=True)
+        if alpha > 1:
             raise ValueError("image_overlay_alpha must lie in [0,1]")
 
 
@@ -275,6 +305,8 @@ class ImageExperimentConfig:
         self.execution.validate()
         self.diagnostics.validate()
         self.visualization.validate()
+        if self.schema_version != "image-run-config-v1":
+            raise ValueError(f"unsupported image configuration schema {self.schema_version!r}")
         if self.purpose not in ("smoke", "exploratory", "comparison"):
             raise ValueError("purpose must be smoke, exploratory, or comparison")
         if self.purpose == "comparison" and self.training.exploratory_latest_only:
@@ -300,6 +332,15 @@ class ImageExperimentConfig:
             "component_loss": component_loss,
             "pizza_loss": pizza_loss,
             "positive_weighting": self.objective.positive_weighting,
+            "positive_weighting_semantics": IMAGE_POSITIVE_WEIGHTING_POLICY,
+            "positive_weighting_formula": {
+                "inverse_sqrt": "r_c=1/sqrt(n_c^+)",
+                "effective_number": "r_c=(1-beta)/(1-beta^n_c^+)",
+                "experimental_inverse_frequency": "r_c=1/n_c^+ (explicit experimental alternative)",
+                "normalization": "scale raw values across all positive-supported canonical classes in this supervision scope so the most-supported class has weight 1; then cap each positive weight at positive_weight_cap and project to selected classes",
+                "negative_weight": 1.0,
+                "zero_positive_support": "weight 1 for exploratory runs; comparison coverage fails before training",
+            },
             "positive_weight_cap": self.objective.positive_weight_cap,
             "effective_number_beta": self.objective.effective_number_beta,
             "component_coefficient": self.objective.component_coefficient,
@@ -353,9 +394,15 @@ def image_config_from_mapping(value: dict[str, object]) -> ImageExperimentConfig
             raise ValueError(f"configuration section {section!r} must be an object")
         fields = dict(raw)
         if section == "dataset" and fields.get("trainable_class_ids") is not None:
-            fields["trainable_class_ids"] = tuple(fields["trainable_class_ids"])
+            raw_ids = fields["trainable_class_ids"]
+            if not isinstance(raw_ids, list):
+                raise ValueError("trainable_class_ids must be a JSON array of integers")
+            fields["trainable_class_ids"] = tuple(raw_ids)
         if section == "vision" and fields.get("trainable_backbone_blocks") is not None:
-            fields["trainable_backbone_blocks"] = tuple(fields["trainable_backbone_blocks"])
+            raw_blocks = fields["trainable_backbone_blocks"]
+            if not isinstance(raw_blocks, list):
+                raise ValueError("trainable_backbone_blocks must be a JSON array of integers")
+            fields["trainable_backbone_blocks"] = tuple(raw_blocks)
         kwargs[section] = cls(**fields)
     if "purpose" in value:
         kwargs["purpose"] = value["purpose"]

@@ -19,6 +19,23 @@ from torch import Tensor, nn
 _RAW_LIMIT = 12.0
 _FLOAT32_RESERVE = 16.0 * torch.finfo(torch.float32).eps
 
+# Semantic axes are part of the diagnostic API; they are never inferred from
+# tensor extents because batch and class counts may coincide.
+GEOMETRY_DIAGNOSTIC_AXES: dict[str, tuple[str, ...]] = {
+    "box_low": ("class", "coordinate"),
+    "box_high": ("class", "coordinate"),
+    "frame_low": ("class", "house", "coordinate"),
+    "frame_high": ("class", "house", "coordinate"),
+    "window_low": ("class", "house", "window", "coordinate"),
+    "window_high": ("class", "house", "window", "coordinate"),
+    "frame_margin": ("point", "class", "house"),
+    "frame_contains": ("point", "class", "house"),
+    "window_margin": ("point", "class", "house", "window"),
+    "window_contains": ("point", "class", "house", "window"),
+    "house_margin": ("point", "class", "house"),
+    "house_contains": ("point", "class", "house"),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class GeometryEvaluation:
@@ -226,8 +243,8 @@ class BoxGeometry(nn.Module):
 
     def __init__(self, dimensions: int, classes: int, *, seed: int = 42, min_width: float = 1e-5):
         super().__init__()
-        if dimensions < 1 or classes < 1:
-            raise ValueError("dimensions and classes must be positive")
+        if type(dimensions) is not int or type(classes) is not int or dimensions < 1 or classes < 1:
+            raise ValueError("dimensions and classes must be positive integers")
         self.dimensions = int(dimensions)
         self.classes = int(classes)
         self.seed = int(seed)
@@ -293,7 +310,8 @@ class BoxGeometry(nn.Module):
         if points.shape[0] == 0:
             empty = torch.empty((0, self.classes), dtype=torch.bool, device=points.device)
             margin = points.new_empty((0, self.classes))
-            return GeometryEvaluation(empty, margin, {} if diagnostics else None)
+            diag = {"box_low": lows, "box_high": highs} if diagnostics else None
+            return GeometryEvaluation(empty, margin, diag)
         psize = point_chunk_size if point_chunk_size is not None else points.shape[0]
         csize = class_chunk_size if class_chunk_size is not None else self.classes
         contains_rows: list[Tensor] = []
@@ -338,8 +356,8 @@ class TownGeometry(nn.Module):
         window_target_volume: float = 0.25,
     ):
         super().__init__()
-        if dimensions < 1 or classes < 1 or houses < 1 or windows < 1:
-            raise ValueError("dimensions, classes, houses, and windows must be positive")
+        if any(type(value) is not int for value in (dimensions, classes, houses, windows)) or dimensions < 1 or classes < 1 or houses < 1 or windows < 1:
+            raise ValueError("dimensions, classes, houses, and windows must be positive integers")
         if window_mode != "contained":
             raise ValueError("Phase 2 supports only the genuine 'contained' window parameterization")
         self.dimensions = int(dimensions)
@@ -455,13 +473,26 @@ class TownGeometry(nn.Module):
         if points.shape[0] == 0:
             empty = torch.empty((0, self.classes), dtype=torch.bool, device=points.device)
             margin = points.new_empty((0, self.classes))
-            return GeometryEvaluation(empty, margin, {} if diagnostics else None)
+            if not diagnostics:
+                return GeometryEvaluation(empty, margin)
+            return GeometryEvaluation(empty, margin, {
+                "frame_low": frame_low,
+                "frame_high": frame_high,
+                "window_low": window_low,
+                "window_high": window_high,
+                "frame_margin": points.new_empty((0, self.classes, self.houses)),
+                "frame_contains": torch.empty((0, self.classes, self.houses), dtype=torch.bool, device=points.device),
+                "window_margin": points.new_empty((0, self.classes, self.houses, self.windows)),
+                "window_contains": torch.empty((0, self.classes, self.houses, self.windows), dtype=torch.bool, device=points.device),
+                "house_margin": points.new_empty((0, self.classes, self.houses)),
+                "house_contains": torch.empty((0, self.classes, self.houses), dtype=torch.bool, device=points.device),
+            })
         psize = point_chunk_size if point_chunk_size is not None else points.shape[0]
         csize = class_chunk_size if class_chunk_size is not None else self.classes
         contains_batches: list[Tensor] = []
         margin_batches: list[Tensor] = []
         diagnostic_batches: dict[str, list[Tensor]] = {
-            key: [] for key in ("frame_contains", "window_contains", "house_contains", "house_margin", "window_margin")
+            key: [] for key in ("frame_margin", "frame_contains", "window_margin", "window_contains", "house_margin", "house_contains")
         }
         for p_start in range(0, points.shape[0], psize):
             point_chunk = points[p_start : p_start + psize]

@@ -32,7 +32,7 @@
     "geometry_loss": "signed_distance",
     "temperature": 0.1,
     "hinge_margin": 0.1,
-    "positive_weighting": "inverse_frequency",
+    "positive_weighting": "experimental_inverse_frequency",
     "positive_weight_cap": 20.0,
     "effective_number_beta": 0.99,
     "component_coefficient": 1.0,

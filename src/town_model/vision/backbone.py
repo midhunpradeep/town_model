@@ -10,6 +10,8 @@ from torch import Tensor, nn
 from torchvision.models import MobileNet_V3_Large_Weights, mobilenet_v3_large
 from torchvision.ops.feature_pyramid_network import FeaturePyramidNetwork, LastLevelMaxPool
 
+from town_model.vision_validation import validate_mobilenet_block_indices
+
 
 class MobileNetV3LargeFPN(nn.Module):
     """ImageNet MobileNetV3-Large stages with four detector-compatible FPN maps.
@@ -35,9 +37,7 @@ class MobileNetV3LargeFPN(nn.Module):
             )
         if not str(__import__("torchvision").__version__).startswith("0.20.1"):
             raise RuntimeError(f"expected torchvision 0.20.1, found {__import__('torchvision').__version__}")
-        blocks = tuple(sorted(set(trainable_backbone_blocks)))
-        if any(type(index) is not int or index < 0 or index >= 17 for index in blocks):
-            raise ValueError("trainable MobileNet blocks must be feature indices in [0,16]")
+        blocks = validate_mobilenet_block_indices(trainable_backbone_blocks)
         weights = MobileNet_V3_Large_Weights.DEFAULT if pretrained else None
         classification_model = mobilenet_v3_large(weights=weights)
         self.mobile_features = classification_model.features
@@ -53,9 +53,7 @@ class MobileNetV3LargeFPN(nn.Module):
         self.set_trainable(trainable_fpn=True, trainable_backbone_blocks=blocks)
 
     def set_trainable(self, *, trainable_fpn: bool, trainable_backbone_blocks: Iterable[int] = ()) -> None:
-        blocks = tuple(sorted(set(trainable_backbone_blocks)))
-        if any(type(index) is not int or index < 0 or index >= len(self.mobile_features) for index in blocks):
-            raise ValueError("trainable MobileNet blocks must be valid feature indices [0,16]")
+        blocks = validate_mobilenet_block_indices(trainable_backbone_blocks, maximum=len(self.mobile_features) - 1)
         self.trainable_backbone_blocks = blocks
         for parameter in self.mobile_features.parameters():
             parameter.requires_grad_(False)
