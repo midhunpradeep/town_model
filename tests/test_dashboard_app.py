@@ -18,7 +18,9 @@ def test_dashboard_explorer_loads_shared_dataset_and_renders_annotations(prepare
     assert any(item.value == "Image and annotation explorer" for item in app.subheader)
     assert any(item.label == "Pizza image" for item in app.selectbox)
     assert any("Source-inferred labels:" in item.value for item in app.markdown)
-    assert len(app.dataframe) == 1
+    # The dataset explorer now exposes the canonical pizza-target state/mask table
+    # as well as the component-occurrence table.
+    assert len(app.dataframe) == 2
 
 
 def test_dashboard_marks_corrupt_data_unverified_and_blocks_explorer(prepared_dataset: Path) -> None:

@@ -45,6 +45,24 @@ def _class_labels(vector: tuple[int, ...], classes: tuple[dict[str, Any], ...]) 
     return class_names_for_targets(vector, classes)
 
 
+def target_state_rows(targets: tuple[int, ...], known_mask: tuple[int, ...], classes: tuple[dict[str, Any], ...]) -> list[dict[str, Any]]:
+    """Render authoritative target/mask states without deriving ontology labels."""
+    if len(targets) != len(classes) or len(known_mask) != len(classes):
+        raise ValueError("target vectors must match the canonical ontology manifest width")
+    rows = []
+    for class_info in classes:
+        class_id = int(class_info["class_id"])
+        known = bool(known_mask[class_id])
+        target = bool(targets[class_id])
+        rows.append({
+            "class_id": class_id,
+            "class": class_info["name"],
+            "status": "fixed positive" if class_info.get("fixed_positive") else "unsupported" if class_info.get("unsupported") else "trainable",
+            "target_state": "positive" if known and target else "known negative" if known else "unknown",
+        })
+    return rows
+
+
 def _load_config_defaults() -> DatasetConfig:
     return load_config(DEFAULT_DATASET_CONFIG)
 
@@ -212,6 +230,8 @@ def _render_explorer(st, dataset_path: Path) -> None:
     st.caption("The source-inferred labels below are retained as audit provenance; ontology targets include corrected class ancestry.")
     st.write("Source-inferred labels:", ", ".join(record.pizza_source_labels))
     st.write("Corrected ontology targets:", ", ".join(_class_labels(record.pizza_targets, explorer.classes)))
+    with st.expander("Canonical pizza target states and known masks"):
+        st.dataframe(pd.DataFrame(target_state_rows(record.pizza_targets, record.pizza_known_mask, explorer.classes)), hide_index=True, width="stretch")
 
     st.markdown("#### Ground-truth component occurrences")
     component_table = [
@@ -229,6 +249,8 @@ def _render_explorer(st, dataset_path: Path) -> None:
         st.write("Detector identity (separate from ontology class IDs):", selected_component.detector_category)
         st.write("Original-image xyxy bounding box:", selected_component.bbox_xyxy_original)
         st.write("Corrected ontology targets:", ", ".join(_class_labels(selected_component.ontology_targets, explorer.classes)))
+        with st.expander("Canonical component target states and known masks"):
+            st.dataframe(pd.DataFrame(target_state_rows(selected_component.ontology_targets, selected_component.ontology_known_mask, explorer.classes)), hide_index=True, width="stretch")
 
     with st.expander("Raw generator metadata — audit only, never predictive input"):
         st.json({"audit": record.audit, "source_annotations": record.source_annotations})
