@@ -18,14 +18,28 @@ from .geometry import (
     validate_min_width,
 )
 from .losses import SupervisionReduction, reduce_supervision, validate_signed_distance_margin
+from .image_embeddings import (
+    ComponentPointProjection,
+    DeepSetsComposition,
+    GlobalPointProjection,
+    HybridPointFusion,
+    ImageOntologyModel,
+    PizzaMode,
+)
 
 __all__ = [
     "BoxClassifier",
+    "ComponentPointProjection",
+    "DeepSetsComposition",
     "BoxGeometry",
     "ClassifierOutput",
     "GeometryEvaluation",
+    "GlobalPointProjection",
+    "HybridPointFusion",
+    "ImageOntologyModel",
     "NeuralBaseline",
     "PointClassifier",
+    "PizzaMode",
     "SupervisionReduction",
     "SyntheticPointEncoder",
     "TownClassifier",
