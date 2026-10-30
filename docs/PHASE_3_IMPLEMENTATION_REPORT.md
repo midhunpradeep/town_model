@@ -89,3 +89,7 @@ The cache-vs-live training parity test uses tight numerical tolerances rather th
 4. **Test partition sealed/unreported.** No test labels were used for model selection and no post-selection test report was run for this implementation report.
 5. **Platform/UI gaps.** CUDA is unavailable; only headless Streamlit `AppTest` was exercised, not a real browser or multi-user deployment.
 6. **Independent review is outstanding.** Do not merge to `main`, mark Phase 3 accepted, start Phase 4, or describe these experiments as detector-pretrained/canonical stage-2 science until the specified detector stages and independent acceptance criteria are completed.
+
+## Pre-review remediation addendum
+
+The independent pre-review remediation is recorded in [`PHASE_3_PRE_REVIEW_REMEDIATION_REPORT.md`](PHASE_3_PRE_REVIEW_REMEDIATION_REPORT.md). It corrects the positive-weight denominator, restores signed-distance hinge defaults for box/town, adds detached dashboard run controls, fixes letterboxed global ROI coordinates, and fixes geometric snapshot diagnostic reshaping. The prior 211-test count and weighted-run metrics above remain historical; corrected weighted runs and a modest baseline/box/town hybrid learning demonstration are documented separately. The final remediation suite passes **238 tests**, including all nine real-RGB family×composition smokes. A headless Chrome dashboard control/preflight test now passes; the installed PyTorch build remains CPU-only, and Phase 3 is still unaccepted/pre-detector.
