@@ -104,7 +104,9 @@ class ObjectiveConfig:
     geometry_loss: str = "signed_bce"
     temperature: float = 0.1
     hinge_margin: float = 0.1
-    positive_weighting: Literal["none", "inverse_sqrt", "effective_number"] = "none"
+    positive_weighting: Literal["none", "inverse_sqrt", "inverse_frequency", "effective_number"] = "none"
+    positive_weight_cap: float = 10.0
+    effective_number_beta: float = 0.99
     component_coefficient: float = 1.0
     pizza_coefficient: float = 1.0
 
@@ -119,8 +121,12 @@ class ObjectiveConfig:
             raise ValueError("signed BCE temperature must be finite and positive")
         if not math.isfinite(self.hinge_margin) or self.hinge_margin < 0:
             raise ValueError("hinge margin must be finite and nonnegative")
-        if self.positive_weighting not in ("none", "inverse_sqrt", "effective_number"):
+        if self.positive_weighting not in ("none", "inverse_sqrt", "inverse_frequency", "effective_number"):
             raise ValueError("unsupported positive class-weight policy")
+        if not math.isfinite(self.positive_weight_cap) or self.positive_weight_cap < 1:
+            raise ValueError("positive_weight_cap must be finite and at least one")
+        if not math.isfinite(self.effective_number_beta) or not 0 <= self.effective_number_beta < 1:
+            raise ValueError("effective_number_beta must be finite in [0,1)")
         for name, value in (("component_coefficient", self.component_coefficient), ("pizza_coefficient", self.pizza_coefficient)):
             if not math.isfinite(value) or value < 0:
                 raise ValueError(f"{name} must be finite and nonnegative")
@@ -131,20 +137,23 @@ class ObjectiveConfig:
 @dataclass(frozen=True, slots=True)
 class TrainingConfig:
     seed: int = 42
-    epochs: int = 2
+    epochs: int = 50
     physical_batch_size: int = 4
-    accumulation_steps: int = 1
+    accumulation_steps: int = 4
     learning_rate_pretrained: float = 1e-5
     learning_rate_fpn: float = 1e-4
     learning_rate_projection: float = 1e-3
     learning_rate_classifier: float = 1e-3
-    weight_decay: float = 1e-4
+    weight_decay_pretrained: float = 1e-4
+    weight_decay_fpn: float = 1e-4
+    weight_decay_projection: float = 1e-4
+    weight_decay_classifier: float = 1e-4
     schedule: Literal["warmup_cosine", "constant"] = "warmup_cosine"
     warmup_steps: int = 2
     gradient_clip_norm: float = 1.0
     precision: str = "float32"
     checkpoint_latest_every_steps: int = 1
-    early_stopping_patience: int = 4
+    early_stopping_patience: int = 10
     exploratory_latest_only: bool = True
 
     def validate(self) -> None:
@@ -153,11 +162,14 @@ class TrainingConfig:
         for name, value in (("epochs", self.epochs), ("physical_batch_size", self.physical_batch_size), ("accumulation_steps", self.accumulation_steps), ("checkpoint_latest_every_steps", self.checkpoint_latest_every_steps), ("early_stopping_patience", self.early_stopping_patience)):
             if type(value) is not int or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
+        if self.checkpoint_latest_every_steps != 1:
+            raise ValueError("latest checkpoint writes are currently restricted to every optimizer step for faithful resume")
         for name, value in (("learning_rate_pretrained", self.learning_rate_pretrained), ("learning_rate_fpn", self.learning_rate_fpn), ("learning_rate_projection", self.learning_rate_projection), ("learning_rate_classifier", self.learning_rate_classifier), ("gradient_clip_norm", self.gradient_clip_norm)):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
-        if not math.isfinite(self.weight_decay) or self.weight_decay < 0:
-            raise ValueError("weight_decay must be finite and nonnegative")
+        for name, value in (("weight_decay_pretrained", self.weight_decay_pretrained), ("weight_decay_fpn", self.weight_decay_fpn), ("weight_decay_projection", self.weight_decay_projection), ("weight_decay_classifier", self.weight_decay_classifier)):
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and nonnegative")
         if self.schedule not in ("warmup_cosine", "constant"):
             raise ValueError("unsupported learning-rate schedule")
         if type(self.warmup_steps) is not int or self.warmup_steps < 0:
@@ -170,13 +182,21 @@ class TrainingConfig:
 class ExecutionConfig:
     device: str = "cpu"
     num_workers: int = 0
+    cpu_threads: int = 2
     allow_cpu_smoke: bool = True
+    feature_cache_directory: str | None = None
 
     def validate(self) -> None:
         if self.device not in ("cpu", "cuda", "auto"):
             raise ValueError("device must be cpu, cuda, or auto")
-        if type(self.num_workers) is not int or self.num_workers < 0:
-            raise ValueError("num_workers must be a nonnegative integer")
+        if type(self.num_workers) is not int or self.num_workers != 0:
+            raise ValueError("num_workers must be 0; Phase 3 currently uses deterministic synchronous image loading")
+        if type(self.allow_cpu_smoke) is not bool:
+            raise ValueError("allow_cpu_smoke must be a boolean")
+        if type(self.cpu_threads) is not int or self.cpu_threads < 1:
+            raise ValueError("cpu_threads must be a positive integer")
+        if self.feature_cache_directory is not None and not self.feature_cache_directory:
+            raise ValueError("feature_cache_directory must be a nonempty path or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,6 +209,10 @@ class DiagnosticsConfig:
     def validate(self) -> None:
         if self.snapshot_every_epochs < 1 or self.max_reference_samples < 1 or self.max_component_traces_per_sample < 0:
             raise ValueError("snapshot frequencies/caps are invalid")
+
+    @property
+    def include_visual_features(self) -> bool:
+        return self.include_roi_feature_means
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,6 +251,10 @@ class ImageExperimentConfig:
         self.visualization.validate()
         if self.purpose not in ("smoke", "exploratory", "comparison"):
             raise ValueError("purpose must be smoke, exploratory, or comparison")
+        if self.purpose == "comparison" and self.training.exploratory_latest_only:
+            raise ValueError("comparison runs require best-validation checkpoints; latest-only is for labeled smoke runs")
+        if self.execution.feature_cache_directory and self.vision.visual_policy != "frozen":
+            raise ValueError("feature caching is valid only for frozen visual features")
         if self.model.family != "town" and (self.model.houses != 2 or self.model.windows != 1 or self.model.window_mode != "contained"):
             raise ValueError("town geometry settings are invalid for non-town classifier families")
         return self
@@ -236,6 +264,8 @@ class ImageExperimentConfig:
         self.validate()
         value = asdict(self)
         value.pop("visualization", None)
+        value.pop("diagnostics", None)
+        value["execution"].pop("feature_cache_directory", None)
         return value
 
     def identity_hash(self) -> str:
@@ -247,3 +277,38 @@ class ImageExperimentConfig:
         if not path.is_absolute() and repository_root is not None:
             path = repository_root / path
         return path.resolve()
+
+
+def image_config_from_mapping(value: dict[str, object]) -> ImageExperimentConfig:
+    """Strict JSON/TOML-compatible constructor shared by CLI and dashboard."""
+    expected = {"dataset", "vision", "model", "objective", "training", "execution", "diagnostics", "visualization", "purpose", "schema_version"}
+    unknown = set(value) - expected
+    if unknown:
+        raise ValueError(f"unknown image experiment configuration fields: {sorted(unknown)}")
+    sections = {
+        "dataset": DatasetSubsetConfig,
+        "vision": VisionConfig,
+        "model": ImageModelConfig,
+        "objective": ObjectiveConfig,
+        "training": TrainingConfig,
+        "execution": ExecutionConfig,
+        "diagnostics": DiagnosticsConfig,
+        "visualization": VisualizationPreferences,
+    }
+    kwargs: dict[str, object] = {}
+    for section, cls in sections.items():
+        raw = value.get(section, {})
+        if not isinstance(raw, dict):
+            raise ValueError(f"configuration section {section!r} must be an object")
+        fields = dict(raw)
+        if section == "dataset" and fields.get("trainable_class_ids") is not None:
+            fields["trainable_class_ids"] = tuple(fields["trainable_class_ids"])
+        if section == "vision" and fields.get("trainable_backbone_blocks") is not None:
+            fields["trainable_backbone_blocks"] = tuple(fields["trainable_backbone_blocks"])
+        kwargs[section] = cls(**fields)
+    if "purpose" in value:
+        kwargs["purpose"] = value["purpose"]
+    if "schema_version" in value:
+        kwargs["schema_version"] = value["schema_version"]
+    config = ImageExperimentConfig(**kwargs)
+    return config.validate()

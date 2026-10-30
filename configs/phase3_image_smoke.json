@@ -1,0 +1,81 @@
+{
+  "dataset": {
+    "dataset_path": "examples/pizza-48",
+    "train_size": 4,
+    "validation_size": 2,
+    "selection_seed": 31,
+    "train_split": "train",
+    "validation_split": "validation",
+    "trainable_class_ids": null
+  },
+  "vision": {
+    "resolution": 224,
+    "roi_size": 7,
+    "roi_source": "ground_truth",
+    "pretrained_imagenet": true,
+    "visual_policy": "frozen",
+    "trainable_backbone_blocks": []
+  },
+  "model": {
+    "family": "baseline",
+    "pizza_mode": "hybrid",
+    "latent_dimensions": 2,
+    "classifier_seed": 23,
+    "houses": 2,
+    "windows": 1,
+    "min_width": 0.00001,
+    "window_mode": "contained",
+    "window_target_volume": 0.25
+  },
+  "objective": {
+    "baseline_loss": "bce",
+    "geometry_loss": "signed_bce",
+    "temperature": 0.1,
+    "hinge_margin": 0.1,
+    "positive_weighting": "none",
+    "positive_weight_cap": 10.0,
+    "effective_number_beta": 0.99,
+    "component_coefficient": 1.0,
+    "pizza_coefficient": 1.0
+  },
+  "training": {
+    "seed": 23,
+    "epochs": 2,
+    "physical_batch_size": 2,
+    "accumulation_steps": 1,
+    "learning_rate_pretrained": 0.00001,
+    "learning_rate_fpn": 0.0001,
+    "learning_rate_projection": 0.001,
+    "learning_rate_classifier": 0.001,
+    "weight_decay_pretrained": 0.0001,
+    "weight_decay_fpn": 0.0001,
+    "weight_decay_projection": 0.0001,
+    "weight_decay_classifier": 0.0001,
+    "schedule": "constant",
+    "warmup_steps": 0,
+    "gradient_clip_norm": 1.0,
+    "precision": "float32",
+    "checkpoint_latest_every_steps": 1,
+    "early_stopping_patience": 10,
+    "exploratory_latest_only": true
+  },
+  "execution": {
+    "device": "cpu",
+    "num_workers": 0,
+    "cpu_threads": 2,
+    "allow_cpu_smoke": true,
+    "feature_cache_directory": null
+  },
+  "diagnostics": {
+    "snapshot_every_epochs": 1,
+    "max_reference_samples": 6,
+    "max_component_traces_per_sample": 64,
+    "include_roi_feature_means": true
+  },
+  "visualization": {
+    "point_projection": "none",
+    "image_overlay_alpha": 0.6
+  },
+  "purpose": "smoke",
+  "schema_version": "image-run-config-v1"
+}

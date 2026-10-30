@@ -1,0 +1,81 @@
+{
+  "dataset": {
+    "dataset_path": "artifacts/datasets/pizza-4800-phase3",
+    "train_size": 16,
+    "validation_size": 32,
+    "selection_seed": 2025,
+    "train_split": "train",
+    "validation_split": "validation",
+    "trainable_class_ids": [0, 2]
+  },
+  "vision": {
+    "resolution": 224,
+    "roi_size": 7,
+    "roi_source": "ground_truth",
+    "pretrained_imagenet": true,
+    "visual_policy": "frozen",
+    "trainable_backbone_blocks": []
+  },
+  "model": {
+    "family": "baseline",
+    "pizza_mode": "global",
+    "latent_dimensions": 2,
+    "classifier_seed": 42,
+    "houses": 2,
+    "windows": 1,
+    "min_width": 0.00001,
+    "window_mode": "contained",
+    "window_target_volume": 0.25
+  },
+  "objective": {
+    "baseline_loss": "bce",
+    "geometry_loss": "signed_bce",
+    "temperature": 0.1,
+    "hinge_margin": 0.1,
+    "positive_weighting": "inverse_frequency",
+    "positive_weight_cap": 20.0,
+    "effective_number_beta": 0.99,
+    "component_coefficient": 1.0,
+    "pizza_coefficient": 1.0
+  },
+  "training": {
+    "seed": 42,
+    "epochs": 20,
+    "physical_batch_size": 4,
+    "accumulation_steps": 1,
+    "learning_rate_pretrained": 0.00001,
+    "learning_rate_fpn": 0.0001,
+    "learning_rate_projection": 0.0001,
+    "learning_rate_classifier": 0.001,
+    "weight_decay_pretrained": 0.0001,
+    "weight_decay_fpn": 0.0001,
+    "weight_decay_projection": 0.0001,
+    "weight_decay_classifier": 0.0001,
+    "schedule": "constant",
+    "warmup_steps": 0,
+    "gradient_clip_norm": 1.0,
+    "precision": "float32",
+    "checkpoint_latest_every_steps": 1,
+    "early_stopping_patience": 60,
+    "exploratory_latest_only": false
+  },
+  "execution": {
+    "device": "auto",
+    "num_workers": 0,
+    "cpu_threads": 2,
+    "allow_cpu_smoke": true,
+    "feature_cache_directory": "artifacts/phase3/feature-cache"
+  },
+  "diagnostics": {
+    "snapshot_every_epochs": 5,
+    "max_reference_samples": 16,
+    "max_component_traces_per_sample": 64,
+    "include_roi_feature_means": true
+  },
+  "visualization": {
+    "point_projection": "pca",
+    "image_overlay_alpha": 0.6
+  },
+  "purpose": "exploratory",
+  "schema_version": "image-run-config-v1"
+}

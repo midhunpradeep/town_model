@@ -236,13 +236,13 @@ def test_hand_computed_known_mask_positive_weight_and_per_image_component_reduct
     )
     expected_positive = torch.nn.functional.softplus(torch.tensor(-2.0))
     expected_negative_inside = torch.nn.functional.softplus(torch.tensor(2.0))
-    first_component = (3 * expected_positive + expected_negative_inside) / 4
+    first_component = (3 * expected_positive + expected_negative_inside) / 2
     second_component = expected_positive
     assert terms.component_eligible_images.tolist() == [True, False]
     assert terms.component_per_image[0].item() == pytest.approx(((first_component + second_component) / 2).item())
     assert terms.component_per_image[1].item() == 0  # not eligible and excluded from the mean
     assert terms.pizza_eligible_images.tolist() == [True, False]
-    assert terms.pizza_per_image[0].item() == pytest.approx(expected_positive.item())
+    assert terms.pizza_per_image[0].item() == pytest.approx((3 * expected_positive).item())
     objective = aggregate_effective_batch([terms])
     assert objective.component_eligible_images == 1
     assert objective.pizza_eligible_images == 1

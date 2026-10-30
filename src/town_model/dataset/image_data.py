@@ -29,6 +29,8 @@ class PreparedDataset:
     canonical_class_ids: tuple[int, ...]
     class_names: tuple[str, ...]
     class_iris: tuple[str, ...]
+    pizza_supervision_class_ids: tuple[int, ...]
+    component_supervision_class_ids: tuple[int, ...]
     fixed_positive_class_ids: tuple[int, ...]
     unsupported_class_ids: tuple[int, ...]
     class_manifest_sha256: str
@@ -112,6 +114,8 @@ def load_prepared_dataset(root: Path | str, *, validate: bool = True) -> Prepare
         canonical_class_ids=canonical_ids,
         class_names=tuple(item["name"] for item in trainable),
         class_iris=tuple(item["iri"] for item in trainable),
+        pizza_supervision_class_ids=tuple(item["class_id"] for item in trainable if item.get("pizza_supervision")),
+        component_supervision_class_ids=tuple(item["class_id"] for item in trainable if item.get("component_supervision")),
         fixed_positive_class_ids=tuple(vocabulary.get("fixed_positive_class_ids", ())),
         unsupported_class_ids=tuple(vocabulary.get("unsupported_class_ids", ())),
         class_manifest_sha256=hashlib.sha256(vocabulary_raw).hexdigest(),

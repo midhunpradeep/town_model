@@ -12,6 +12,10 @@ from typing import Sequence
 
 from .application import generate_dataset, inspect_dataset, validate_dataset_operation
 from .config import DEFAULT_CONFIG_PATH, DEFAULT_PIZZA_TYPES, load_config
+from .dataset.image_data import deterministic_subset
+from .experiments.image_config import image_config_from_mapping
+from .experiments.image_runs import inspect_run as inspect_image_run, request_stop as request_image_stop, resolve_image_experiment, run_image_experiment, run_image_matrix
+from .training.image_trainer import evaluate_image_checkpoint
 from .experiments.synthetic import (
     SyntheticConfig,
     evaluate_saved_run,
@@ -69,6 +73,31 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--snapshot-interval", type=int, default=10)
     mapping.add_argument("--scenario", choices=("simple", "window"), default="window")
 
+    image = experiment_commands.add_parser("image", help="Run/resume/inspect real-image Phase 3 embeddings; all runs are pre-detector GT-ROI exploratory work")
+    image_commands = image.add_subparsers(dest="image_command", required=True)
+    image_run = image_commands.add_parser("run", help="Run one validated image experiment configuration")
+    image_run.add_argument("--config", type=Path, required=True, help="JSON image experiment configuration")
+    image_run.add_argument("--output", type=Path, required=True, help="Parent directory for immutable image runs")
+    image_run.add_argument("--resume", action="store_true", help="Resume a stopped/interrupted/failed run with its exact config")
+
+    image_matrix = image_commands.add_parser("matrix", help="Run a paired family × pizza-composition image experiment matrix")
+    image_matrix.add_argument("--config", type=Path, required=True, help="JSON base configuration shared across all matrix cells")
+    image_matrix.add_argument("--output", type=Path, required=True, help="Parent directory for immutable image runs and matrix manifest")
+    image_matrix.add_argument("--families", nargs="+", choices=("baseline", "box", "town"), default=("baseline", "box", "town"))
+    image_matrix.add_argument("--pizza-modes", nargs="+", choices=("global", "compositional", "hybrid"), default=("global", "compositional", "hybrid"))
+
+    image_resume = image_commands.add_parser("resume", help="Resume from the run's persisted resolved configuration")
+    image_resume.add_argument("run", type=Path)
+    image_resume.add_argument("--config", type=Path, help="Optional JSON config override; identity must still match")
+    image_evaluate = image_commands.add_parser("evaluate", help="Evaluate a saved image checkpoint without training or optimizer updates")
+    image_evaluate.add_argument("run", type=Path)
+    image_evaluate.add_argument("--split", choices=("train", "validation", "test"), default="validation")
+    image_evaluate.add_argument("--checkpoint", default="best", help="best, latest, or an explicit trusted checkpoint path")
+    image_stop = image_commands.add_parser("stop", help="Request a graceful stop at the next optimizer boundary")
+    image_stop.add_argument("run", type=Path)
+    image_inspect = image_commands.add_parser("inspect", help="Read JSON run lifecycle and metrics without loading checkpoint optimizer state")
+    image_inspect.add_argument("run", type=Path)
+
     evaluate = commands.add_parser("evaluate", help="Evaluate a saved Phase 2 checkpoint without training")
     evaluate.add_argument("run", type=Path)
     evaluate.add_argument("--split", choices=("train", "validation"), default="validation")
@@ -91,6 +120,17 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument("--port", type=int, default=8501)
     dashboard.add_argument("--headless", action="store_true", help="Do not open a browser automatically")
     return parser
+
+
+def _load_image_config(path: Path):
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("image experiment config must be a JSON object")
+    if "training_config" in payload:
+        payload = payload["training_config"]
+    if not isinstance(payload, dict):
+        raise ValueError("persisted training_config must be a JSON object")
+    return image_config_from_mapping(payload)
 
 
 def _print_validation(report: object) -> None:
@@ -153,6 +193,91 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(summary.to_dict(), indent=2, sort_keys=True))
             return 0 if summary.integrity_status == "current_pass" else 1
         if args.command == "experiment":
+            repository_root = Path(__file__).resolve().parents[2]
+            if args.experiment_kind == "image":
+                if args.image_command in ("run", "matrix"):
+                    image_config = _load_image_config(args.config)
+                    if args.image_command == "run":
+                        run_path, result = run_image_experiment(
+                            image_config, args.output, repository_root=repository_root, resume=args.resume
+                        )
+                        print(json.dumps({
+                            "run_directory": str(run_path),
+                            "run_id": run_path.name,
+                            "status": result.status,
+                            "optimizer_step": result.global_step,
+                            "completed_epochs": result.completed_epochs,
+                            "best_primary_monitor": result.best_primary_monitor,
+                            "training_protocol": "pre-detector exploratory GT-ROI; not detector-pretrained Phase 3 acceptance evidence",
+                        }, indent=2, sort_keys=True))
+                    else:
+                        matrix_path = run_image_matrix(
+                            image_config,
+                            args.output,
+                            repository_root=repository_root,
+                            families=args.families,
+                            pizza_modes=args.pizza_modes,
+                        )
+                        print(json.dumps({"status": "completed", "matrix_manifest": str(matrix_path / "comparison.json")}, indent=2))
+                    return 0
+                if args.image_command == "resume":
+                    if args.config:
+                        image_config = _load_image_config(args.config)
+                    else:
+                        image_config = _load_image_config(args.run.expanduser().resolve() / "resolved-config.json")
+                    run_path, result = run_image_experiment(
+                        image_config,
+                        args.run.expanduser().resolve().parent,
+                        repository_root=repository_root,
+                        resume=True,
+                    )
+                    if run_path != args.run.expanduser().resolve():
+                        raise ValueError(f"resolved image run path does not match requested run: {run_path}")
+                    print(json.dumps({"run_directory": str(run_path), "status": result.status, "optimizer_step": result.global_step}, indent=2))
+                    return 0
+                if args.image_command == "evaluate":
+                    run_path = args.run.expanduser().resolve()
+                    image_config = _load_image_config(run_path / "resolved-config.json")
+                    resolved = resolve_image_experiment(image_config, repository_root=repository_root)
+                    if resolved.run_id != run_path.name:
+                        raise ValueError("saved image run identity does not match its resolved configuration")
+                    if args.checkpoint == "best":
+                        checkpoint = run_path / "checkpoints" / "best-validation.pt"
+                    elif args.checkpoint == "latest":
+                        checkpoint = run_path / "checkpoints" / "latest.pt"
+                    else:
+                        checkpoint = Path(args.checkpoint).expanduser()
+                    if not checkpoint.is_absolute() and args.checkpoint not in ("best", "latest"):
+                        checkpoint = run_path / checkpoint
+                    if args.split == "train":
+                        evaluation_subset = resolved.train_subset
+                    elif args.split == "validation":
+                        evaluation_subset = resolved.validation_subset
+                    else:
+                        evaluation_subset = deterministic_subset(
+                            resolved.dataset, "test", size=None, seed=image_config.dataset.selection_seed + 2
+                        )
+                    result = evaluate_image_checkpoint(
+                        resolved.dataset,
+                        resolved.train_subset,
+                        resolved.validation_subset,
+                        evaluation_subset,
+                        image_config,
+                        checkpoint,
+                        class_ids=resolved.class_ids,
+                    )
+                    print(json.dumps(result, indent=2, sort_keys=True))
+                    return 0
+                if args.image_command == "stop":
+                    request_image_stop(args.run)
+                    print(json.dumps({"run_directory": str(args.run.resolve()), "stop_requested": True}, indent=2))
+                    return 0
+                if args.image_command == "inspect":
+                    manifest = inspect_image_run(args.run)
+                    metrics_path = args.run.expanduser().resolve() / "metrics.json"
+                    metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.is_file() else None
+                    print(json.dumps({"manifest": manifest, "metrics": metrics}, indent=2, sort_keys=True))
+                    return 0
             config = SyntheticConfig(
                 seed=args.seed,
                 points=args.points,

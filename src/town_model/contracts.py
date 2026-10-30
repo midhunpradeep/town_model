@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import torch
 from torch import Tensor
@@ -135,6 +135,15 @@ class VisionFeatureBatch:
     global_spatial_features: Tensor
     component_ids: tuple[tuple[str | None, ...], ...]
     diagnostics: FeatureDiagnostics | None = None
+
+
+class FrozenImageFeatureCache(Protocol):
+    """Read-only, producer-identified cached features for frozen visual runs."""
+
+    identity: dict[str, Any]
+    cache_id: str
+
+    def get(self, batch: ImageBatch, *, diagnostics: bool = False) -> VisionFeatureBatch: ...
 
 
 @dataclass(frozen=True, slots=True)

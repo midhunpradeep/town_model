@@ -26,6 +26,7 @@ from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
 from town_model.dashboard.runtime import submit_generation
+from town_model.dashboard.image_embeddings import render_image_embeddings
 from town_model.dashboard.geometry import (
     build_comparison_figure,
     build_history_figure,
@@ -547,12 +548,13 @@ def main() -> None:
 
     st.set_page_config(page_title="Town Embeddings Research", layout="wide")
     st.title("Representing Ontologies Using Town Embeddings")
-    st.caption(f"Phase 1 dataset explorer + Phase 2 Geometry Laboratory · dataset wire schema {SCHEMA_VERSION}")
-    page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset", "Geometry Laboratory"))
+    st.caption(f"Phase 1 dataset explorer + Phase 2 Geometry Laboratory + Phase 3 image embeddings · dataset wire schema {SCHEMA_VERSION}")
+    page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset", "Geometry Laboratory", "Image Embeddings"))
     default_path = DEFAULT_EXAMPLE_DATASET if DEFAULT_EXAMPLE_DATASET.is_dir() else REPOSITORY_ROOT / "artifacts" / "datasets" / "pizza-48"
     dataset_path = Path(st.sidebar.text_input("Prepared dataset path", value=str(default_path))).expanduser()
     st.sidebar.caption("Generation is explicit. Opening or refreshing this dashboard never creates data.")
     runs_root = Path(st.sidebar.text_input("Synthetic run directory", value=str(REPOSITORY_ROOT / "artifacts" / "phase2" / "runs"))).expanduser()
+    image_runs_root = Path(st.sidebar.text_input("Image embedding run directory", value=str(REPOSITORY_ROOT / "artifacts" / "phase3" / "runs"))).expanduser()
 
     if page == "Dataset overview":
         _render_overview(st, dataset_path)
@@ -560,8 +562,10 @@ def main() -> None:
         _render_explorer(st, dataset_path)
     elif page == "Generate dataset":
         _generation_page(st)
-    else:
+    elif page == "Geometry Laboratory":
         _render_geometry_laboratory(st, runs_root)
+    else:
+        render_image_embeddings(st, image_runs_root, dataset_path)
 
 
 if __name__ == "__main__":

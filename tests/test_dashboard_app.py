@@ -48,6 +48,48 @@ def test_dashboard_marks_corrupt_data_unverified_and_blocks_explorer(prepared_da
     assert not app.get("imgs")
 
 
+def test_dashboard_image_embeddings_page_loads_without_training_or_checkpoints(tmp_path) -> None:
+    app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+    app.sidebar.radio[0].set_value("Image Embeddings")
+    app.sidebar.text_input[2].set_value(str(tmp_path / "empty-image-runs"))
+    app.run()
+    assert not app.exception
+    assert any("Image Embeddings" in item.value for item in app.subheader)
+    assert any("pre-detector exploratory embeddings" in item.value for item in app.warning)
+    assert any("No Phase 3 image runs" in item.value for item in app.info)
+
+
+def test_dashboard_image_embeddings_inspects_a_saved_run_without_loading_checkpoints(tmp_path, capsys, monkeypatch) -> None:
+    import torch
+    from town_model.cli import main
+
+    repository = Path(__file__).parents[1]
+    example = repository / "examples" / "pizza-48"
+    config = repository / "configs" / "phase3_image_smoke.json"
+    runs_root = tmp_path / "image-runs"
+    assert main(["experiment", "image", "run", "--config", str(config), "--output", str(runs_root)]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "completed"
+
+    def fail_checkpoint_load(*args, **kwargs):
+        raise AssertionError("read-only dashboard must not deserialize a model/optimizer checkpoint")
+
+    monkeypatch.setattr(torch, "load", fail_checkpoint_load)
+    app_path = repository / "src" / "town_model" / "dashboard" / "app.py"
+    app = AppTest.from_file(str(app_path), default_timeout=60).run()
+    app.sidebar.radio[0].set_value("Image Embeddings")
+    app.sidebar.text_input[0].set_value(str(example))
+    app.sidebar.text_input[2].set_value(str(runs_root))
+    app.run()
+    assert not app.exception
+    assert any(item.label == "Historical epoch snapshot" for item in app.selectbox)
+    assert any(item.label == "GT component occurrence" for item in app.selectbox)
+    assert any(item.label == "Trainable ontology class" for item in app.selectbox)
+    assert len(app.image) >= 1
+    assert not any("checkpoint" in item.value.lower() and "error" in item.value.lower() for item in app.error)
+
+
 def test_dashboard_generate_page_is_available_without_triggering_generation() -> None:
     app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
     app = AppTest.from_file(str(app_path), default_timeout=30).run()
