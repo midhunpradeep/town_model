@@ -21,7 +21,7 @@ from torch import Tensor
 
 from town_model.contracts import FrozenImageFeatureCache, ImageBatch, VisionFeatureBatch
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset
-from town_model.experiments.image_config import ImageExperimentConfig
+from town_model.experiments.image_config import IMAGE_FEATURE_EXTRACTION_CONTRACT, ImageExperimentConfig
 from town_model.models.image_embeddings import ImageOntologyModel
 from town_model.vision.backbone import MobileNetV3LargeFPN
 from town_model.vision.batching import collate_image_records
@@ -303,8 +303,10 @@ def evaluate_image_model(
     class_indices: tuple[int, ...],
     device: torch.device,
     feature_cache: FrozenImageFeatureCache | None = None,
+    component_positive_weights: Tensor | None = None,
+    pizza_positive_weights: Tensor | None = None,
 ) -> dict[str, Any]:
-    """Known-mask GT-ROI metrics only; never reads the test partition."""
+    """Known-mask GT-ROI metrics and objective losses for one original split."""
     old_visual_mode = visual.training
     old_model_mode = model.training
     visual.eval()
@@ -315,6 +317,7 @@ def evaluate_image_model(
     components_predictions: list[Tensor] = []
     components_targets: list[Tensor] = []
     components_known: list[Tensor] = []
+    objective_windows: list[ImageObjectiveTerms] = []
     transform = ImageNetLetterbox(config.vision.resolution)
     with torch.no_grad():
         for start in range(0, len(subset.records), config.training.physical_batch_size):
@@ -329,6 +332,17 @@ def evaluate_image_model(
             else:
                 vision_features = visual(batch, GroundTruthROIProvider(), diagnostics=config.diagnostics.include_visual_features)
             result = model(vision_features, batch.sample_ids)
+            objective_windows.append(image_objective_terms(
+                result,
+                batch,
+                family=model.family,
+                geometry_loss=config.objective.geometry_loss,
+                temperature=config.objective.temperature,
+                hinge_margin=config.objective.hinge_margin,
+                class_column_indices=class_indices,
+                component_positive_weights=component_positive_weights,
+                pizza_positive_weights=pizza_positive_weights,
+            ))
             pizza_prediction = result.pizza_classifier.logits >= 0 if result.pizza_classifier.logits is not None else result.pizza_classifier.contains
             pizzas_predictions.append(pizza_prediction)
             class_idx = torch.tensor(class_indices, dtype=torch.long, device=device)
@@ -361,8 +375,24 @@ def evaluate_image_model(
     primary = None
     if pizza_metric["macro_f1"] is not None and component_metric["macro_f1"] is not None:
         primary = 0.5 * pizza_metric["macro_f1"] + 0.5 * component_metric["macro_f1"]
+    try:
+        objective_result = aggregate_effective_batch(
+            objective_windows,
+            component_coefficient=config.objective.component_coefficient,
+            pizza_coefficient=config.objective.pizza_coefficient,
+        )
+        objective_losses = {
+            "total": float(objective_result.total.detach().cpu()),
+            "component": float(objective_result.component_loss.detach().cpu()) if objective_result.component_loss is not None else None,
+            "pizza": float(objective_result.pizza_loss.detach().cpu()) if objective_result.pizza_loss is not None else None,
+            "undefined_tasks": list(objective_result.undefined_tasks),
+        }
+    except UndefinedImageObjective:
+        objective_losses = {"total": None, "component": None, "pizza": None, "undefined_tasks": ["component", "pizza"]}
     return {
         "split": subset.split,
+        "objective_losses": objective_losses,
+        "objective_identity": config.objective_identity(),
         "pizza": pizza_metric,
         "component_gt_roi": component_metric,
         "primary_monitor": primary,
@@ -478,6 +508,7 @@ def _compatibility_identity(
 ) -> dict[str, Any]:
     return {
         "config_hash": config.identity_hash(),
+        "objective_identity": config.objective_identity(),
         "dataset_id": dataset.dataset_id,
         "dataset_manifest_sha256": dataset.dataset_manifest_sha256,
         "class_manifest_sha256": dataset.class_manifest_sha256,
@@ -486,7 +517,8 @@ def _compatibility_identity(
         "class_ids": list(class_ids),
         "roi_source": config.vision.roi_source,
         "visual_initial_state_hash": visual_state_hash,
-        "architecture": "mobilenet_v3_large_fpn_image_ontology_v1",
+        "architecture": "mobilenet_v3_large_fpn_image_ontology_v2",
+        "feature_extraction_contract": IMAGE_FEATURE_EXTRACTION_CONTRACT,
     }
 
 
@@ -646,6 +678,7 @@ def train_image_model(
     stop_requested: Callable[[], bool] | None = None,
     feature_cache: FrozenImageFeatureCache | None = None,
     snapshot_callback: Callable[[int, int, SharedVisualFeatureExtractor, ImageOntologyModel, bool], None] | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> ImageTrainingResult:
     """Train one classifier/composition pair on real prepared RGB images."""
     config.validate()
@@ -712,6 +745,7 @@ def train_image_model(
             "visual_state_sha256": visual_initial_hash,
             "backbone_initialization": visual.backbone.initialization_source,
             "backbone_architecture": "torchvision_mobilenet_v3_large_features_0_16",
+            "feature_extraction_contract": IMAGE_FEATURE_EXTRACTION_CONTRACT,
             "fpn_input_indices": list(visual.backbone.feature_indices),
             "fpn_input_channels": list(visual.backbone.input_channels),
             "fpn_output_channels": visual.backbone.output_channels,
@@ -735,6 +769,8 @@ def train_image_model(
     elif config.execution.feature_cache_directory:
         raise ValueError("feature_cache_directory is configured but the experiment service did not provide a validated cache")
     resolved_config = asdict(config)
+    resolved_config["resolved_objective"] = config.objective_identity()
+    resolved_config["objective_semantics"] = config.identity_dict()["objective_semantics"]
     resolved_config["feature_cache_identity"] = feature_cache.identity if feature_cache is not None else None
     resolved_config["resolved_data"] = {
         "dataset_id": dataset.dataset_id,
@@ -894,6 +930,7 @@ def train_image_model(
                 "epoch": epoch + 1,
                 "optimizer_step": global_step,
                 "training_objective": float(objective.total.detach().cpu()),
+                "objective_identity": config.objective_identity(),
                 "component_loss": float(objective.component_loss.detach().cpu()) if objective.component_loss is not None else None,
                 "pizza_loss": float(objective.pizza_loss.detach().cpu()) if objective.pizza_loss is not None else None,
                 "component_eligible_images": objective.component_eligible_images,
@@ -912,6 +949,8 @@ def train_image_model(
                 history=history, class_ids=class_ids, parents=checkpoint_parents,
             )
             _atomic_torch_save(checkpoint, latest_path)
+            if progress_callback is not None:
+                progress_callback({"event": "optimizer_step", **history_row})
             pending.clear()
             pending_microbatch_count = 0
             if stop_requested is not None and stop_requested():
@@ -922,13 +961,19 @@ def train_image_model(
         batch_cursor_resume = 0
         epoch_order_resume = None
         last_epoch_completed = epoch + 1
+        component_weight_tensor = torch.tensor(component_weights, dtype=torch.float32, device=device)
+        pizza_weight_tensor = torch.tensor(pizza_weights, dtype=torch.float32, device=device)
         training_metrics = evaluate_image_model(
             visual, model, train_subset, config, class_indices=class_indices, device=device,
             feature_cache=feature_cache,
+            component_positive_weights=component_weight_tensor,
+            pizza_positive_weights=pizza_weight_tensor,
         )
         validation = evaluate_image_model(
             visual, model, validation_subset, config, class_indices=class_indices, device=device,
             feature_cache=feature_cache,
+            component_positive_weights=component_weight_tensor,
+            pizza_positive_weights=pizza_weight_tensor,
         )
         primary = validation["primary_monitor"]
         history.append({
@@ -1029,6 +1074,16 @@ def _evaluate_image_checkpoint(
     payload = _load_checkpoint(checkpoint, identity, device)
     visual.load_state_dict(payload["visual_state"], strict=True)
     model.load_state_dict(payload["model_state"], strict=True)
+    component_weights = _positive_weights(
+        train_subset, dataset, class_ids, level="component",
+        weighting=config.objective.positive_weighting, cap=config.objective.positive_weight_cap,
+        beta=config.objective.effective_number_beta, require_coverage=config.purpose == "comparison",
+    )
+    pizza_weights = _positive_weights(
+        train_subset, dataset, class_ids, level="pizza",
+        weighting=config.objective.positive_weighting, cap=config.objective.positive_weight_cap,
+        beta=config.objective.effective_number_beta, require_coverage=config.purpose == "comparison",
+    )
     metrics = evaluate_image_model(
         visual,
         model,
@@ -1036,6 +1091,8 @@ def _evaluate_image_checkpoint(
         config,
         class_indices=class_indices,
         device=device,
+        component_positive_weights=torch.tensor(component_weights, dtype=torch.float32, device=device),
+        pizza_positive_weights=torch.tensor(pizza_weights, dtype=torch.float32, device=device),
     )
     return {
         "checkpoint_path": str(checkpoint),

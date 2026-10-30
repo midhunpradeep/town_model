@@ -16,7 +16,7 @@ import torch
 
 from town_model.contracts import FeatureDiagnostics, FrozenImageFeatureCache, ImageBatch, VisionFeatureBatch
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset
-from town_model.experiments.image_config import ImageExperimentConfig
+from town_model.experiments.image_config import IMAGE_FEATURE_EXTRACTION_CONTRACT, ImageExperimentConfig
 from town_model.training.image_trainer import _hash_state
 from town_model.vision.backbone import MobileNetV3LargeFPN
 from town_model.vision.batching import collate_image_records
@@ -218,6 +218,7 @@ def prepare_frozen_feature_cache(
         "visual_state_sha256": visual_state_hash,
         "backbone_initialization": visual.backbone.initialization_source,
         "backbone_architecture": "torchvision_mobilenet_v3_large_features_0_16",
+        "feature_extraction_contract": IMAGE_FEATURE_EXTRACTION_CONTRACT,
         "fpn_input_indices": list(visual.backbone.feature_indices),
         "fpn_input_channels": list(visual.backbone.input_channels),
         "fpn_output_channels": visual.backbone.output_channels,

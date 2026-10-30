@@ -29,7 +29,7 @@
   },
   "objective": {
     "baseline_loss": "bce",
-    "geometry_loss": "signed_bce",
+    "geometry_loss": "signed_distance",
     "temperature": 0.1,
     "hinge_margin": 0.1,
     "positive_weighting": "inverse_frequency",

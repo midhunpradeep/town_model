@@ -45,6 +45,7 @@ def test_frozen_cache_has_strict_identity_and_only_deterministic_train_validatio
     assert set(cache.identity["sample_splits"].values()) == {"train", "validation"}
     assert not any(split == "test" for split in cache.identity["sample_splits"].values())
     assert cache.identity["roi_source"] == "ground_truth"
+    assert cache.identity["feature_extraction_contract"] == "original_extent_roi_letterbox_padding_v2"
     assert cache.identity["visual_state_sha256"]
 
     batch = collate_image_records(dataset, train.records[:2], transform=ImageNetLetterbox(config.vision.resolution))
@@ -69,6 +70,8 @@ def test_frozen_cache_has_strict_identity_and_only_deterministic_train_validatio
     manifest = json.loads((cache.directory / "manifest.json").read_text())
     with pytest.raises(ValueError, match="incompatible producer identity"):
         FrozenFeatureCache.open(cache.directory, {**cache.identity, "roi_source": "predicted"})
+    with pytest.raises(ValueError, match="incompatible producer identity"):
+        FrozenFeatureCache.open(cache.directory, {**cache.identity, "feature_extraction_contract": "legacy_canvas_extent_v1"})
     sample_entry = next(iter(manifest["samples"].values()))
     artifact = cache.directory / sample_entry["path"]
     artifact.write_bytes(b"corrupt-cache-entry")

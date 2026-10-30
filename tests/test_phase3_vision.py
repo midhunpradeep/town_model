@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL import Image
 
-from town_model.contracts import ROIIdentity
+from town_model.contracts import ImageBatch, ROIIdentity
 from town_model.dataset.image_data import deterministic_subset, load_prepared_dataset
 from town_model.vision.backbone import MobileNetV3LargeFPN
 from town_model.vision.batching import collate_image_records
@@ -107,6 +107,79 @@ def test_empty_roi_set_preserves_global_branch_and_has_zero_component_width(extr
     assert features.component_vectors.shape == (count, 0, 260)
     assert features.component_valid_mask.shape == (count, 0)
     assert features.global_spatial_features.shape == (count, 256, 7, 7)
+
+
+def test_global_roi_uses_transformed_original_extent_for_padded_and_unpadded_images(extracted):
+    batch, _, extractor = extracted
+    transform = ImageNetLetterbox(224)
+    padded_image = Image.new("RGB", (400, 200), (220, 40, 20))
+    square_image = Image.new("RGB", (224, 224), (20, 180, 80))
+    prepared = [transform(image) for image in (padded_image, square_image)]
+    images = torch.stack([item[0] for item in prepared])
+    geometries = tuple(item[1] for item in prepared)
+    class_count = batch.pizza_targets.shape[1]
+    empty_boxes = tuple(torch.empty((0, 4), dtype=torch.float32) for _ in prepared)
+    test_batch = ImageBatch(
+        images=images,
+        original_image_sizes=tuple(geometry.original_size_hw for geometry in geometries),
+        processed_image_sizes=tuple(geometry.processed_size_hw for geometry in geometries),
+        image_geometries=geometries,
+        sample_ids=("padded-full-frame", "square-full-frame"),
+        gt_component_boxes_xyxy=empty_boxes,
+        component_ids=((), ()),
+        component_detector_category_ids=((), ()),
+        pizza_targets=torch.zeros((2, class_count), dtype=torch.float32),
+        pizza_known_masks=torch.zeros((2, class_count), dtype=torch.bool),
+        component_targets=tuple(torch.empty((0, class_count), dtype=torch.float32) for _ in prepared),
+        component_known_masks=tuple(torch.empty((0, class_count), dtype=torch.bool) for _ in prepared),
+        split_identity=("train", "train"),
+    )
+    test_batch.validate()
+    image_shapes = list(test_batch.processed_image_sizes)
+    original_boxes = [
+        test_batch.images.new_tensor([[0.0, 0.0, float(width), float(height)]])
+        for height, width in test_batch.original_image_sizes
+    ]
+    expected_boxes = [
+        transform_boxes_xyxy(boxes, geometry)
+        for boxes, geometry in zip(original_boxes, geometries, strict=True)
+    ]
+    canvas_boxes = [test_batch.images.new_tensor([[0.0, 0.0, 224.0, 224.0]]) for _ in prepared]
+    with torch.no_grad():
+        feature_maps = extractor.backbone(test_batch.images)
+        expected_spatial = extractor.global_roi_align(feature_maps, expected_boxes, image_shapes)
+        canvas_spatial = extractor.global_roi_align(feature_maps, canvas_boxes, image_shapes)
+
+    class RecordingROIAlign(torch.nn.Module):
+        def __init__(self, delegate):
+            super().__init__()
+            self.delegate = delegate
+            self.seen_boxes = None
+
+        def forward(self, features, boxes, shapes):
+            self.seen_boxes = [value.detach().clone() for value in boxes]
+            return self.delegate(features, boxes, shapes)
+
+    original_align = extractor.global_roi_align
+    recording_align = RecordingROIAlign(original_align)
+    extractor.global_roi_align = recording_align
+    try:
+        with torch.no_grad():
+            result = extractor(test_batch)
+    finally:
+        extractor.global_roi_align = original_align
+
+    assert geometries[0].original_size_hw == (200, 400)
+    assert geometries[0].resized_size_hw == (112, 224)
+    assert geometries[0].pad_left_top == (0, 56)
+    assert expected_boxes[0].tolist() == [[0.0, 56.0, 224.0, 168.0]]
+    assert expected_boxes[1].tolist() == [[0.0, 0.0, 224.0, 224.0]]
+    assert recording_align.seen_boxes is not None
+    assert all(torch.equal(actual, expected) for actual, expected in zip(recording_align.seen_boxes, expected_boxes, strict=True))
+    assert result.global_spatial_features.shape == (2, 256, 7, 7)
+    assert torch.allclose(result.global_spatial_features, expected_spatial)
+    assert not torch.allclose(result.global_spatial_features[0], canvas_spatial[0])
+    assert torch.allclose(result.global_spatial_features[1], canvas_spatial[1])
 
 
 def test_frozen_visual_path_and_trainable_fpn_gradient_activity(extracted):

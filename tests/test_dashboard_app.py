@@ -60,6 +60,92 @@ def test_dashboard_image_embeddings_page_loads_without_training_or_checkpoints(t
     assert any("No Phase 3 image runs" in item.value for item in app.info)
 
 
+def test_image_embeddings_preflight_rejects_invalid_draft_without_creating_run_artifacts(tmp_path):
+    import json
+
+    app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
+    runs_root = tmp_path / "invalid-dashboard-runs"
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+    app.sidebar.radio[0].set_value("Image Embeddings")
+    app.sidebar.text_input[2].set_value(str(runs_root))
+    app.run()
+    invalid = {
+        "dataset": {"dataset_path": "examples/pizza-48", "train_size": 4, "validation_size": 2, "selection_seed": 31},
+        "vision": {"roi_source": "predicted"},
+        "purpose": "smoke",
+    }
+    app.text_area[0].set_value(json.dumps(invalid))
+    preflight = next(button for button in app.button if button.label == "Preflight validate")
+    preflight.click()
+    app.run()
+    assert not app.exception
+    assert any("preflight failed" in item.value.lower() for item in app.error)
+    assert not runs_root.exists()
+
+
+def test_image_embeddings_launch_button_uses_validated_detached_worker_service(tmp_path, monkeypatch):
+    import os
+    import json
+    import town_model.experiments.image_runs as image_runs
+
+    calls = {}
+
+    class FakeProcess:
+        pid = os.getpid()
+
+    def fake_popen(command, **kwargs):
+        calls["command"] = command
+        calls["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(image_runs.subprocess, "Popen", fake_popen)
+    runs_root = tmp_path / "valid-dashboard-runs"
+    app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
+    app = AppTest.from_file(str(app_path), default_timeout=60).run()
+    app.sidebar.radio[0].set_value("Image Embeddings")
+    app.sidebar.text_input[2].set_value(str(runs_root))
+    app.run()
+    launch_button = next(button for button in app.button if button.label == "Launch new local run")
+    launch_button.click()
+    app.run()
+    assert not app.exception
+    assert any("Launched detached worker" in item.value for item in app.success)
+    assert "town_model.experiments.image_worker" in calls["command"]
+    assert calls["kwargs"]["start_new_session"] is True
+    assert calls["kwargs"]["stdin"] is image_runs.subprocess.DEVNULL
+    statuses = list((runs_root / ".image-workers").glob("image-*.json"))
+    status_files = [path for path in statuses if not path.name.endswith(".config.json")]
+    assert len(status_files) == 1
+    worker = json.loads(status_files[0].read_text(encoding="utf-8"))
+    assert worker["state"] == "launching"
+    assert not Path(worker["run_directory"]).exists()
+    reservation = runs_root / ".image-launch-locks" / f"{worker['run_id']}.lock"
+    owner = json.loads(reservation.read_text(encoding="utf-8"))
+    image_runs.release_launch_reservation(reservation, owner["token"])
+
+
+def test_image_embeddings_displays_worker_subprocess_failure_and_captured_log(tmp_path):
+    import json
+
+    runs_root = tmp_path / "worker-failure-runs"
+    worker_directory = runs_root / ".image-workers"
+    worker_directory.mkdir(parents=True)
+    log_path = worker_directory / "failed.log"
+    log_path.write_text("town: error: simulated CLI failure\n", encoding="utf-8")
+    (worker_directory / "failed.json").write_text(json.dumps({
+        "run_id": "image-failed", "state": "failed", "pid": 123, "exit_code": 2,
+        "error": None, "log_path": str(log_path),
+    }), encoding="utf-8")
+    app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+    app.sidebar.radio[0].set_value("Image Embeddings")
+    app.sidebar.text_input[2].set_value(str(runs_root))
+    app.run()
+    assert not app.exception
+    assert any("worker failed" in item.value.lower() for item in app.error)
+    assert any("simulated CLI failure" in item.value for item in app.code)
+
+
 def test_dashboard_image_embeddings_inspects_a_saved_run_without_loading_checkpoints(tmp_path, capsys, monkeypatch) -> None:
     import torch
     from town_model.cli import main

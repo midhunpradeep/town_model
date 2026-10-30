@@ -54,6 +54,10 @@ def test_one_real_image_optimizer_update_saves_resumable_training_state(tmp_path
     assert payload["identity"]["dataset_id"] == dataset.dataset_id
     assert payload["identity"]["train_subset_id"] == train.subset_id
     assert payload["history"]
+    epoch_metrics = next(row for row in payload["history"] if "validation" in row)
+    assert epoch_metrics["training_metrics"]["objective_losses"]["total"] is not None
+    assert epoch_metrics["validation"]["objective_losses"]["component"] is not None
+    assert epoch_metrics["validation"]["objective_losses"]["pizza"] is not None
     assert payload["history"][0]["gradient_activity"]["component_projection"]["gradient_l2"] > 0
     assert payload["history"][0]["gradient_activity"]["classifier_geometry"]["gradient_l2"] > 0
     assert payload["history"][-1]["validation"]["primary_monitor"] is None or isinstance(payload["history"][-1]["validation"]["primary_monitor"], float)
@@ -108,6 +112,10 @@ def test_nine_real_image_training_smokes_update_save_reload_and_evaluate(tmp_pat
     assert result.status == "completed"
     assert result.global_step > 0
     payload = torch.load(result.latest_checkpoint, map_location="cpu", weights_only=False)
+    effective_loss = payload["resolved_config"]["resolved_objective"]["component_loss"]["name"]
+    assert effective_loss == ("binary_cross_entropy_with_logits" if family == "baseline" else "signed_distance_hinge")
+    if family != "baseline":
+        assert payload["resolved_config"]["resolved_objective"]["component_loss"]["parameters"] == {"margin": 0.1}
     visual, model, class_indices = build_image_modules(dataset, config)
     visual.load_state_dict(payload["visual_state"], strict=True)
     model.load_state_dict(payload["model_state"], strict=True)
@@ -206,6 +214,34 @@ def test_trainable_fpn_real_image_run_updates_fpn_and_reports_gradient_activity(
     from town_model.training.image_trainer import _hash_state
 
     assert _hash_state(payload["visual_state"]) != payload["identity"]["visual_initial_state_hash"]
+
+
+def test_legacy_checkpoint_objective_and_feature_contract_is_not_silently_resumed(tmp_path, tiny_real_subsets):
+    from town_model.training.image_trainer import ImageTrainingError, _compatibility_identity, _hash_state, _load_checkpoint
+
+    dataset, train, validation = tiny_real_subsets
+    config = _tiny_config()
+    visual, model, _ = build_image_modules(dataset, config)
+    class_ids = tuple(config.dataset.trainable_class_ids or dataset.canonical_class_ids)
+    identity = _compatibility_identity(dataset, train, validation, config, class_ids, _hash_state(visual.state_dict()))
+    identity["common_neural_state_hash"] = _hash_state(model.common_state_dict())
+    identity["classifier_family"] = model.family
+    identity["pizza_mode"] = model.pizza_mode
+    legacy_identity = dict(identity)
+    legacy_identity.update({
+        "config_hash": "pre-review-objective-hash",
+        "architecture": "mobilenet_v3_large_fpn_image_ontology_v1",
+    })
+    legacy_identity.pop("objective_identity")
+    legacy_identity.pop("feature_extraction_contract")
+    checkpoint = tmp_path / "legacy.pt"
+    torch.save({
+        "schema_version": "image-training-checkpoint-v1",
+        "identity": legacy_identity,
+        "accumulation_window_open": False,
+    }, checkpoint)
+    with pytest.raises(ImageTrainingError, match="identity fields differ"):
+        _load_checkpoint(checkpoint, identity, torch.device("cpu"))
 
 
 def test_invalid_device_fails_before_checkpoint_directory_creation(tmp_path, tiny_real_subsets):

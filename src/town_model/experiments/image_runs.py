@@ -9,7 +9,10 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
+import sys
 import tempfile
+import uuid
 from typing import Any, Callable, Iterable
 
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset, deterministic_subset, load_prepared_dataset
@@ -19,6 +22,7 @@ from town_model.inspection.image_snapshots import save_image_snapshot
 from town_model.training.image_trainer import (
     ImageTrainingResult,
     _device_for,
+    _positive_weights,
     build_image_modules,
     train_image_model,
     validate_image_training_data,
@@ -50,10 +54,33 @@ class ResolvedImageExperiment:
     identity_hash: str
     run_id: str
 
+    def class_weight_vectors(self) -> dict[str, Any]:
+        weighting = self.config.objective.positive_weighting
+        arguments = {
+            "weighting": weighting,
+            "cap": self.config.objective.positive_weight_cap,
+            "beta": self.config.objective.effective_number_beta,
+            "require_coverage": self.config.purpose == "comparison",
+        }
+        return {
+            "component_positive": list(_positive_weights(
+                self.train_subset, self.dataset, self.class_ids, level="component", **arguments
+            )),
+            "pizza_positive": list(_positive_weights(
+                self.train_subset, self.dataset, self.class_ids, level="pizza", **arguments
+            )),
+            "policy": weighting,
+            "cap": self.config.objective.positive_weight_cap,
+            "effective_number_beta": self.config.objective.effective_number_beta,
+            "normalization": "known_mask * positive_class_weight * penalty divided by sum of known class weights per instance; known negatives weight one; unknowns excluded",
+        }
+
     def resolved_config(self) -> dict[str, Any]:
         return {
             "schema_version": self.config.schema_version,
             "training_config": asdict(self.config),
+            "resolved_objective": self.config.objective_identity(),
+            "class_weight_vectors": self.class_weight_vectors(),
             "identity_hash": self.identity_hash,
             "identity": self.identity,
             "dataset": {
@@ -157,6 +184,166 @@ def resolve_image_experiment(
         identity_hash=identity_hash,
         run_id=f"image-{identity_hash[:20]}",
     )
+
+
+@dataclass(frozen=True, slots=True)
+class ImageWorkerLaunch:
+    run_directory: Path
+    pid: int
+    status_path: Path
+    log_path: Path
+
+
+def _pid_is_alive(owner: dict[str, Any]) -> bool:
+    if owner.get("hostname") != socket.gethostname():
+        return True
+    try:
+        os.kill(int(owner["pid"]), 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+
+
+def release_launch_reservation(path: Path | str | None, token: str | None) -> None:
+    """Release one worker reservation only when its unguessable token matches."""
+    if not path or not token:
+        return
+    reservation = Path(path)
+    try:
+        owner = json.loads(reservation.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if owner.get("token") == token:
+        try:
+            reservation.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _acquire_launch_reservation(path: Path, token: str, run_id: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    owner = {"pid": os.getpid(), "hostname": socket.gethostname(), "token": token, "run_id": run_id}
+    for attempt in range(2):
+        try:
+            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as error:
+            try:
+                previous = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                previous = {"pid": -1, "hostname": socket.gethostname()}
+            if attempt == 0 and not _pid_is_alive(previous):
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            raise RunLifecycleError(f"another image worker launch is active for run {run_id}") from error
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(owner, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        return
+    raise RunLifecycleError(f"could not reserve image worker launch for run {run_id}")
+
+
+def launch_image_experiment(
+    config: ImageExperimentConfig,
+    output_root: Path | str,
+    *,
+    repository_root: Path | str | None = None,
+    resume: bool = False,
+) -> ImageWorkerLaunch:
+    """Preflight and launch the shared CLI execution path in a detached process."""
+    resolved = resolve_image_experiment(config, repository_root=repository_root)
+    base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
+    output = Path(output_root).expanduser().resolve()
+    run_directory = output / resolved.run_id
+    if resume:
+        if not run_directory.is_dir():
+            raise FileNotFoundError(f"cannot resume an image run that does not exist: {run_directory}")
+        manifest = inspect_run(run_directory, refresh_interrupted=True)
+        saved = json.loads((run_directory / "resolved-config.json").read_text(encoding="utf-8"))
+        if manifest.get("identity_hash") != resolved.identity_hash or saved.get("identity_hash") != resolved.identity_hash:
+            raise RunLifecycleError("resume configuration does not match the saved scientific run identity")
+        if manifest["state"] not in ("stopped", "interrupted", "failed"):
+            raise RunLifecycleError(f"cannot resume an image run in state {manifest['state']!r}")
+        if not (run_directory / "checkpoints" / "latest.pt").is_file():
+            raise RunLifecycleError("run has no latest checkpoint available for compatible resume")
+    elif run_directory.exists():
+        raise FileExistsError(f"image run already exists and will not be overwritten: {run_directory}")
+
+    worker_root = output / ".image-workers"
+    token = uuid.uuid4().hex
+    reservation = output / ".image-launch-locks" / f"{resolved.run_id}.lock"
+    _acquire_launch_reservation(reservation, token, resolved.run_id)
+    status_path = worker_root / f"{resolved.run_id}.json"
+    config_path = worker_root / f"{resolved.run_id}-{token}.config.json"
+    log_path = worker_root / f"{resolved.run_id}-{token}.log"
+    try:
+        worker_root.mkdir(parents=True, exist_ok=True)
+        _atomic_json(config_path, asdict(config))
+        _atomic_json(status_path, {
+            "run_id": resolved.run_id,
+            "run_directory": str(run_directory),
+            "state": "launching",
+            "resume": resume,
+            "log_path": str(log_path),
+            "requested_at": _now(),
+        })
+        command = [
+            sys.executable,
+            "-m",
+            "town_model.experiments.image_worker",
+            "--config",
+            str(config_path),
+            "--output",
+            str(output),
+            "--status",
+            str(status_path),
+            "--reservation",
+            str(reservation),
+            "--reservation-token",
+            token,
+        ]
+        if resume:
+            command.append("--resume")
+        environment = os.environ.copy()
+        with log_path.open("ab") as log_file:
+            process = subprocess.Popen(
+                command,
+                cwd=base,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                close_fds=True,
+            )
+        # Transfer the reservation to the child. It is released by its wrapper
+        # on every exit path, not by the browser/session that requested launch.
+        _atomic_json(reservation, {
+            "pid": process.pid,
+            "hostname": socket.gethostname(),
+            "token": token,
+            "run_id": resolved.run_id,
+        })
+        return ImageWorkerLaunch(run_directory, process.pid, status_path, log_path)
+    except Exception as error:
+        release_launch_reservation(reservation, token)
+        _atomic_json(status_path, {
+            "run_id": resolved.run_id,
+            "run_directory": str(run_directory),
+            "state": "failed",
+            "exit_code": None,
+            "error": f"{type(error).__name__}: {error}",
+            "log_path": str(log_path),
+            "finished_at": _now(),
+        })
+        raise
 
 
 class RunWriterLock:
@@ -323,6 +510,8 @@ def run_image_experiment(
                 "schema_version": "image-run-manifest-v1",
                 "run_id": resolved.run_id,
                 "identity_hash": resolved.identity_hash,
+                "objective_identity": resolved.config.objective_identity(),
+                "class_weight_vectors": resolved.class_weight_vectors(),
                 "state": "draft",
                 "created_at": _now(),
                 "updated_at": _now(),
@@ -362,6 +551,17 @@ def run_image_experiment(
         should_stop = stop_requested or (lambda: (root / "stop.request").exists())
         snapshot_paths: list[str] = []
 
+        def progress_callback(event: dict[str, Any]) -> None:
+            progress = {
+                "run_id": resolved.run_id,
+                "identity_hash": resolved.identity_hash,
+                "objective_identity": config.objective_identity(),
+                "updated_at": _now(),
+                **event,
+            }
+            _atomic_json(root / "progress.json", progress)
+            print("IMAGE_PROGRESS " + json.dumps(progress, sort_keys=True, allow_nan=False), file=sys.stderr, flush=True)
+
         def snapshot_callback(epoch, step, visual, model, is_final):
             if epoch % config.diagnostics.snapshot_every_epochs != 0 and not is_final:
                 return
@@ -394,10 +594,12 @@ def run_image_experiment(
                 stop_requested=should_stop,
                 feature_cache=feature_cache,
                 snapshot_callback=snapshot_callback,
+                progress_callback=progress_callback,
             )
             metrics = {
                 "run_id": resolved.run_id,
                 "identity_hash": resolved.identity_hash,
+                "objective_identity": config.objective_identity(),
                 "status": result.status,
                 "optimizer_step": result.global_step,
                 "completed_epochs": result.completed_epochs,

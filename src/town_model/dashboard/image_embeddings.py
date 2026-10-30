@@ -17,6 +17,14 @@ from PIL import Image, ImageDraw
 import torch
 
 from town_model.dashboard.data import find_sample, load_dashboard_data
+from town_model.experiments.image_config import IMAGE_OBJECTIVE_REDUCTION, image_config_from_mapping
+from town_model.experiments.image_runs import (
+    RunLifecycleError,
+    inspect_run,
+    launch_image_experiment,
+    request_stop,
+    resolve_image_experiment,
+)
 from town_model.inspection.image_snapshots import ImageResearchSnapshot, load_image_snapshot
 from town_model.models.geometry import BoxGeometry, evaluate_town_corners
 
@@ -256,23 +264,168 @@ def _draw_snapshot_image(image: Image.Image, record, selected_component: str | N
     return Image.alpha_composite(rendered, overlay).convert("RGB")
 
 
+def _repository_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _read_config_draft(text: str):
+    payload = json.loads(text)
+    if not isinstance(payload, dict):
+        raise ValueError("image experiment configuration must be a JSON object")
+    if "training_config" in payload:
+        payload = payload["training_config"]
+    if not isinstance(payload, dict):
+        raise ValueError("training_config must be a JSON object")
+    return image_config_from_mapping(payload)
+
+
+def _worker_records(runs_root: Path) -> list[dict[str, Any]]:
+    status_directory = runs_root / ".image-workers"
+    if not status_directory.is_dir():
+        return []
+    records = []
+    for path in sorted(status_directory.glob("*.json")):
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(value, dict) and value.get("run_id"):
+            records.append(value)
+    return records
+
+
+def _log_tail(path: str | Path | None, *, lines: int = 80) -> str:
+    if not path:
+        return ""
+    try:
+        return "".join(Path(path).read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)[-lines:])
+    except OSError as error:
+        return f"Could not read worker log: {error}"
+
+
+def _render_image_run_controls(st, runs_root: Path) -> None:
+    st.markdown("#### Validated local experiment controls")
+    st.caption("Configuration preflight and run lifecycle use the shared experiment service. Training runs in a detached CLI worker process; Streamlit session state never owns the optimizer or worker lifetime.")
+    repository = _repository_root()
+    default_config = repository / "configs" / "phase3_image_smoke.json"
+    config_path = st.text_input("Load image configuration JSON", value=str(default_config), key="image_config_file")
+    draft_key = "image_config_draft_json"
+    if draft_key not in st.session_state:
+        try:
+            st.session_state[draft_key] = default_config.read_text(encoding="utf-8")
+        except OSError:
+            st.session_state[draft_key] = "{}"
+    if st.button("Load configuration draft", key="image_config_load"):
+        try:
+            st.session_state[draft_key] = Path(config_path).expanduser().read_text(encoding="utf-8")
+            st.success("Configuration draft loaded. Review or edit the JSON before preflight/launch.")
+        except OSError as error:
+            st.error(f"Could not load configuration draft: {error}")
+    draft = st.text_area("Image experiment configuration draft (JSON)", key=draft_key, height=300)
+    preflight_column, launch_column = st.columns(2)
+    if preflight_column.button("Preflight validate", key="image_config_preflight"):
+        try:
+            config = _read_config_draft(draft)
+            resolved = resolve_image_experiment(config, repository_root=repository)
+            st.success(f"Preflight passed · run `{resolved.run_id}` · identity `{resolved.identity_hash}`")
+            st.json({
+                "objective": config.objective_identity(),
+                "train_samples": len(resolved.train_subset.records),
+                "validation_samples": len(resolved.validation_subset.records),
+                "train_subset_id": resolved.train_subset.subset_id,
+                "validation_subset_id": resolved.validation_subset.subset_id,
+                "known_positive_support": {
+                    level: {
+                        str(class_id): resolved.train_subset.class_support[level]["known_positive"][resolved.train_subset.class_support["class_ids"].index(class_id)]
+                        for class_id in resolved.class_ids
+                    }
+                    for level in ("pizza", "component")
+                },
+            })
+        except (OSError, ValueError, RunLifecycleError, json.JSONDecodeError) as error:
+            st.error(f"Image experiment preflight failed: {error}")
+    if launch_column.button("Launch new local run", key="image_run_launch"):
+        try:
+            config = _read_config_draft(draft)
+            worker = launch_image_experiment(config, runs_root, repository_root=repository)
+            st.success(f"Launched detached worker PID {worker.pid} for `{worker.run_directory.name}`. Log: `{worker.log_path}`")
+        except (OSError, ValueError, RunLifecycleError, json.JSONDecodeError) as error:
+            st.error(f"Image experiment launch failed before/while starting the worker: {error}")
+
+    if st.button("Refresh run state and logs", key="image_run_refresh"):
+        st.rerun()
+    workers = _worker_records(runs_root)
+    if workers:
+        st.markdown("#### Worker subprocess status")
+        for worker in workers:
+            state = worker.get("state", "unknown")
+            st.write(
+                f"`{worker['run_id']}` · **{state}** · PID `{worker.get('pid', 'starting')}` · "
+                f"exit code `{worker.get('exit_code', 'pending')}`"
+            )
+            if state == "failed":
+                st.error(f"Worker failed: {worker.get('error') or 'see captured CLI output below'}")
+            log_text = _log_tail(worker.get("log_path"))
+            if log_text:
+                with st.expander(f"Worker log · {worker['run_id']}", expanded=state == "failed"):
+                    st.code(log_text)
+
+
 def render_image_embeddings(st, runs_root: Path, dataset_path: Path) -> None:
     st.subheader("Image Embeddings · pre-detector GT-ROI exploratory work")
     st.warning("Every run on this page uses ground-truth component ROIs. These are pre-detector exploratory embeddings, not detector-pretrained Phase 3 acceptance evidence and not Phase 4.")
+    _render_image_run_controls(st, runs_root)
     runs = discover_image_runs(runs_root)
     if not runs:
         st.info(f"No Phase 3 image runs with validated run manifests were found under `{runs_root}`.")
         return
     selected_run = st.selectbox("Image run", runs, format_func=lambda path: path.name, key="image_embedding_run")
     try:
-        manifest = json.loads((selected_run / "manifest.json").read_text(encoding="utf-8"))
+        manifest = inspect_run(selected_run, refresh_interrupted=True)
         config = json.loads((selected_run / "resolved-config.json").read_text(encoding="utf-8"))
         metrics = json.loads((selected_run / "metrics.json").read_text(encoding="utf-8")) if (selected_run / "metrics.json").is_file() else {}
-    except (OSError, json.JSONDecodeError) as error:
-        st.error(f"Could not read this run's JSON provenance: {error}")
+        progress = json.loads((selected_run / "progress.json").read_text(encoding="utf-8")) if (selected_run / "progress.json").is_file() else {}
+    except (OSError, ValueError, RunLifecycleError, json.JSONDecodeError) as error:
+        st.error(f"Could not inspect this run's persisted state: {error}")
         return
-    st.caption(f"State: `{manifest['state']}` · run `{manifest['run_id']}` · identity `{manifest['identity_hash']}`")
-    st.json({"resolved_configuration": config, "run_manifest": manifest, "metrics": metrics})
+    state = manifest["state"]
+    st.caption(f"State: `{state}` · run `{manifest['run_id']}` · identity `{manifest['identity_hash']}`")
+    if progress:
+        progress_columns = st.columns(4)
+        progress_columns[0].metric("Epoch", progress.get("epoch", "—"))
+        progress_columns[1].metric("Optimizer step", progress.get("optimizer_step", "—"))
+        progress_columns[2].metric("Effective loss", progress.get("training_objective", "—"))
+        progress_columns[3].metric("Objective", progress.get("objective_identity", {}).get("component_loss", {}).get("name", "—"))
+        st.caption(f"Last worker update: {progress.get('updated_at', 'unknown')} · component loss {progress.get('component_loss')} · pizza loss {progress.get('pizza_loss')}")
+    controls = st.columns(2)
+    if controls[0].button("Request graceful stop", key=f"stop-{manifest['run_id']}", disabled=state != "running"):
+        try:
+            request_stop(selected_run)
+            st.success("Graceful stop requested; the CLI worker will stop at the next optimizer boundary.")
+        except (OSError, RunLifecycleError) as error:
+            st.error(f"Could not request graceful stop: {error}")
+    reduction = config.get("identity", {}).get("training_config", {}).get("objective_semantics")
+    latest_checkpoint = selected_run / "checkpoints" / "latest.pt"
+    resume_allowed = state in ("stopped", "interrupted", "failed") and latest_checkpoint.is_file() and reduction == IMAGE_OBJECTIVE_REDUCTION
+    if controls[1].button("Resume selected run", key=f"resume-{manifest['run_id']}", disabled=not resume_allowed):
+        try:
+            saved_config = _read_config_draft(json.dumps(config["training_config"]))
+            worker = launch_image_experiment(saved_config, selected_run.parent, repository_root=_repository_root(), resume=True)
+            st.success(f"Launched compatible resume worker PID {worker.pid} for `{worker.run_directory.name}`.")
+        except (OSError, ValueError, RunLifecycleError, json.JSONDecodeError) as error:
+            st.error(f"Resume was rejected: {error}")
+    if state in ("stopped", "interrupted", "failed") and latest_checkpoint.is_file() and not resume_allowed:
+        st.warning("This checkpoint uses an incompatible/legacy objective identity and cannot be silently resumed under the corrected training contract.")
+    worker = next((item for item in reversed(_worker_records(runs_root)) if item.get("run_id") == manifest["run_id"]), None)
+    if worker:
+        st.caption(f"Subprocess state `{worker.get('state')}` · PID `{worker.get('pid', 'unknown')}` · exit code `{worker.get('exit_code', 'pending')}`")
+        if worker.get("state") == "failed":
+            st.error(f"Image worker exited with status {worker.get('exit_code')}: {worker.get('error') or 'see captured CLI output'}")
+        log_text = _log_tail(worker.get("log_path"))
+        if log_text:
+            with st.expander("Captured subprocess progress/log output", expanded=worker.get("state") == "failed"):
+                st.code(log_text)
+    st.json({"resolved_configuration": config, "run_manifest": manifest, "progress": progress, "metrics": metrics})
     snapshot_paths = discover_snapshots(selected_run)
     if not snapshot_paths:
         st.info("This run has no completed, persisted numerical snapshots yet. Running checkpoints are not loaded by the dashboard.")

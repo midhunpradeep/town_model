@@ -73,7 +73,7 @@ town experiment image evaluate artifacts/phase3/runs/<run-id> --split validation
 # Only after model selection: town experiment image evaluate artifacts/phase3/runs/<run-id> --split test --checkpoint best
 ```
 
-The **Image Embeddings** dashboard reads checksummed JSON/NPZ research snapshots without loading checkpoint optimizer state or starting training. Its exact geometry slices use raw saved latent coordinates; optional PCA is display-only. See [Phase 3 scope](docs/PHASE_3_SCOPE.md), [architecture](docs/PHASE_3_ARCHITECTURE.md), and [implementation report](docs/PHASE_3_IMPLEMENTATION_REPORT.md). Phase 3 has not been independently accepted. Detector pretraining, predicted-ROI fine-tuning, CUDA/browser verification, and Phase 4 remain out of scope/unverified.
+The **Image Embeddings** dashboard includes validated config drafting/preflight, detached local run launch, status/progress/log inspection, graceful stop, and compatible resume. Saved snapshot inspection remains read-only and does not deserialize checkpoint optimizer state; exact geometry slices use raw saved latent coordinates and optional PCA is display-only. See [Phase 3 scope](docs/PHASE_3_SCOPE.md), [architecture](docs/PHASE_3_ARCHITECTURE.md), [implementation report](docs/PHASE_3_IMPLEMENTATION_REPORT.md), and [pre-review remediation report](docs/PHASE_3_PRE_REVIEW_REMEDIATION_REPORT.md). Phase 3 has not been independently accepted. Detector pretraining, predicted-ROI fine-tuning, and Phase 4 remain out of scope; the installed PyTorch runtime is CPU-only.
 
 ## Tests
 

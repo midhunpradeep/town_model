@@ -6,6 +6,7 @@ from town_model.experiments.image_config import (
     DatasetSubsetConfig,
     ImageExperimentConfig,
     ImageModelConfig,
+    ObjectiveConfig,
     VisionConfig,
     DiagnosticsConfig,
     ExecutionConfig,
@@ -58,6 +59,40 @@ def test_config_mapping_restores_sequence_fields():
     })
     assert config.dataset.trainable_class_ids == (0, 2)
     assert config.vision.trainable_backbone_blocks == (12, 16)
+
+
+def test_default_and_selectable_image_objective_identities_and_scientific_hashes():
+    expected = {
+        "baseline": "binary_cross_entropy_with_logits",
+        "box": "signed_distance_hinge",
+        "town": "signed_distance_hinge",
+    }
+    configs = {}
+    for family, loss_name in expected.items():
+        config = ImageExperimentConfig(model=ImageModelConfig(family=family)).validate()
+        configs[family] = config
+        assert config.objective.geometry_loss == "signed_distance"
+        assert config.objective_identity()["component_loss"]["name"] == loss_name
+        assert config.objective_identity()["pizza_loss"]["name"] == loss_name
+        assert config.objective_identity()["reduction"] == "known-weight-sum-normalized-per-instance-v2"
+        assert config.identity_dict()["objective_semantics"] == "known-weight-sum-normalized-per-instance-v2"
+        assert config.identity_dict()["vision_feature_contract"] == "original_extent_roi_letterbox_padding_v2"
+
+    hinge = ImageExperimentConfig(model=ImageModelConfig(family="box"), objective=ObjectiveConfig(hinge_margin=0.0)).validate()
+    assert hinge.objective_identity()["component_loss"]["parameters"] == {"margin": 0.0}
+    signed_bce = ImageExperimentConfig(
+        model=ImageModelConfig(family="box"), objective=ObjectiveConfig(geometry_loss="signed_bce")
+    ).validate()
+    assert signed_bce.objective_identity()["component_loss"] == {
+        "name": "signed_margin_bce",
+        "formula": "softplus(-(2 * target - 1) * signed_margin / temperature)",
+        "parameters": {"temperature": 0.1},
+    }
+    assert signed_bce.identity_hash() != configs["box"].identity_hash()
+    changed_margin = ImageExperimentConfig(
+        model=ImageModelConfig(family="box"), objective=ObjectiveConfig(hinge_margin=0.2)
+    ).validate()
+    assert changed_margin.identity_hash() != configs["box"].identity_hash()
 
 
 def test_explicit_trainable_ids_must_be_nonempty_unique_and_valid():

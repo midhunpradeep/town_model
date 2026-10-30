@@ -106,15 +106,24 @@ def _reshape_classifier_output(output: ClassifierOutput, batch: int, count: int)
         name: value.reshape(batch, count, *value.shape[1:])
         for name, value in (output.fixed_positive or {}).items()
     }
-    diagnostics = {
-        name: value.reshape(batch, count, *value.shape[1:])
-        for name, value in (output.diagnostics or {}).items()
-    }
+    diagnostics = None
+    if output.diagnostics:
+        diagnostics = {}
+        point_count, class_count = output.contains.shape
+        for name, value in output.diagnostics.items():
+            # Geometry corners are class parameters; town activity tensors
+            # are point outputs [N,C,...] and follow the component batch reshape.
+            if name in ("box_low", "box_high", "frame_low", "frame_high", "window_low", "window_high"):
+                diagnostics[name] = value
+            elif value.ndim >= 2 and value.shape[:2] == (point_count, class_count):
+                diagnostics[name] = value.reshape(batch, count, *value.shape[1:])
+            else:
+                diagnostics[name] = value
     return ClassifierOutput(
         contains=output.contains.reshape(batch, count, output.contains.shape[-1]),
         logits=reshape_optional(output.logits),
         signed_margin=reshape_optional(output.signed_margin),
-        diagnostics=diagnostics or None,
+        diagnostics=diagnostics,
         fixed_positive=fixed or None,
     )
 

@@ -58,12 +58,13 @@ class SharedVisualFeatureExtractor(nn.Module):
         else:
             pooled = maps["0"].new_empty((0, 256, 7, 7))
 
-        # The global ROI is the full processed image for every sample. It is
-        # independent of component count and remains available for empty sets.
-        full_image_boxes = [
-            batch.images.new_tensor([[0.0, 0.0, float(width), float(height)]])
-            for height, width in batch.processed_image_sizes
-        ]
+        # Map the full original-image ROI through the same authoritative
+        # resize/pad transform as component boxes. A letterboxed canvas includes
+        # padding, so its processed rectangle is not the original image extent.
+        full_image_boxes = []
+        for (height, width), geometry in zip(batch.original_image_sizes, batch.image_geometries, strict=True):
+            original_extent = batch.images.new_tensor([[0.0, 0.0, float(width), float(height)]])
+            full_image_boxes.append(transform_boxes_xyxy(original_extent, geometry))
         global_spatial = self.global_roi_align(maps, full_image_boxes, image_shapes)
         if global_spatial.shape != (len(batch.sample_ids), 256, 7, 7):
             raise RuntimeError(f"global ROIAlign returned unexpected shape {tuple(global_spatial.shape)}")

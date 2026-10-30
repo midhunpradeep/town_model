@@ -12,6 +12,32 @@ from typing import Literal
 from town_model.models.geometry import validate_min_width
 
 
+IMAGE_OBJECTIVE_REDUCTION = "known-weight-sum-normalized-per-instance-v2"
+IMAGE_FEATURE_EXTRACTION_CONTRACT = "original_extent_roi_letterbox_padding_v2"
+
+
+def _loss_identity(name: str, *, temperature: float, hinge_margin: float) -> dict[str, object]:
+    if name == "bce":
+        return {
+            "name": "binary_cross_entropy_with_logits",
+            "formula": "softplus(logit) - target * logit",
+            "parameters": {},
+        }
+    if name == "signed_distance":
+        return {
+            "name": "signed_distance_hinge",
+            "formula": "max(0, margin - (2 * target - 1) * signed_margin)",
+            "parameters": {"margin": hinge_margin},
+        }
+    if name == "signed_bce":
+        return {
+            "name": "signed_margin_bce",
+            "formula": "softplus(-(2 * target - 1) * signed_margin / temperature)",
+            "parameters": {"temperature": temperature},
+        }
+    raise ValueError(f"unsupported image loss identity {name!r}")
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetSubsetConfig:
     dataset_path: str = "examples/pizza-48"
@@ -101,7 +127,7 @@ class ImageModelConfig:
 @dataclass(frozen=True, slots=True)
 class ObjectiveConfig:
     baseline_loss: str = "bce"
-    geometry_loss: str = "signed_bce"
+    geometry_loss: str = "signed_distance"
     temperature: float = 0.1
     hinge_margin: float = 0.1
     positive_weighting: Literal["none", "inverse_sqrt", "inverse_frequency", "effective_number"] = "none"
@@ -259,6 +285,28 @@ class ImageExperimentConfig:
             raise ValueError("town geometry settings are invalid for non-town classifier families")
         return self
 
+    def objective_identity(self) -> dict[str, object]:
+        """Return the effective family loss formulas and their resolved parameters."""
+        if self.model.family == "baseline":
+            component_loss = pizza_loss = _loss_identity("bce", temperature=self.objective.temperature, hinge_margin=self.objective.hinge_margin)
+        else:
+            component_loss = pizza_loss = _loss_identity(
+                self.objective.geometry_loss,
+                temperature=self.objective.temperature,
+                hinge_margin=self.objective.hinge_margin,
+            )
+        return {
+            "family": self.model.family,
+            "component_loss": component_loss,
+            "pizza_loss": pizza_loss,
+            "positive_weighting": self.objective.positive_weighting,
+            "positive_weight_cap": self.objective.positive_weight_cap,
+            "effective_number_beta": self.objective.effective_number_beta,
+            "component_coefficient": self.objective.component_coefficient,
+            "pizza_coefficient": self.objective.pizza_coefficient,
+            "reduction": IMAGE_OBJECTIVE_REDUCTION,
+        }
+
     def identity_dict(self) -> dict[str, object]:
         """Scientific/training identity deliberately excludes presentation preferences."""
         self.validate()
@@ -266,6 +314,9 @@ class ImageExperimentConfig:
         value.pop("visualization", None)
         value.pop("diagnostics", None)
         value["execution"].pop("feature_cache_directory", None)
+        value["objective_semantics"] = IMAGE_OBJECTIVE_REDUCTION
+        value["vision_feature_contract"] = IMAGE_FEATURE_EXTRACTION_CONTRACT
+        value["resolved_objective"] = self.objective_identity()
         return value
 
     def identity_hash(self) -> str:

@@ -68,10 +68,10 @@ def _instance_terms(
             raise ValueError("positive weights must be finite and positive")
     weights = torch.where(target_values == 1, pos_weights.unsqueeze(0), 1.0)
     weights = weights * known.to(dtype=torch.float32)
-    # Positive weights change positive-example influence; normalize by the
-    # number of observed labels, not the sum of weights (which cancels weights
-    # for one-supervised-class rows).
-    denominator = known.sum(dim=-1).to(dtype=torch.float32)
+    # The scientific contract normalizes by total known class weight. This
+    # makes weighting affect relative class influence without changing the
+    # scale of a supervised instance merely because its positives are weighted.
+    denominator = weights.sum(dim=-1)
     eligible = denominator > 0
     values = (penalties * weights).sum(dim=-1) / denominator.clamp_min(torch.finfo(torch.float32).tiny)
     return values, eligible
