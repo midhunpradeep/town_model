@@ -64,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--steps", type=int, default=60)
         command.add_argument("--learning-rate", type=float, default=0.03)
         command.add_argument("--margin", type=float, default=0.1)
+        command.add_argument("--window-target-volume", type=float, default=0.25)
         command.add_argument("--unknown-fraction", type=float, default=0.04)
         command.add_argument("--snapshot-interval", type=int, default=10)
     mapping.add_argument("--scenario", choices=("simple", "window"), default="window")
@@ -159,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 steps=args.steps,
                 learning_rate=args.learning_rate,
                 margin=args.margin,
+                window_target_volume=args.window_target_volume,
                 unknown_fraction=args.unknown_fraction,
                 snapshot_interval=args.snapshot_interval,
             )

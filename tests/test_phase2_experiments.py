@@ -55,6 +55,10 @@ def test_all_three_fixed_classifiers_train_reload_and_share_identical_fixture(tm
         final = saved_geometry(run, "final")
         assert initial["points"].shape == final["points"].shape == (60, 2)
         assert final["output"].contains.shape == (60, 2)
+        assert initial["snapshot_activity_step"] == 0
+        assert initial["snapshot_activity_source"] == "snapshot"
+        assert final["snapshot_activity_step"] == final["step"]
+        assert final["snapshot_activity_source"] == "snapshot"
 
 
 def test_fixed_nonconvex_fixture_has_closed_window_exclusion_and_multiple_regions() -> None:

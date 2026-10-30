@@ -37,9 +37,19 @@ def _as_float32_tensor(value: Tensor, name: str) -> Tensor:
 
 
 def _safe_floor(min_width: float) -> float:
-    if not math.isfinite(min_width) or min_width <= 0 or min_width >= 2:
-        raise ValueError("min_width must be finite and in (0, 2)")
-    return min_width + _FLOAT32_RESERVE
+    maximum = 2.0 - 2.0 * _FLOAT32_RESERVE
+    if (
+        isinstance(min_width, bool)
+        or not isinstance(min_width, (int, float))
+        or not math.isfinite(min_width)
+        or min_width <= 0
+        or min_width >= maximum
+    ):
+        raise ValueError(
+            f"min_width must be finite and positive and less than {maximum:.9g} "
+            "to leave float32 width reserve inside [-1,1]"
+        )
+    return float(min_width) + _FLOAT32_RESERVE
 
 
 def _bounded_corners(raw_low: Tensor, raw_width: Tensor, floor: float) -> tuple[Tensor, Tensor]:
@@ -183,8 +193,8 @@ class BoxGeometry(nn.Module):
         self.dimensions = int(dimensions)
         self.classes = int(classes)
         self.seed = int(seed)
+        self.width_floor = _safe_floor(min_width)
         self.min_width = float(min_width)
-        self.width_floor = _safe_floor(self.min_width)
         generator = torch.Generator(device="cpu").manual_seed(self.seed)
         center = torch.randn((classes, dimensions), generator=generator) * 0.025
         widths = 1.82 + torch.rand((classes, dimensions), generator=generator) * 0.12
@@ -214,6 +224,8 @@ class BoxGeometry(nn.Module):
         result = cls(lows.shape[-1], lows.shape[0], min_width=min_width)
         if lows.shape[1] != 1:
             raise ValueError("a pure box has one physical box per class; expected [C,1,d]")
+        if torch.any(highs - lows < result.min_width):
+            raise ValueError("physical boxes must meet the configured minimum axis width")
         result.register_buffer("fixed_low", lows[:, 0, :].clone())
         result.register_buffer("fixed_high", highs[:, 0, :].clone())
         result.raw_low.requires_grad_(False)
@@ -267,7 +279,13 @@ class BoxGeometry(nn.Module):
 
 
 class TownGeometry(nn.Module):
-    """Fixed-capacity union of houses, each subtracting contained windows."""
+    """Fixed-capacity houses with seeded windows sized by target volume.
+
+    ``window_target_volume`` is a provisional fraction of available interior
+    span above the minimum window floor. Its per-axis fraction is
+    ``volume ** (1/dimensions)``; centers remain seeded, label-agnostic, and
+    distinct across houses.
+    """
 
     def __init__(
         self,
@@ -279,6 +297,7 @@ class TownGeometry(nn.Module):
         seed: int = 42,
         min_width: float = 1e-5,
         window_mode: str = "contained",
+        window_target_volume: float = 0.25,
     ):
         super().__init__()
         if dimensions < 1 or classes < 1 or houses < 1 or windows < 1:
@@ -290,12 +309,25 @@ class TownGeometry(nn.Module):
         self.houses = int(houses)
         self.windows = int(windows)
         self.seed = int(seed)
+        self.clearance = _safe_floor(min_width)
         self.min_width = float(min_width)
-        self.clearance = _safe_floor(self.min_width)
+        if (
+            isinstance(window_target_volume, bool)
+            or not isinstance(window_target_volume, (int, float))
+            or not math.isfinite(window_target_volume)
+            or not 0.0 < window_target_volume < 1.0
+        ):
+            raise ValueError("window_target_volume must be finite and in (0,1)")
+        self.window_target_volume = float(window_target_volume)
+        self.window_axis_fraction = self.window_target_volume ** (1.0 / self.dimensions)
         self.window_floor = self.clearance
         self.frame_floor = 3.0 * self.clearance + _FLOAT32_RESERVE
-        if self.frame_floor >= 2.0:
-            raise ValueError("min_width is too large for contained town windows")
+        if self.frame_floor >= 2.0 - _FLOAT32_RESERVE:
+            maximum_town_width = (2.0 - 5.0 * _FLOAT32_RESERVE) / 3.0
+            raise ValueError(
+                "min_width is infeasible for contained town frames; "
+                f"it must be less than {maximum_town_width:.9g}"
+            )
         self.window_mode = window_mode
         generator = torch.Generator(device="cpu").manual_seed(self.seed)
         centers = torch.randn((classes, houses, dimensions), generator=generator) * 0.03
@@ -315,7 +347,7 @@ class TownGeometry(nn.Module):
         # between houses/classes. No target or positive point is consulted.
         frame_width = frame_high - frame_low
         interior = frame_width - 2 * self.clearance
-        window_width = self.window_floor + 0.72 * (interior - self.window_floor)
+        window_width = self.window_floor + self.window_axis_fraction * (interior - self.window_floor)
         positions = torch.full((classes, houses, windows, dimensions), 0.5)
         for house_index in range(houses):
             positions[:, house_index, :, :] = min(0.85, max(0.15, 0.5 + (house_index - (houses - 1) / 2) * 0.06))
@@ -337,6 +369,9 @@ class TownGeometry(nn.Module):
             "window_mode": self.window_mode,
             "minimum_axis_width": self.min_width,
             "numerical_clearance_floor": self.clearance,
+            "window_target_volume_fraction": self.window_target_volume,
+            "window_target_volume_basis": "available interior span above minimum window floor",
+            "window_axis_fraction": self.window_axis_fraction,
             "frame_centers": ((frame_low + frame_high) / 2).detach().tolist(),
             "frame_widths": (frame_high - frame_low).detach().tolist(),
             "window_centers": ((window_low + window_high) / 2).detach().tolist(),

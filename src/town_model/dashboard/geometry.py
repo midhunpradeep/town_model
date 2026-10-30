@@ -11,7 +11,7 @@ import matplotlib
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Patch, Rectangle
 import numpy as np
 import torch
 
@@ -140,11 +140,20 @@ def _draw_physical_boundaries(ax, model, class_index: int, fixed: torch.Tensor, 
         for house_index in range(frame_low.shape[0]):
             low, high = frame_low[house_index], frame_high[house_index]
             if _slice_intersects(low, high, fixed, axes):
-                ax.add_patch(Rectangle((float(low[axis_x]), float(low[axis_y])), float(high[axis_x] - low[axis_x]), float(high[axis_y] - low[axis_y]), fill=False, edgecolor="#126782", linestyle="--", linewidth=1.6, label="actual house frame" if house_index == 0 else None))
+                ax.add_patch(Rectangle((float(low[axis_x]), float(low[axis_y])), float(high[axis_x] - low[axis_x]), float(high[axis_y] - low[axis_y]), fill=False, edgecolor="#126782", linestyle="--", linewidth=1.6, label=f"house {house_index} frame"))
             for window_index in range(window_low.shape[1]):
                 wlow, whigh = window_low[house_index, window_index], window_high[house_index, window_index]
                 if _slice_intersects(wlow, whigh, fixed, axes):
-                    ax.add_patch(Rectangle((float(wlow[axis_x]), float(wlow[axis_y])), float(whigh[axis_x] - wlow[axis_x]), float(whigh[axis_y] - wlow[axis_y]), facecolor="white", alpha=0.8, edgecolor="#8c2b67", linewidth=1.8, label="excluded window" if house_index == 0 and window_index == 0 else None))
+                    ax.add_patch(Rectangle(
+                        (float(wlow[axis_x]), float(wlow[axis_y])),
+                        float(whigh[axis_x] - wlow[axis_x]),
+                        float(whigh[axis_y] - wlow[axis_y]),
+                        fill=False,
+                        edgecolor="#8c2b67",
+                        linestyle=":",
+                        linewidth=2.0,
+                        label=f"house {house_index} window {window_index} boundary (house-specific exclusion)",
+                    ))
 
 
 def build_region_figure(
@@ -213,7 +222,11 @@ def build_region_figure(
     ax.set_aspect("equal", adjustable="box")
     anchor_label = "zero anchor" if anchor_mode == "zero" else f"anchor through {view['sample_id']}"
     ax.set_title(f"{model.family} · {class_name} · {view['split']} · {anchor_label}\n{decision_label}")
-    ax.legend(loc="best", fontsize="small")
+    handles, labels = ax.get_legend_handles_labels()
+    if model.family == "town":
+        handles.insert(0, Patch(facecolor="#70ad86", edgecolor="none", alpha=0.45))
+        labels.insert(0, "final town membership (model-evaluated)")
+    ax.legend(handles, labels, loc="best", fontsize="small")
     selected_contains = bool(selected_output.contains[0, class_index].item())
     if selected_output.signed_margin is not None:
         selected_score = float(selected_output.signed_margin[0, class_index].item())

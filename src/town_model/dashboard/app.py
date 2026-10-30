@@ -453,7 +453,6 @@ def _render_geometry_laboratory(st, runs_root: Path) -> None:
                 "window_high": window_high[class_index].detach().cpu().tolist(),
                 "window_mode": model.geometry.window_mode,
                 "initialization": model.geometry.initialization_info,
-                "activity": view["metrics"].get("geometry_activity", {}).get("activity"),
             }
         else:
             geometry_values = {
@@ -462,6 +461,16 @@ def _render_geometry_laboratory(st, runs_root: Path) -> None:
                 "decision_boundary": "logit == 0",
             }
         st.json(geometry_values)
+        st.markdown("#### Activity for selected snapshot")
+        snapshot_activity = view.get("snapshot_activity")
+        if snapshot_activity is None:
+            st.info(view.get("snapshot_activity_compatibility_note") or "Snapshot-specific activity diagnostics are unavailable.")
+        else:
+            st.caption(
+                f"Snapshot `{view['name']}` at step {view['snapshot_activity_step']} · "
+                f"measured on {view.get('snapshot_activity_split') or 'unspecified'} points."
+            )
+            st.json(snapshot_activity)
 
     with tabs[1]:
         try:
@@ -489,8 +498,20 @@ def _render_geometry_laboratory(st, runs_root: Path) -> None:
         plt.close(history_figure)
         st.caption("BCE and signed-distance hinge values are different objectives and must not be compared as raw loss magnitudes.")
         st.dataframe(pd.DataFrame(comparison_rows(selected_group)), hide_index=True, width="stretch")
-        st.markdown("#### Gradient and activity diagnostics")
-        st.json({"gradient_norms_last_step": view["metrics"].get("gradient_norms_last_step"), "geometry_activity": view["metrics"].get("geometry_activity")})
+        final_history = view["metrics"].get("history", [])
+        final_diagnostic_step = max((row.get("step", 0) for row in final_history), default="unknown")
+        st.markdown(f"#### Final-step gradient diagnostics (step {final_diagnostic_step})")
+        st.caption("Gradients are recorded only for the final optimization step; they do not describe the selected historical snapshot.")
+        st.json(view["metrics"].get("gradient_norms_last_step"))
+        st.markdown("#### Selected snapshot activity")
+        if view.get("snapshot_activity") is None:
+            st.info(view.get("snapshot_activity_compatibility_note") or "Snapshot-specific activity diagnostics are unavailable.")
+        else:
+            st.caption(
+                f"Snapshot `{view['name']}` at step {view['snapshot_activity_step']} · "
+                f"measured on {view.get('snapshot_activity_split') or 'unspecified'} points."
+            )
+            st.json(view["snapshot_activity"])
 
     with tabs[3]:
         motion_figure = build_motion_figure(view, class_name=class_name)

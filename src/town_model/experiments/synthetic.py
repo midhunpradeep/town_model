@@ -8,6 +8,7 @@ import importlib.metadata
 import json
 from pathlib import Path
 import platform
+import pickle
 import sys
 import time
 from typing import Any, Literal
@@ -27,6 +28,10 @@ from town_model.models import (
 MODEL_FAMILIES = ("baseline", "box", "town")
 
 
+class SavedArtifactError(ValueError):
+    """A persisted PyTorch artifact is unreadable or structurally incompatible."""
+
+
 @dataclass(frozen=True, slots=True)
 class SyntheticConfig:
     seed: int = 42
@@ -41,6 +46,7 @@ class SyntheticConfig:
     windows: int = 1
     min_width: float = 1e-5
     window_mode: str = "contained"
+    window_target_volume: float = 0.25
     snapshot_interval: int = 10
 
     def validate(self) -> None:
@@ -58,6 +64,8 @@ class SyntheticConfig:
             raise ValueError("houses, windows, and snapshot_interval must be positive")
         if self.window_mode != "contained":
             raise ValueError("Phase 2 supports only window_mode='contained'")
+        if not np.isfinite(self.window_target_volume) or not 0.0 < self.window_target_volume < 1.0:
+            raise ValueError("window_target_volume must be finite and in (0,1)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,6 +270,7 @@ def _model_settings(model: PointClassifier, config: SyntheticConfig, seed: int) 
         "houses": config.houses if model.family == "town" else None,
         "windows_per_house": config.windows if model.family == "town" else None,
         "window_mode": config.window_mode if model.family == "town" else None,
+        "window_target_volume": config.window_target_volume if model.family == "town" else None,
         "minimum_axis_width": config.min_width if model.family != "baseline" else None,
     }
 
@@ -325,6 +334,12 @@ def _loss_for(model: PointClassifier, output, targets: Tensor, known: Tensor, ma
     mode = "bce" if model.family == "baseline" else "signed_distance"
     penalties = unreduced_penalties(output, targets, mode=mode, margin=margin)
     return reduce_supervision(penalties, targets, known), mode
+
+
+def _configured_margin(config: dict[str, Any]) -> float:
+    """Resolve an omitted margin to the documented default without erasing zero."""
+    value = config.get("margin")
+    return 0.1 if value is None else float(value)
 
 
 def _evaluate_split(
@@ -427,6 +442,8 @@ def _snapshot(
         validation_output = model(validation_points)
     payload = {
         "step": step,
+        "activity": _geometry_activity(model, train_points),
+        "activity_split": "train",
         "model_state": _clone_state(model),
         "encoder_state": _clone_state(encoder) if encoder is not None else None,
         "train_points": train_points.detach().cpu(),
@@ -450,6 +467,26 @@ def _atomic_torch_save(payload: Any, path: Path) -> None:
     temporary.replace(path)
 
 
+def _load_torch_artifact(path: Path, artifact_name: str) -> Any:
+    """Deserialize one trusted local PyTorch artifact and translate file failures."""
+    try:
+        # Checkpoints use Python pickle: only load artifacts from trusted run directories.
+        return torch.load(path, map_location="cpu", weights_only=False)
+    except FileNotFoundError:
+        raise
+    except (pickle.UnpicklingError, EOFError, RuntimeError, OSError) as error:
+        raise SavedArtifactError(
+            f"could not read or deserialize {artifact_name} at {path}: "
+            f"{type(error).__name__}: {error}"
+        ) from error
+
+
+def _require_artifact_mapping(payload: Any, path: Path, artifact_name: str) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise SavedArtifactError(f"incompatible {artifact_name} at {path}: expected a mapping payload")
+    return payload
+
+
 def _run_one(
     group_dir: Path,
     fixture: SyntheticFixture,
@@ -466,6 +503,7 @@ def _run_one(
         family, config.dimensions, fixture.class_names,
         seed=config.seed, houses=config.houses, windows=config.windows,
         min_width=config.min_width, window_mode=config.window_mode,
+        window_target_volume=config.window_target_volume,
     ).to(device)
     encoder = _make_encoder(fixture, encoder_seed)
     if encoder is not None:
@@ -476,7 +514,7 @@ def _run_one(
     encoder_initial = _clone_state(encoder) if encoder is not None else None
     objective = "bce" if family == "baseline" else "signed_distance"
     resolved = {
-        "schema_version": 1,
+        "schema_version": 2,
         "experiment": {"kind": fixture.kind, "scenario": fixture.scenario, "seed": config.seed, "dataset_id": fixture.fixture_id},
         "model": _model_settings(model, config, config.seed),
         "training": {
@@ -581,7 +619,7 @@ def _run_one(
             stream.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
 
     checkpoint = {
-        "checkpoint_schema": 1,
+        "checkpoint_schema": 2,
         "family": family,
         "dimensions": config.dimensions,
         "class_names": fixture.class_names,
@@ -591,6 +629,7 @@ def _run_one(
             "windows": config.windows,
             "min_width": config.min_width,
             "window_mode": config.window_mode,
+            "window_target_volume": config.window_target_volume,
         },
         "encoder_config": None if encoder is None else {
             "input_dimensions": fixture.input_dimensions,
@@ -636,7 +675,7 @@ def run_experiment(
     group_dir.mkdir(parents=True)
     _json_write(group_dir / "status.json", {"status": "running", "completed_families": []})
     _write_fixture(group_dir, fixture)
-    _json_write(group_dir / "resolved_config.json", {"experiment": kind, "scenario": scenario, **asdict(resolved_config)})
+    _json_write(group_dir / "resolved_config.json", {"schema_version": 2, "experiment": kind, "scenario": scenario, **asdict(resolved_config)})
     encoder_seed = resolved_config.seed + 100_003
     base_encoder = _make_encoder(fixture, encoder_seed)
     base_encoder_state = _clone_state(base_encoder) if base_encoder is not None else None
@@ -702,36 +741,93 @@ def load_saved_run(run_path: Path | str, *, checkpoint: Path | str | None = None
     metadata = json.loads((run_dir / "resolved_config.json").read_text(encoding="utf-8"))
     fixture_meta, arrays = _load_fixture(group_dir)
     checkpoint_path = Path(checkpoint).expanduser() if checkpoint else run_dir / "checkpoint.pt"
-    saved = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    if saved.get("fixture_id") != fixture_meta.get("fixture_id"):
-        raise ValueError("checkpoint fixture identity does not match its run directory")
-    if tuple(saved.get("class_names", ())) != tuple(fixture_meta.get("class_names", ())):
-        raise ValueError("checkpoint class ordering does not match its fixture manifest")
-    expected_config_hash = hashlib.sha256(json.dumps(metadata, sort_keys=True).encode()).hexdigest()
-    if saved.get("config_identity") != expected_config_hash:
-        raise ValueError("checkpoint resolved configuration does not match resolved_config.json")
-    family = saved["family"]
-    model = make_classifier(
-        family,
-        int(saved["dimensions"]),
-        tuple(saved["class_names"]),
-        seed=int(saved["seed"]),
-        houses=int(saved["model_config"]["houses"]),
-        windows=int(saved["model_config"]["windows"]),
-        min_width=float(saved["model_config"]["min_width"]),
-        window_mode=saved["model_config"]["window_mode"],
+    saved = _require_artifact_mapping(
+        _load_torch_artifact(checkpoint_path, "synthetic checkpoint"), checkpoint_path, "synthetic checkpoint"
     )
-    model.load_state_dict(saved["model_state"])
+    required = {
+        "checkpoint_schema", "family", "dimensions", "class_names", "seed", "model_config",
+        "encoder_config", "model_state", "encoder_state", "optimizer_state", "step",
+        "config_identity", "fixture_id",
+    }
+    missing = sorted(required - saved.keys())
+    if missing:
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: missing fields {missing}")
+    schema = saved["checkpoint_schema"]
+    if type(schema) is not int or schema not in {1, 2}:
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: unsupported schema {schema!r}")
+    if (
+        not isinstance(saved["class_names"], (list, tuple))
+        or not saved["class_names"]
+        or not all(isinstance(name, str) for name in saved["class_names"])
+    ):
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: invalid class_names")
+    if isinstance(saved["dimensions"], bool) or not isinstance(saved["dimensions"], int) or saved["dimensions"] < 1:
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: invalid dimensions")
+    if not isinstance(saved["family"], str) or saved["family"] not in MODEL_FAMILIES:
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: invalid model family")
+    if isinstance(saved["step"], bool) or not isinstance(saved["step"], int) or saved["step"] < 0:
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: invalid training step")
+    if not isinstance(saved["optimizer_state"], dict):
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: invalid optimizer_state")
+    model_config = _require_artifact_mapping(saved["model_config"], checkpoint_path, "checkpoint model_config")
+    expected_model_fields = {"houses", "windows", "min_width", "window_mode"}
+    if saved["checkpoint_schema"] >= 2:
+        expected_model_fields.add("window_target_volume")
+    missing_model_fields = sorted(expected_model_fields - model_config.keys())
+    if missing_model_fields:
+        raise SavedArtifactError(
+            f"incompatible checkpoint at {checkpoint_path}: model_config is missing {missing_model_fields}"
+        )
+    if saved["fixture_id"] != fixture_meta.get("fixture_id"):
+        raise SavedArtifactError(f"checkpoint at {checkpoint_path} fixture identity does not match its run directory")
+    if tuple(saved["class_names"]) != tuple(fixture_meta.get("class_names", ())):
+        raise SavedArtifactError(f"checkpoint at {checkpoint_path} class ordering does not match its fixture manifest")
+    expected_config_hash = hashlib.sha256(json.dumps(metadata, sort_keys=True).encode()).hexdigest()
+    if saved["config_identity"] != expected_config_hash:
+        raise SavedArtifactError(f"checkpoint at {checkpoint_path} resolved configuration identity does not match resolved_config.json")
+    family = saved["family"]
+    if not isinstance(saved["model_state"], dict):
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: invalid model_state")
+    dimensions = saved["dimensions"]
+    window_target_volume = model_config.get("window_target_volume", 0.72**dimensions)
+    try:
+        model = make_classifier(
+            family,
+            dimensions,
+            tuple(saved["class_names"]),
+            seed=int(saved["seed"]),
+            houses=int(model_config["houses"]),
+            windows=int(model_config["windows"]),
+            min_width=float(model_config["min_width"]),
+            window_mode=model_config["window_mode"],
+            window_target_volume=float(window_target_volume),
+        )
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        raise SavedArtifactError(f"incompatible model configuration in checkpoint at {checkpoint_path}: {error}") from error
+    try:
+        model.load_state_dict(saved["model_state"])
+    except (RuntimeError, TypeError, ValueError) as error:
+        raise SavedArtifactError(f"incompatible model state in checkpoint at {checkpoint_path}: {error}") from error
     encoder = None
     if saved["encoder_config"] is not None:
-        enc_config = saved["encoder_config"]
-        encoder = SyntheticPointEncoder(
-            int(enc_config["input_dimensions"]),
-            int(enc_config["latent_dimensions"]),
-            seed=int(enc_config["seed"]),
-            hidden_dimensions=int(enc_config["hidden_dimensions"]),
-        )
-        encoder.load_state_dict(saved["encoder_state"])
+        enc_config = _require_artifact_mapping(saved["encoder_config"], checkpoint_path, "checkpoint encoder_config")
+        if not isinstance(saved["encoder_state"], dict):
+            raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: encoder_state is missing")
+        try:
+            encoder = SyntheticPointEncoder(
+                int(enc_config["input_dimensions"]),
+                int(enc_config["latent_dimensions"]),
+                seed=int(enc_config["seed"]),
+                hidden_dimensions=int(enc_config["hidden_dimensions"]),
+            )
+        except (KeyError, TypeError, ValueError, OverflowError) as error:
+            raise SavedArtifactError(f"incompatible encoder configuration in checkpoint at {checkpoint_path}: {error}") from error
+        try:
+            encoder.load_state_dict(saved["encoder_state"])
+        except (RuntimeError, TypeError, ValueError) as error:
+            raise SavedArtifactError(f"incompatible encoder state in checkpoint at {checkpoint_path}: {error}") from error
+    elif saved["encoder_state"] is not None:
+        raise SavedArtifactError(f"incompatible checkpoint at {checkpoint_path}: unexpected encoder_state")
     bundle = {"run_dir": run_dir, "fixture": fixture_meta, "checkpoint": saved, "resolved_config": metadata}
     return model, encoder, bundle, arrays
 
@@ -750,7 +846,7 @@ def evaluate_saved_run(run_path: Path | str, split: str = "validation", *, check
     with torch.no_grad():
         points = features if encoder is None else encoder(features)
         output = model(points)
-        reduction, objective = _loss_for(model, output, targets, known, float(bundle["resolved_config"]["training"]["margin"] or 0.1))
+        reduction, objective = _loss_for(model, output, targets, known, _configured_margin(bundle["resolved_config"]["training"]))
     metrics = _classification_metrics(output, targets, known, model.class_names)
     return {
         "run_id": str(bundle["run_dir"].relative_to(bundle["run_dir"].parent.parent)),
@@ -776,6 +872,7 @@ def resume_saved_run(run_path: Path | str, additional_steps: int) -> dict[str, A
     metric_path = run_dir / "metrics.json"
     metrics = json.loads(metric_path.read_text(encoding="utf-8"))
     config = settings["training"]
+    margin = _configured_margin(config)
     fixture_meta = bundle["fixture"]
     fixture = SyntheticFixture(
         fixture_id=fixture_meta["fixture_id"],
@@ -796,8 +893,11 @@ def resume_saved_run(run_path: Path | str, additional_steps: int) -> dict[str, A
         lr=float(config["learning_rate"]),
     )
     if checkpoint.get("optimizer_state") is None:
-        raise ValueError("checkpoint has no optimizer state and cannot be resumed")
-    optimizer.load_state_dict(checkpoint["optimizer_state"])
+        raise SavedArtifactError(f"checkpoint at {run_dir / 'checkpoint.pt'} has no optimizer state and cannot be resumed")
+    try:
+        optimizer.load_state_dict(checkpoint["optimizer_state"])
+    except (KeyError, RuntimeError, TypeError, ValueError) as error:
+        raise SavedArtifactError(f"incompatible optimizer state in checkpoint at {run_dir / 'checkpoint.pt'}: {error}") from error
     features, targets, known = _subset_tensors(fixture, fixture.train_indices, device=torch.device("cpu"))
     previous_step = int(checkpoint["step"])
     target_step = previous_step + additional_steps
@@ -815,22 +915,22 @@ def resume_saved_run(run_path: Path | str, additional_steps: int) -> dict[str, A
             optimizer.zero_grad(set_to_none=True)
             points = _points_for(encoder, features)
             output = model(points)
-            reduction, _ = _loss_for(model, output, targets, known, float(config["margin"] or 0.1))
+            reduction, _ = _loss_for(model, output, targets, known, margin)
             if not torch.isfinite(reduction.loss):
                 raise FloatingPointError(f"non-finite resumed objective at step {step}")
             reduction.loss.backward()
             last_gradient = _gradient_report(model, encoder)
             optimizer.step()
             if step % interval == 0 or step == target_step:
-                train_metric, _ = _evaluate_split(model, encoder, fixture, fixture.train_indices, margin=float(config["margin"] or 0.1), device=torch.device("cpu"))
-                validation_metric, _ = _evaluate_split(model, encoder, fixture, fixture.validation_indices, margin=float(config["margin"] or 0.1), device=torch.device("cpu"))
+                train_metric, _ = _evaluate_split(model, encoder, fixture, fixture.train_indices, margin=margin, device=torch.device("cpu"))
+                validation_metric, _ = _evaluate_split(model, encoder, fixture, fixture.validation_indices, margin=margin, device=torch.device("cpu"))
                 history.append({"step": step, "training": train_metric, "validation": validation_metric, "gradient_norms": last_gradient, "resumed": True})
                 _snapshot(run_dir, f"step_{step:05d}", model, encoder, fixture, step=step)
     finally:
         torch.set_num_threads(old_num_threads)
 
-    train_metric, train_points = _evaluate_split(model, encoder, fixture, fixture.train_indices, margin=float(config["margin"] or 0.1), device=torch.device("cpu"))
-    validation_metric, _ = _evaluate_split(model, encoder, fixture, fixture.validation_indices, margin=float(config["margin"] or 0.1), device=torch.device("cpu"))
+    train_metric, train_points = _evaluate_split(model, encoder, fixture, fixture.train_indices, margin=margin, device=torch.device("cpu"))
+    validation_metric, _ = _evaluate_split(model, encoder, fixture, fixture.validation_indices, margin=margin, device=torch.device("cpu"))
     metrics["training_metrics"] = train_metric
     metrics["validation_metrics"] = validation_metric
     metrics["history"] = history
@@ -862,34 +962,70 @@ def inspect_saved_run(run_path: Path | str) -> dict[str, Any]:
 
 
 def saved_geometry(run_path: Path | str, snapshot: str | None = None) -> dict[str, Any]:
-    """Restore actual model state and point coordinates from a run snapshot."""
+    """Restore actual model state and snapshot-specific activity when available."""
     run_dir = Path(run_path).expanduser().resolve()
     chosen = snapshot or "final"
     model, encoder, bundle, arrays = load_saved_run(run_dir)
+    snapshot_data: dict[str, Any] | None = None
     if chosen == "final":
         checkpoint = bundle["checkpoint"]
         model_state = checkpoint["model_state"]
         encoder_state = checkpoint["encoder_state"]
-        step = checkpoint["step"]
+        step = int(checkpoint["step"])
         name = "final checkpoint"
+        final_snapshot = run_dir / "snapshots" / f"step_{step:05d}.pt"
+        if final_snapshot.is_file():
+            snapshot_data = _require_artifact_mapping(
+                _load_torch_artifact(final_snapshot, "geometry snapshot"), final_snapshot, "geometry snapshot"
+            )
+            if snapshot_data.get("step") != step:
+                raise SavedArtifactError(f"incompatible geometry snapshot at {final_snapshot}: step does not match checkpoint")
     elif chosen == "initial":
-        initial = torch.load(run_dir / "initial_state.pt", map_location="cpu", weights_only=False)
-        model_state = initial["model_state"]
-        encoder_state = initial["encoder_state"]
+        initial_snapshot = run_dir / "snapshots" / "initial.pt"
+        if initial_snapshot.is_file():
+            snapshot_data = _require_artifact_mapping(
+                _load_torch_artifact(initial_snapshot, "initial geometry snapshot"), initial_snapshot, "geometry snapshot"
+            )
+            if snapshot_data.get("step") != 0:
+                raise SavedArtifactError(f"incompatible initial geometry snapshot at {initial_snapshot}: expected step 0")
+            model_state = snapshot_data.get("model_state")
+            encoder_state = snapshot_data.get("encoder_state")
+        else:
+            initial_path = run_dir / "initial_state.pt"
+            initial = _require_artifact_mapping(
+                _load_torch_artifact(initial_path, "initial model state"), initial_path, "initial model state"
+            )
+            model_state = initial.get("model_state")
+            encoder_state = initial.get("encoder_state")
         step = 0
         name = chosen
     else:
         snapshot_path = run_dir / "snapshots" / f"{chosen}.pt"
         if not snapshot_path.is_file():
             raise FileNotFoundError(f"snapshot not found: {snapshot_path}")
-        data = torch.load(snapshot_path, map_location="cpu", weights_only=False)
-        model_state = data["model_state"]
-        encoder_state = data["encoder_state"]
-        step = int(data["step"])
+        snapshot_data = _require_artifact_mapping(
+            _load_torch_artifact(snapshot_path, "geometry snapshot"), snapshot_path, "geometry snapshot"
+        )
+        model_state = snapshot_data.get("model_state")
+        encoder_state = snapshot_data.get("encoder_state")
+        if "step" not in snapshot_data:
+            raise SavedArtifactError(f"incompatible geometry snapshot at {snapshot_path}: missing step")
+        step = int(snapshot_data["step"])
+        if step < 0:
+            raise SavedArtifactError(f"incompatible geometry snapshot at {snapshot_path}: step cannot be negative")
         name = chosen
-    model.load_state_dict(model_state)
-    if encoder is not None and encoder_state is not None:
-        encoder.load_state_dict(encoder_state)
+    if not isinstance(model_state, dict):
+        raise SavedArtifactError(f"incompatible model state for snapshot {name!r} in {run_dir}")
+    if encoder is not None and not isinstance(encoder_state, dict):
+        raise SavedArtifactError(f"incompatible encoder state for snapshot {name!r} in {run_dir}")
+    if encoder is None and encoder_state is not None:
+        raise SavedArtifactError(f"unexpected encoder state for snapshot {name!r} in {run_dir}")
+    try:
+        model.load_state_dict(model_state)
+        if encoder is not None:
+            encoder.load_state_dict(encoder_state)
+    except (RuntimeError, TypeError, ValueError) as error:
+        raise SavedArtifactError(f"incompatible model state for snapshot {name!r} in {run_dir}: {error}") from error
     model.eval()
     if encoder is not None:
         encoder.eval()
@@ -897,11 +1033,29 @@ def saved_geometry(run_path: Path | str, snapshot: str | None = None) -> dict[st
     with torch.no_grad():
         points = features if encoder is None else encoder(features)
         output = model(points, diagnostics=True)
+
+    activity = snapshot_data.get("activity") if snapshot_data is not None else None
+    activity_split = snapshot_data.get("activity_split") if snapshot_data is not None else None
+    activity_source = "snapshot" if activity is not None else None
+    if activity is None and chosen == "final":
+        metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+        activity = metrics.get("geometry_activity")
+        if activity is not None:
+            activity_source = "final_run_metrics"
+            activity_split = "train"
     return {
         "name": name,
         "step": step,
         "points": points,
         "output": output,
+        "snapshot_activity": activity,
+        "snapshot_activity_split": activity_split,
+        "snapshot_activity_step": step if activity is not None else None,
+        "snapshot_activity_source": activity_source,
+        "snapshot_activity_compatibility_note": (
+            None if activity is not None else
+            "This run artifact predates snapshot-specific activity diagnostics; historical activity is unavailable."
+        ),
         "fixture": bundle["fixture"],
         "arrays": arrays,
         "model": model,

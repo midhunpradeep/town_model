@@ -1,6 +1,6 @@
 # Phase 2 scope — geometry, comparable classifiers, and interactive verification
 
-**Status:** implemented as a bounded milestone on `implementation/phase-2-geometry-classifiers`, based on the accepted Phase 1 baseline `bf2e3080a07734c50b9c679aa812d1e1e933db91`.
+**Status:** implemented as a bounded milestone on `implementation/phase-2-geometry-classifiers`, based on the accepted Phase 1 baseline `bf2e3080a07734c50b9c679aa812d1e1e933db91`. The independent review findings and their remediation are tracked in [`PHASE_2_REMEDIATION_REPORT.md`](PHASE_2_REMEDIATION_REPORT.md); that report supersedes the original implementation report's pre-review closure statement.
 
 ## Authority and sequencing amendment
 
@@ -47,9 +47,9 @@ The neural head uses standard unreduced BCE-with-logits. Both penalty matrices g
 
 ### Parameterization decision
 
-Raw corner logits are clamped to `[-12,12]` before sigmoid. Box low corners are mapped into the domain and high corners are mapped above their lows while reserving a positive minimum width. Town frames reserve enough width for one positive-width window and positive clearances on both sides; contained-window coordinates are parameterized within that frame interior. A 16-float32-epsilon numerical reserve is added to the configured `1e-5` minimum to protect the actual float32 corner differences. This is a parameterization safety reserve, not a membership epsilon. No physical-corner repair is performed after optimizer updates.
+Raw corner logits are clamped to `[-12,12]` before sigmoid. Box low corners are mapped into the domain and high corners are mapped above their lows while reserving a positive minimum width. Town frames reserve enough width for one positive-width window and positive clearances on both sides; contained-window coordinates are parameterized within that frame interior. A 16-float32-epsilon numerical reserve is added to the configured minimum to protect physical widths and contained-window clearances. For a pure box, the accepted range is `0 < min_width < 2 - 32*eps32`; contained towns impose the stricter `min_width < (2 - 80*eps32)/3`, where `eps32` is float32 machine epsilon. Requests outside those feasible ranges are rejected before parameters are created. The reserve is a parameterization safety measure, not a membership epsilon. No physical-corner repair is performed after optimizer updates.
 
-Initial boxes/frames are label-agnostic and broad (roughly 1.82–1.94 units per axis before domain-fit adjustment); distinct houses receive seeded offsets. Windows start as substantial centered exclusions (about 72% of available interior width per axis). Seeds, physical centers/widths, train/validation occupancy, activity, and final corners are persisted. Initialization never examines positive examples.
+Initial boxes/frames are label-agnostic and broad (roughly 1.82–1.94 units per axis before domain-fit adjustment); distinct houses receive seeded offsets. The configurable default `window_target_volume=0.25` sets `q(d)=0.25**(1/d)` as the per-axis fraction of available interior span above the minimum window-width floor (`window_width = floor + q*(interior-floor)`). This provides a provisional quarter-volume opportunity across dimensions; the actual window/frame volume fraction is measured and can differ slightly due to the positive floor. Initialization neither fits labels nor maximizes window volume. Historical schema-1 runs without this setting retain their original 72%-per-axis initialization when loaded. Seeds, physical centers/widths, volume fractions, snapshot-specific occupancy/activity, and final corners are persisted; initialization never examines positive examples.
 
 ## Explicitly deferred requirements and non-goals
 

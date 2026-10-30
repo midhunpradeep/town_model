@@ -129,6 +129,7 @@ class TownClassifier(PointClassifier):
         windows: int = 1,
         min_width: float = 1e-5,
         window_mode: str = "contained",
+        window_target_volume: float = 0.25,
         fixed_classes: tuple[str, ...] = ("DomainThing",),
     ):
         super().__init__(dimensions, class_names, fixed_classes=fixed_classes)
@@ -140,6 +141,7 @@ class TownClassifier(PointClassifier):
             seed=seed,
             min_width=min_width,
             window_mode=window_mode,
+            window_target_volume=window_target_volume,
         )
         self.seed = int(seed)
 
@@ -164,6 +166,7 @@ def make_classifier(
     windows: int = 1,
     min_width: float = 1e-5,
     window_mode: str = "contained",
+    window_target_volume: float = 0.25,
 ) -> PointClassifier:
     """Factory for the three comparable public classifier implementations."""
     if family == "baseline":
@@ -179,6 +182,7 @@ def make_classifier(
             windows=windows,
             min_width=min_width,
             window_mode=window_mode,
+            window_target_volume=window_target_volume,
         )
     raise ValueError(f"unsupported classifier family: {family}")
 

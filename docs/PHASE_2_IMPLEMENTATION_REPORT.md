@@ -1,5 +1,7 @@
 # Phase 2 implementation report
 
+> **Historical status:** This report records the pre-review implementation as of `e241ce26140b36d28be61cc8dbb076693c4e6b80`. Its original 120-test result, 72%-per-axis window initialization, and closure statement describe that revision only. The independent review verdict remains preserved in `reviews/phase_02_independent_review.md`; current corrections, verification, and status are in [`PHASE_2_REMEDIATION_REPORT.md`](PHASE_2_REMEDIATION_REPORT.md).
+
 **Branch:** `implementation/phase-2-geometry-classifiers`
 
 **Implementation base:** accepted Phase 1 commit `bf2e3080a07734c50b9c679aa812d1e1e933db91`
@@ -177,4 +179,4 @@ The Geometry Laboratory was exercised through Streamlit `AppTest` against genera
 - The dashboard defaults to train/validation and exposes no test split. No PCA/UMAP view or ontology relation proof/diagnostic is claimed.
 - Small CPU experiments do not establish pizza-image generalization. A geometric town has more capacity than the linear baseline; their parameter counts and architecture are reported, not capacity-matched.
 
-No unresolved blocker remains for the bounded Phase 2 completion criterion. The items above are deliberate deferrals and limitations, not completed Phase 3 requirements. The implementation branch is intentionally not merged into `main`.
+At the time of this original handoff, the author considered the bounded Phase 2 implementation complete; that statement was superseded by the subsequent independent **REQUEST CHANGES** review. The items above remain deliberate Phase 3 deferrals, while F1–F7 and their current closure evidence are recorded in the remediation report. The implementation branch was not merged into `main`.

@@ -46,6 +46,8 @@ town export-geometry artifacts/phase2/runs/<group>/town --output town-geometry.j
 town resume artifacts/phase2/runs/<group>/town --additional-steps 10
 ```
 
+PyTorch checkpoints use Python pickle deserialization. Load only run artifacts from trusted sources; checkpoint loading is not safe for arbitrary untrusted files.
+
 Launch the existing dashboard with `town dashboard`. The **Geometry Laboratory** reads saved groups from `artifacts/phase2/runs` and does not retrain when widgets change. It displays each independently trained model in its own coordinate frame. For `d>2`, region views are exact 2D slices and point markers are explicitly identified as projections.
 
 Read [Phase 2 scope](docs/PHASE_2_SCOPE.md) for the sequencing amendment and explicit deferrals, and [Phase 2 implementation report](docs/PHASE_2_IMPLEMENTATION_REPORT.md) for formulas, test results, sample outcomes, and limitations.
@@ -58,4 +60,4 @@ pytest
 
 ## Scope
 
-Only dataset generation, ontology-aware target preparation, validation/reporting, inspection, and dashboard exploration/generation are implemented. CNN detection, embeddings, geometry, losses, training, and experiment comparison are explicitly deferred to later authorized phases.
+Phase 2 delivers synthetic neural, box, and town classifiers, signed-distance geometry training, reproducible fixed-point and trainable-point comparisons, checkpoint evaluation/resumption, and a saved-run Geometry Laboratory. See [Phase 2 scope](docs/PHASE_2_SCOPE.md) and the [Phase 2 implementation report](docs/PHASE_2_IMPLEMENTATION_REPORT.md). The image-to-town pipeline—including image embeddings and object detection—remains deferred; Phase 2 does not claim detector or image-embedding functionality.
