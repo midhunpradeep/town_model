@@ -109,3 +109,95 @@ The 20 groups account for all 130 full-suite failures. Independent reviewer shou
 - Image Embeddings currently permits raw persisted metadata and checksum-validated snapshot-header inspection only. Full read-only presentation reconciliation is T4 work.
 - Verification ran on the available CPU environment; no CUDA training is claimed (training is disabled by this pass).
 - No datasets, manifests, ontology assets, checkpoints, cached research outputs, accepted review reports, or scientific-specification files were changed. No replacement mathematical decisions were made.
+
+## Remediation record — direct historical image-objective bypass (2026-10-31)
+
+This dated addendum supplements the submitted T2 evidence above; the original report, initial counts, and independent review history are retained unchanged.
+
+### Independent review finding and correction
+
+The independent review issued **REQUEST CHANGES** on submitted T2 SHA `c4c6d9e70e0281ce12434f42c6a9b3ef390352cf`. The report is [`reviews/classifier_teardown_t2_independent_review.md`](../../reviews/classifier_teardown_t2_independent_review.md), committed at review SHA `d44b8508ba0b588dd74ae33625227aba69a19900`.
+
+The blocking bypass was direct execution of historical image scoring/loss formulas in `training/image_objectives.py`: `_penalties()` selected baseline BCE, signed-margin BCE, or signed-distance hinge, while `image_objective_terms()` packed targets and inspected supplied classifier scores before eventually calling `_penalties()`. The reviewer reproduced a historical hinge result of approximately `0.1` for a known positive target and zero supplied signed margin without constructing a backend.
+
+Both entrypoints now call the existing `raise_classifier_backend_unavailable()` immediately, with distinct operation descriptions: `historical image classifier penalty computation` and `historical image classifier objective computation`. The objective guard precedes target packing, score inspection, and loss work; the penalty guard precedes reading tensors or selecting a family/formula. The old formulas remain in place for T3; neither output contracts nor model semantics changed.
+
+### Regression tests and retained aggregation
+
+`tests/test_classifier_backend_unavailable.py` now has three direct `_penalties()` configurations (baseline BCE, signed-margin BCE, and signed-distance hinge), a direct `image_objective_terms()` case with a validated, shape-consistent `ImageBatch` and `ImageModelResult` carrying supplied legacy score tensors, and checks that inputs are unchanged and no artifact path appears. These calls construct no classifier or backend.
+
+A separate test supplies `ImageObjectiveTerms` directly and verifies `aggregate_effective_batch()` still reports component loss `1.0`, pizza loss `4.0`, total `5.0`, and eligible-image counts `1` and `2`. It instruments `_penalties()` to fail if aggregation calls score conversion. `_instance_terms()`, known-mask and positive-weight behavior, effective-window reductions, undefined-task handling, and generic transport were not modified. This preserves aggregation compatibility only; it does not approve an objective for a reconstructed model.
+
+### Reproducible verification
+
+Environment: repository `.venv`, Python 3.12, CPU PyTorch. The separate remediation worktree uses the same local `.venv` environment.
+
+- `PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_classifier_backend_unavailable.py` — **29 passed, 0 failed**, 2 existing Streamlit/Pandas warnings. This includes all previously passing T2 guards for construction, backbone/optimizer initialization, artifact publication, existing run-state mutation, classifier-free `ImagePointModel`, metadata/snapshot readers, CLI/worker behavior, and dashboard unavailability.
+- Exact surviving-infrastructure selection from independent review Section F — **168 passed, 2 deselected**, 5 existing Streamlit/Pandas warnings. The selection is unchanged; its result increases from the review's 163 passed because it includes the five new successful T2 test nodes:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest -q \
+  tests/test_classifier_backend_unavailable.py \
+  tests/test_classifier_teardown_boundary.py::test_dataset_and_point_imports_do_not_load_concrete_classifiers \
+  tests/test_phase3_cache.py::test_frozen_cache_has_strict_identity_and_only_deterministic_train_validation_panel \
+  tests/test_phase3_cache.py::test_feature_cache_lock_recovers_a_dead_local_writer_and_rejects_a_live_writer \
+  tests/test_phase3_vision.py tests/test_phase3_dataset.py \
+  tests/test_application_cli_dashboard.py tests/test_phase3_dashboard_data.py \
+  tests/test_phase3_config.py tests/test_dataset.py tests/test_generator.py \
+  tests/test_generator_worker.py tests/test_labels.py tests/test_ontology.py \
+  tests/test_dashboard_app.py::test_dashboard_explorer_loads_shared_dataset_and_renders_annotations \
+  tests/test_dashboard_app.py::test_dashboard_marks_corrupt_data_unverified_and_blocks_explorer \
+  tests/test_dashboard_app.py::test_dashboard_generate_page_is_available_without_triggering_generation \
+  tests/test_phase2_models_losses.py::test_common_reducer_masks_unknowns_weights_positives_and_normalizes_instances \
+  tests/test_phase2_models_losses.py::test_all_unknown_instances_are_absent_from_objective_and_have_zero_gradient \
+  tests/test_phase2_models_losses.py::test_reducer_rejects_invalid_target_and_mask_shapes \
+  tests/test_phase3_architecture.py tests/test_phase3_d5a_ontology_entailments.py \
+  tests/test_phase3_d5b_relation_publication.py \
+  --deselect=tests/test_phase3_d5a_ontology_entailments.py::test_geometric_violation_does_not_change_ontology_entailment \
+  --deselect=tests/test_phase3_d5b_relation_publication.py::test_cli_surfaces_actionable_post_publication_failure
+```
+
+- `PYTHONPATH=src .venv/bin/python -m pytest -q` — **191 passed, 132 failed, 0 skipped**, 9 existing warnings. The full suite is not green.
+- `PYTHONPATH=src .venv/bin/python -m compileall -q src/town_model tests` — passed.
+- `git diff --check` — passed.
+- The unchanged `tests/test_phase3_models.py::test_default_family_objective_penalties_and_signed_distance_hinge_are_numerically_exact` was rerun directly and now fails with the intended `ClassifierBackendUnavailableError`; it was not edited, skipped, deleted, or weakened.
+
+### Full-suite delta and failure classification
+
+Relative to the independent review's 188 passed / 130 failed, the suite contains five additional passing regression-test nodes and two additional failures from previously passing historical mathematical assertions. Therefore the current 191 passed / 132 failed totals reconcile exactly; there is no additional or unexplained failure group. The two newly invalidated assertions are:
+
+1. `tests/test_phase3_models.py::test_default_family_objective_penalties_and_signed_distance_hinge_are_numerically_exact` — direct historical `_penalties()` math now rejects.
+2. `tests/test_phase3_models.py::test_hand_computed_known_mask_positive_weight_and_per_image_component_reduction` — direct historical `image_objective_terms()` scoring/reduction now rejects before the old loss assertions.
+
+Both are intentionally obsolete mathematical successes for T3 retirement, not regressions in the retained aggregation utility. They remain in the suite unchanged. The other 130 failures are the same disconnected historical model/run/lifecycle expectations and were classified by file and reason in the original table above. Current per-file counts are:
+
+| Test file | Current failures |
+|---|---:|
+| `test_classifier_teardown_boundary.py` | 1 |
+| `test_dashboard_app.py` | 5 |
+| `test_phase2_artifact_errors.py` | 5 |
+| `test_phase2_cli.py` | 2 |
+| `test_phase2_dashboard_geometry.py` | 8 |
+| `test_phase2_experiments.py` | 3 |
+| `test_phase2_geometry.py` | 14 |
+| `test_phase2_gradients.py` | 3 |
+| `test_phase2_min_width_preflight.py` | 5 |
+| `test_phase2_models_losses.py` | 6 |
+| `test_phase2_resume.py` | 6 |
+| `test_phase3_cache.py` | 1 |
+| `test_phase3_cli.py` | 1 |
+| `test_phase3_d5a_ontology_entailments.py` | 1 |
+| `test_phase3_d5b_relation_publication.py` | 1 |
+| `test_phase3_models.py` | 31 |
+| `test_phase3_relations.py` | 5 |
+| `test_phase3_runs.py` | 15 |
+| `test_phase3_training.py` | 18 |
+| `test_phase3_weighting.py` | 1 |
+
+All original per-file counts and causes remain unchanged except `test_phase3_models.py`, which rises from 29 to 31 for the two direct objective assertions listed above. No datasets, checkpoints, run artifacts, accepted baseline branches, or review reports were modified.
+
+### T3 handoff and authority boundary
+
+T3 must preserve the independent ontology metadata assertions in `tests/test_phase3_relations.py::test_ontology_metadata_distinguishes_asserted_entailed_and_unknown_relations` while retiring its later historical geometric relation execution. This is a test-scope handoff only and is not part of this correction.
+
+No scientific model, scoring representation, objective, loss choice, or backend architecture was introduced. Historical formulas remain guarded for T3 removal; score-independent aggregation remains available without implying approval for future training. Issue #5 remains open pending independent review, and issue #6 remains blocked. No T3 work began.
