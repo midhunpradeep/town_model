@@ -1,41 +1,32 @@
-"""Validated image-run identity, lifecycle, persistence, and orchestration."""
+"""Read-only image-run metadata and classifier-independent lifecycle records.
+
+Model-dependent run, worker, resume, and matrix operations reject through the
+shared unavailable-backend error. Stored run identity/configuration is retained
+as JSON metadata and is never used to reconstruct a historical model here.
+"""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import errno
 try:
     import fcntl
 except ImportError:  # pragma: no cover - Windows uses byte-range locking below
     fcntl = None
-import hashlib
 import json
 import os
 from pathlib import Path
 import socket
-import subprocess
-import sys
 import tempfile
-import uuid
-from typing import Any, Callable, Iterable, NoReturn
+from typing import Any, NoReturn
 
 if fcntl is None:  # pragma: no cover - exercised on Windows CI only
     import msvcrt
 
 from town_model.classifier_backend import raise_classifier_backend_unavailable
-from town_model.dataset.image_data import DatasetSubset, PreparedDataset, deterministic_subset, load_prepared_dataset
-from town_model.experiments.feature_cache import FrozenFeatureCache, prepare_frozen_feature_cache
-from town_model.experiments.image_config import IMAGE_POSITIVE_WEIGHTING_POLICY, ImageExperimentConfig
-from town_model.inspection.image_snapshots import save_image_snapshot
-from town_model.training.image_trainer import (
-    ImageTrainingResult,
-    _device_for,
-    _positive_weights,
-    build_image_modules,
-    train_image_model,
-    validate_image_training_data,
-)
+from town_model.dataset.image_data import deterministic_subset, load_prepared_dataset
+from town_model.experiments.image_config import ImageExperimentConfig
+from town_model.experiments.image_validation import device_for_image_config, validate_image_training_data
 
 RUN_STATES = ("draft", "running", "completed", "stopped", "interrupted", "failed")
 _ALLOWED_TRANSITIONS = {
@@ -49,73 +40,11 @@ _ALLOWED_TRANSITIONS = {
 
 
 class RunLifecycleError(RuntimeError):
-    """Invalid local image-run state transition or writer ownership."""
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedImageExperiment:
-    config: ImageExperimentConfig
-    dataset: PreparedDataset
-    train_subset: DatasetSubset
-    validation_subset: DatasetSubset
-    class_ids: tuple[int, ...]
-    identity: dict[str, Any]
-    identity_hash: str
-    run_id: str
-
-    def class_weight_vectors(self) -> dict[str, Any]:
-        weighting = self.config.objective.positive_weighting
-        arguments = {
-            "weighting": weighting,
-            "cap": self.config.objective.positive_weight_cap,
-            "beta": self.config.objective.effective_number_beta,
-            "require_coverage": self.config.purpose == "comparison",
-        }
-        return {
-            "component_positive": list(_positive_weights(
-                self.train_subset, self.dataset, self.class_ids, level="component", **arguments
-            )),
-            "pizza_positive": list(_positive_weights(
-                self.train_subset, self.dataset, self.class_ids, level="pizza", **arguments
-            )),
-            "policy": weighting,
-            "cap": self.config.objective.positive_weight_cap,
-            "effective_number_beta": self.config.objective.effective_number_beta,
-            "semantics_version": IMAGE_POSITIVE_WEIGHTING_POLICY,
-            "formula": self.config.objective_identity()["positive_weighting_formula"],
-            "normalization": "raw positive-count-proportional values are scaled over all positive-supported canonical classes in this level so the most-supported in-scope class has weight 1, then capped and projected to selected classes; per-instance loss divides by the sum of active class weights; known negatives are exactly 1 and unknowns are excluded",
-        }
-
-    def resolved_config(self) -> dict[str, Any]:
-        return {
-            "schema_version": self.config.schema_version,
-            "training_config": asdict(self.config),
-            "resolved_objective": self.config.objective_identity(),
-            "class_weight_vectors": self.class_weight_vectors(),
-            "identity_hash": self.identity_hash,
-            "identity": self.identity,
-            "dataset": {
-                "dataset_id": self.dataset.dataset_id,
-                "manifest_id": self.dataset.manifest_id,
-                "dataset_manifest_sha256": self.dataset.dataset_manifest_sha256,
-                "class_manifest_sha256": self.dataset.class_manifest_sha256,
-                "class_ids": list(self.class_ids),
-                "class_names": [
-                    self.dataset.class_names[self.dataset.canonical_class_ids.index(class_id)]
-                    for class_id in self.class_ids
-                ],
-            },
-            "train_subset": self.train_subset.to_manifest(),
-            "validation_subset": self.validation_subset.to_manifest(),
-            "training_protocol": "pre-detector exploratory GT-ROI; no Pizzaïolo detector-pretraining checkpoint",
-        }
-
-
-def _sha256_json(value: object) -> str:
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+    """Invalid local image-run metadata state or writer ownership."""
 
 
 def _atomic_json(path: Path, value: object) -> None:
+    """Atomically write generic JSON metadata without model interpretation."""
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
@@ -138,31 +67,22 @@ def resolve_image_experiment(
     *,
     repository_root: Path | str | None = None,
 ) -> NoReturn:
-    """Validate independent config/data inputs, then reject unavailable execution."""
+    """Validate persisted config/data inputs, then reject model execution."""
     config.validate()
-    _device_for(config)
+    device_for_image_config(config)
     base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
-    dataset_path = config.resolve_dataset_path(base)
-    dataset = load_prepared_dataset(dataset_path, validate=True)
+    dataset = load_prepared_dataset(config.resolve_dataset_path(base), validate=True)
     train_subset = deterministic_subset(
-        dataset,
-        "train",
-        size=config.dataset.train_size,
-        seed=config.dataset.selection_seed,
+        dataset, "train", size=config.dataset.train_size, seed=config.dataset.selection_seed
     )
     validation_subset = deterministic_subset(
-        dataset,
-        "validation",
-        size=config.dataset.validation_size,
-        seed=config.dataset.selection_seed + 1,
+        dataset, "validation", size=config.dataset.validation_size, seed=config.dataset.selection_seed + 1
     )
     train_ids = {record.sample_id for record in train_subset.records}
     validation_ids = {record.sample_id for record in validation_subset.records}
     if train_ids & validation_ids:
         raise ValueError("original train and validation partitions unexpectedly share sample IDs")
     class_ids = tuple(config.dataset.trainable_class_ids or dataset.canonical_class_ids)
-    if len(set(class_ids)) != len(class_ids) or tuple(sorted(class_ids)) != class_ids or any(class_id not in dataset.canonical_class_ids for class_id in class_ids):
-        raise ValueError("explicit class IDs must be a unique canonical-order subset of trainable ontology class IDs")
     validate_image_training_data(
         dataset,
         train_subset,
@@ -171,17 +91,7 @@ def resolve_image_experiment(
         require_training_coverage=config.purpose == "comparison",
         require_primary_monitor=config.purpose != "smoke",
     )
-    # Dataset/vision settings and authoritative IDs have been checked, but
-    # execution preflight cannot establish availability without a classifier.
     raise_classifier_backend_unavailable("image classifier experiment preflight")
-
-
-@dataclass(frozen=True, slots=True)
-class ImageWorkerLaunch:
-    run_directory: Path
-    pid: int
-    status_path: Path
-    log_path: Path
 
 
 def _process_record(pid: int) -> tuple[str | None, str | None]:
@@ -189,7 +99,7 @@ def _process_record(pid: int) -> tuple[str | None, str | None]:
     try:
         stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
         fields_after_comm = stat[stat.rfind(")") + 2 :].split()
-        return fields_after_comm[19], fields_after_comm[0]  # fields 22 and 3
+        return fields_after_comm[19], fields_after_comm[0]
     except (OSError, IndexError, ValueError):
         return None, None
 
@@ -223,7 +133,7 @@ def _process_start_token(pid: int) -> str | None:
 
 def _process_identity_is_alive(owner: dict[str, Any]) -> bool:
     if owner.get("hostname") != socket.gethostname():
-        return True  # remote/uncertain owners are never declared dead from local PID state
+        return True
     try:
         pid = int(owner["pid"])
         if pid <= 0:
@@ -241,112 +151,11 @@ def _process_identity_is_alive(owner: dict[str, Any]) -> bool:
     expected = owner.get("process_start_token")
     if expected is not None and observed is not None:
         return expected == observed
-    return True  # unable to disambiguate PID reuse: conservatively report uncertain/live
-
-
-def launch_image_experiment(
-    config: ImageExperimentConfig,
-    output_root: Path | str,
-    *,
-    repository_root: Path | str | None = None,
-    resume: bool = False,
-) -> ImageWorkerLaunch:
-    """Launch a historical image worker (unavailable during reconstruction)."""
-    raise_classifier_backend_unavailable("launching an image classifier background worker")
-    resolved = resolve_image_experiment(config, repository_root=repository_root)
-    base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
-    output = Path(output_root).expanduser().resolve()
-    run_directory = output / resolved.run_id
-    if os.name != "posix":
-        raise RunLifecycleError("detached image workers require POSIX file-descriptor inheritance; use the synchronous CLI on this platform")
-    if resume:
-        if not run_directory.is_dir():
-            raise FileNotFoundError(f"cannot resume an image run that does not exist: {run_directory}")
-        manifest = inspect_run(run_directory, refresh_interrupted=True)
-        saved = json.loads((run_directory / "resolved-config.json").read_text(encoding="utf-8"))
-        if manifest.get("identity_hash") != resolved.identity_hash or saved.get("identity_hash") != resolved.identity_hash:
-            raise RunLifecycleError("resume configuration does not match the saved scientific run identity")
-        if manifest["state"] not in ("stopped", "interrupted", "failed"):
-            raise RunLifecycleError(f"cannot resume an image run in state {manifest['state']!r}")
-        if not (run_directory / "checkpoints" / "latest.pt").is_file():
-            raise RunLifecycleError("run has no latest checkpoint available for compatible resume")
-    elif run_directory.exists():
-        raise FileExistsError(f"image run already exists and will not be overwritten: {run_directory}")
-
-    worker_root = output / ".image-workers"
-    token = uuid.uuid4().hex
-    reservation = output / ".image-launch-locks" / f"{resolved.run_id}.lock"
-    reservation_lock = RunWriterLock(reservation)
-    reservation_lock.acquire()
-    status_path = worker_root / f"{resolved.run_id}.json"
-    config_path = worker_root / f"{resolved.run_id}-{token}.config.json"
-    log_path = worker_root / f"{resolved.run_id}-{token}.log"
-    try:
-        worker_root.mkdir(parents=True, exist_ok=True)
-        _atomic_json(config_path, asdict(config))
-        _atomic_json(status_path, {
-            "run_id": resolved.run_id,
-            "run_directory": str(run_directory),
-            "state": "launching",
-            "resume": resume,
-            "log_path": str(log_path),
-            "requested_at": _now(),
-        })
-        command = [
-            sys.executable,
-            "-m",
-            "town_model.experiments.image_worker",
-            "--config",
-            str(config_path),
-            "--output",
-            str(output),
-            "--status",
-            str(status_path),
-            "--reservation-fd",
-            str(reservation_lock.fileno()),
-        ]
-        if resume:
-            command.append("--resume")
-        environment = os.environ.copy()
-        with log_path.open("ab") as log_file:
-            process = subprocess.Popen(
-                command,
-                cwd=base,
-                env=environment,
-                stdin=subprocess.DEVNULL,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-                close_fds=True,
-                pass_fds=(reservation_lock.fileno(),),
-            )
-        reservation_lock.detach()  # child inherited the same flock open-file description
-        current = json.loads(status_path.read_text(encoding="utf-8"))
-        if current.get("state") == "launching":
-            current.update({
-                "pid": process.pid,
-                "hostname": socket.gethostname(),
-                "process_start_token": _process_start_token(process.pid),
-            })
-            _atomic_json(status_path, current)
-        return ImageWorkerLaunch(run_directory, process.pid, status_path, log_path)
-    except Exception as error:
-        reservation_lock.release()
-        _atomic_json(status_path, {
-            "run_id": resolved.run_id,
-            "run_directory": str(run_directory),
-            "state": "failed",
-            "exit_code": None,
-            "exit_status": "unknown; launch failed before a worker outcome was observed",
-            "error": f"{type(error).__name__}: {error}",
-            "log_path": str(log_path),
-            "finished_at": _now(),
-        })
-        raise
+    return True
 
 
 class RunWriterLock:
-    """Crash-released local advisory lock; metadata never determines ownership."""
+    """Crash-released local advisory lock for independent metadata lifecycle users."""
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
@@ -396,7 +205,6 @@ class RunWriterLock:
         return self._descriptor
 
     def detach(self) -> None:
-        """Close the parent handle without unlocking a descriptor inherited by a child."""
         if self.acquired and self._descriptor is not None:
             os.close(self._descriptor)
             self._descriptor = None
@@ -432,6 +240,7 @@ def _read_manifest(run_directory: Path) -> dict[str, Any]:
 
 
 def transition_run(run_directory: Path | str, new_state: str, *, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Update a generic lifecycle record; this does not launch model execution."""
     if new_state not in RUN_STATES:
         raise RunLifecycleError(f"unknown image run state {new_state!r}")
     root = Path(run_directory).resolve()
@@ -462,11 +271,8 @@ def _reconcile_worker_status_file(root: Path, manifest: dict[str, Any]) -> dict[
     state = status.get("state")
     if state in ("launching", "running", "draft"):
         if manifest["state"] == "running":
-            # The run manifest is authoritative for the writer process. Worker
-            # JSON alone is never treated as proof of liveness.
             status.update({
-                "state": "running",
-                "pid": manifest.get("pid"),
+                "state": "running", "pid": manifest.get("pid"),
                 "hostname": manifest.get("hostname"),
                 "process_start_token": manifest.get("process_start_token"),
                 "reconciled_from_manifest": True,
@@ -483,10 +289,8 @@ def _reconcile_worker_status_file(root: Path, manifest: dict[str, Any]) -> dict[
                     "reconciled_from_manifest": True,
                 })
         else:
-            mapped = manifest["state"]
             status.update({
-                "state": mapped,
-                "exit_code": status.get("exit_code"),
+                "state": manifest["state"], "exit_code": status.get("exit_code"),
                 "exit_status": status.get("exit_status") or "unknown; no worker exit code was observed",
                 "interruption_reason": manifest.get("interruption_reason"),
                 "reconciled_from_manifest": True,
@@ -517,10 +321,10 @@ def _advisory_lock_is_held(path: Path) -> bool:
 
 
 def reconcile_worker_status(run_directory: Path | str) -> dict[str, Any] | None:
-    """Return worker status reconciled against process identity and run manifest."""
+    """Explicitly reconcile generic worker metadata against process identity."""
     root = Path(run_directory).expanduser().resolve()
     if (root / "manifest.json").is_file():
-        manifest = inspect_run(root, refresh_interrupted=True)
+        manifest = inspect_run(root)
         return _reconcile_worker_status_file(root, manifest)
     status_path = root.parent / ".image-workers" / f"{root.name}.json"
     try:
@@ -528,272 +332,33 @@ def reconcile_worker_status(run_directory: Path | str) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     reservation = root.parent / ".image-launch-locks" / f"{root.name}.lock"
-    reservation_active = _advisory_lock_is_held(reservation)
-    if status.get("state") in ("launching", "running") and not reservation_active and not _process_identity_is_alive(status):
+    if status.get("state") in ("launching", "running") and not _advisory_lock_is_held(reservation) and not _process_identity_is_alive(status):
         status.update({
-            "state": "interrupted",
-            "exit_code": None,
+            "state": "interrupted", "exit_code": None,
             "exit_status": "unknown; worker died before publishing a run manifest",
-            "finished_at": _now(),
-            "reconciled_from_process_liveness": True,
+            "finished_at": _now(), "reconciled_from_process_liveness": True,
         })
         _atomic_json(status_path, status)
     return status
 
 
 def inspect_run(run_directory: Path | str, *, refresh_interrupted: bool = False) -> dict[str, Any]:
-    """Read persisted lifecycle metadata without changing run or worker state.
-
-    ``refresh_interrupted`` is retained for call compatibility but no longer
-    enables reconciliation writes during classifier reconstruction.
-    """
+    """Read persisted lifecycle JSON without changing run or worker state."""
     del refresh_interrupted
     return _read_manifest(Path(run_directory).expanduser().resolve())
 
 
-def request_stop(run_directory: Path | str) -> None:
+def request_stop(*args, **kwargs) -> NoReturn:
     raise_classifier_backend_unavailable("controlling a historical image classifier worker")
-    root = Path(run_directory).expanduser().resolve()
-    manifest = inspect_run(root, refresh_interrupted=True)
-    if manifest["state"] != "running":
-        raise RunLifecycleError(f"cannot request graceful stop for run in state {manifest['state']!r}")
-    (root / "stop.request").write_text(f"requested_at={_now()}\n", encoding="utf-8")
 
 
-def run_image_experiment(
-    config: ImageExperimentConfig,
-    output_root: Path | str,
-    *,
-    repository_root: Path | str | None = None,
-    resume: bool = False,
-    stop_requested: Callable[[], bool] | None = None,
-) -> tuple[Path, ImageTrainingResult]:
-    """Run or resume a historical classifier experiment (unavailable during reconstruction)."""
+def launch_image_experiment(*args, **kwargs) -> NoReturn:
+    raise_classifier_backend_unavailable("launching an image classifier background worker")
+
+
+def run_image_experiment(*args, **kwargs) -> NoReturn:
     raise_classifier_backend_unavailable("image-to-ontology classifier training or resume")
-    resolved = resolve_image_experiment(config, repository_root=repository_root)
-    feature_cache: FrozenFeatureCache | None = None
-    if config.execution.feature_cache_directory:
-        base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
-        cache_root = Path(config.execution.feature_cache_directory).expanduser()
-        if not cache_root.is_absolute():
-            cache_root = base / cache_root
-        device = _device_for(config)
-        visual, _, _ = build_image_modules(resolved.dataset, config, class_ids=resolved.class_ids)
-        visual.to(device)
-        feature_cache = prepare_frozen_feature_cache(
-            cache_root,
-            resolved.dataset,
-            resolved.train_subset,
-            resolved.validation_subset,
-            visual,
-            config,
-            device=device,
-        )
-    root = Path(output_root).expanduser().resolve() / resolved.run_id
-    manifest_path = root / "manifest.json"
-    if root.exists() and not resume:
-        raise FileExistsError(f"image run already exists and will not be overwritten: {root}")
-    if not root.exists() and resume:
-        raise FileNotFoundError(f"cannot resume an image run that does not exist: {root}")
-    if not root.exists():
-        root.mkdir(parents=True, exist_ok=False)
-        _atomic_json(root / "resolved-config.json", resolved.resolved_config())
-        _atomic_json(
-            manifest_path,
-            {
-                "schema_version": "image-run-manifest-v1",
-                "run_id": resolved.run_id,
-                "identity_hash": resolved.identity_hash,
-                "objective_identity": resolved.config.objective_identity(),
-                "class_weight_vectors": resolved.class_weight_vectors(),
-                "state": "draft",
-                "created_at": _now(),
-                "updated_at": _now(),
-                "pid": os.getpid(),
-                "hostname": socket.gethostname(),
-                "run_directory": str(root),
-                "checkpoint_path": None,
-                "error": None,
-            },
-        )
-    with RunWriterLock(root / ".writer.lock"):
-        manifest = _read_manifest(root)
-        resolved_on_disk = json.loads((root / "resolved-config.json").read_text(encoding="utf-8"))
-        if manifest.get("identity_hash") != resolved.identity_hash or resolved_on_disk.get("identity_hash") != resolved.identity_hash:
-            raise RunLifecycleError("existing run identity/configuration does not match the validated request")
-        state = manifest["state"]
-        if resume:
-            if state == "running":
-                if _process_alive(manifest):
-                    raise RunLifecycleError("cannot resume an image run that still has a live writer")
-                transition_run(root, "interrupted", details={"interruption_reason": "stale running state discovered during resume"})
-                state = "interrupted"
-            if state not in ("stopped", "interrupted", "failed"):
-                raise RunLifecycleError(f"cannot faithfully resume an image run in state {state!r}")
-            checkpoint = root / "checkpoints" / "latest.pt"
-            if not checkpoint.is_file():
-                raise RunLifecycleError("run has no valid latest checkpoint to resume")
-            transition_run(root, "running", details={
-                "pid": os.getpid(), "hostname": socket.gethostname(),
-                "process_start_token": _process_start_token(os.getpid()), "resumed_at": _now(), "error": None
-            })
-            resume_from = checkpoint
-        else:
-            if state != "draft":
-                raise RunLifecycleError(f"new run must be draft, found {state!r}")
-            transition_run(root, "running", details={"pid": os.getpid(), "hostname": socket.gethostname(), "process_start_token": _process_start_token(os.getpid()), "started_at": _now()})
-            resume_from = None
-        should_stop = stop_requested or (lambda: (root / "stop.request").exists())
-        snapshot_paths: list[str] = []
-
-        def progress_callback(event: dict[str, Any]) -> None:
-            progress = {
-                "run_id": resolved.run_id,
-                "identity_hash": resolved.identity_hash,
-                "objective_identity": config.objective_identity(),
-                "updated_at": _now(),
-                **event,
-            }
-            _atomic_json(root / "progress.json", progress)
-            print("IMAGE_PROGRESS " + json.dumps(progress, sort_keys=True, allow_nan=False), file=sys.stderr, flush=True)
-
-        def snapshot_callback(epoch, step, visual, model, is_final):
-            if epoch % config.diagnostics.snapshot_every_epochs != 0 and not is_final:
-                return
-            snapshot = save_image_snapshot(
-                root / "snapshots" / f"epoch-{epoch:05d}",
-                dataset=resolved.dataset,
-                train_subset=resolved.train_subset,
-                validation_subset=resolved.validation_subset,
-                visual=visual,
-                model=model,
-                config=config,
-                class_ids=resolved.class_ids,
-                class_indices=tuple(resolved.dataset.canonical_class_ids.index(class_id) for class_id in resolved.class_ids),
-                epoch=epoch,
-                optimizer_step=step,
-                latest_checkpoint=root / "checkpoints" / "latest.pt",
-                identity_hash=resolved.identity_hash,
-                feature_cache=feature_cache,
-            )
-            snapshot_paths.append(str(snapshot.path))
-
-        try:
-            result = train_image_model(
-                resolved.dataset,
-                resolved.train_subset,
-                resolved.validation_subset,
-                config,
-                root,
-                resume_from=resume_from,
-                stop_requested=should_stop,
-                feature_cache=feature_cache,
-                snapshot_callback=snapshot_callback,
-                progress_callback=progress_callback,
-            )
-            metrics = {
-                "run_id": resolved.run_id,
-                "identity_hash": resolved.identity_hash,
-                "objective_identity": config.objective_identity(),
-                "status": result.status,
-                "optimizer_step": result.global_step,
-                "completed_epochs": result.completed_epochs,
-                "best_primary_monitor": result.best_primary_monitor,
-                "stopped_reason": result.stopped_reason,
-                "initial_metrics": result.initial_metrics,
-                "history": list(result.history),
-                "snapshots": snapshot_paths,
-            }
-            _atomic_json(root / "metrics.json", metrics)
-            state_after = "stopped" if result.status == "stopped" else "completed"
-            transition_run(
-                root,
-                state_after,
-                details={
-                    "checkpoint_path": str(result.latest_checkpoint),
-                    "optimizer_step": result.global_step,
-                    "completed_epochs": result.completed_epochs,
-                    "best_primary_monitor": result.best_primary_monitor,
-                    "stopped_reason": result.stopped_reason,
-                    "snapshot_paths": snapshot_paths,
-                    "finished_at": _now(),
-                },
-            )
-            try:
-                (root / "stop.request").unlink()
-            except FileNotFoundError:
-                pass
-            return root, result
-        except KeyboardInterrupt:
-            transition_run(root, "interrupted", details={
-                "error": "KeyboardInterrupt",
-                "checkpoint_path": str(root / "checkpoints" / "latest.pt"),
-                "finished_at": _now(),
-            })
-            raise
-        except Exception as error:
-            transition_run(root, "failed", details={
-                "error": f"{type(error).__name__}: {error}",
-                "checkpoint_path": str(root / "checkpoints" / "latest.pt") if (root / "checkpoints" / "latest.pt").exists() else None,
-                "failed_at": _now(),
-            })
-            raise
 
 
-def run_image_matrix(
-    config: ImageExperimentConfig,
-    output_root: Path | str,
-    *,
-    repository_root: Path | str | None = None,
-    families: Iterable[str] = ("baseline", "box", "town"),
-    pizza_modes: Iterable[str] = ("global", "compositional", "hybrid"),
-) -> Path:
-    """Run a historical classifier matrix (unavailable during reconstruction)."""
+def run_image_matrix(*args, **kwargs) -> NoReturn:
     raise_classifier_backend_unavailable("automatic image classifier matrix execution")
-    if config.purpose != "comparison":
-        raise ValueError("image family×composition matrices require purpose='comparison' and its strict support/checkpoint rules")
-    selected_families = tuple(families)
-    selected_modes = tuple(pizza_modes)
-    if not selected_families or any(value not in ("baseline", "box", "town") for value in selected_families):
-        raise ValueError("families must be a nonempty subset of baseline, box, town")
-    if not selected_modes or any(value not in ("global", "compositional", "hybrid") for value in selected_modes):
-        raise ValueError("pizza_modes must be a nonempty subset of global, compositional, hybrid")
-    planned = [
-        replace(config, model=replace(config.model, family=family, pizza_mode=mode))
-        for family in selected_families
-        for mode in selected_modes
-    ]
-    resolved = [resolve_image_experiment(item, repository_root=repository_root) for item in planned]
-    matrix_identity = {
-        "schema_version": "image-matrix-v1",
-        "run_ids": [item.run_id for item in resolved],
-        "dataset_id": resolved[0].dataset.dataset_id,
-        "train_subset_id": resolved[0].train_subset.subset_id,
-        "validation_subset_id": resolved[0].validation_subset.subset_id,
-        "matrix": [{"family": item.config.model.family, "pizza_mode": item.config.model.pizza_mode} for item in resolved],
-    }
-    matrix_id = f"matrix-{_sha256_json(matrix_identity)[:20]}"
-    output = Path(output_root).expanduser().resolve()
-    matrix_path = output / "matrices" / matrix_id
-    if matrix_path.exists():
-        raise FileExistsError(f"image matrix manifest already exists and will not be overwritten: {matrix_path}")
-    results = []
-    for item in planned:
-        run_path, result = run_image_experiment(item, output, repository_root=repository_root)
-        results.append({
-            "run_id": run_path.name,
-            "run_directory": str(run_path),
-            "family": item.model.family,
-            "pizza_mode": item.model.pizza_mode,
-            "status": result.status,
-        })
-    matrix_path.mkdir(parents=True, exist_ok=False)
-    _atomic_json(matrix_path / "comparison.json", {
-        **matrix_identity,
-        "matrix_id": matrix_id,
-        "status": "completed",
-        "runs": results,
-        "training_protocol": "pre-detector exploratory GT-ROI; not detector-pretrained Phase 3 acceptance evidence",
-        "created_at": _now(),
-    })
-    return matrix_path

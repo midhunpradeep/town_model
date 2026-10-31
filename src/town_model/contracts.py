@@ -159,19 +159,3 @@ class ImagePointResult:
     final_pizza_points: Tensor
     pizza_mode: str
     vision_diagnostics: FeatureDiagnostics | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ImageModelResult:
-    sample_ids: tuple[str, ...]
-    component_ids: tuple[tuple[str | None, ...], ...]
-    component_valid_mask: Tensor
-    component_points: Tensor
-    global_pizza_points: Tensor
-    composed_pizza_points: Tensor
-    final_pizza_points: Tensor
-    component_classifier: Any
-    pizza_classifier: Any
-    pizza_mode: str
-    vision_diagnostics: FeatureDiagnostics | None = None
-    geometry_diagnostics: dict[str, Any] | None = None

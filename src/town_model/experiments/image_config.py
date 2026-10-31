@@ -1,4 +1,8 @@
-"""Immutable, validated image-experiment configuration authority."""
+"""Historical image configuration deserialization and identity compatibility.
+
+The model/objective fields below are archived run metadata. Validation and
+identity serialization do not provide an executable model or future spec.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +14,6 @@ from numbers import Real
 from pathlib import Path
 from typing import Literal
 
-from town_model.models.image_model_validation import validate_image_model_parameters
 from town_model.vision_validation import validate_mobilenet_block_indices, validate_mobilenet_runtime
 
 
@@ -33,6 +36,7 @@ def _finite_real(name: str, value: object, *, minimum: float, inclusive: bool) -
 
 
 def _loss_identity(name: str, *, temperature: float, hinge_margin: float) -> dict[str, object]:
+    """Serialize historical formula labels/parameters for stored identity only."""
     if name == "bce":
         return {
             "name": "binary_cross_entropy_with_logits",
@@ -129,25 +133,32 @@ class ImageModelConfig:
     classifier_seed: int = 42
 
     def validate(self) -> None:
+        """Validate archived model fields for config reading and identity only.
+
+        These historical values are not a constructor contract and do not make
+        any classifier backend executable.
+        """
         if self.family not in ("baseline", "box", "town"):
-            raise ValueError(f"unsupported classifier family {self.family!r}")
+            raise ValueError(f"unsupported historical classifier family {self.family!r}")
         if self.pizza_mode not in ("global", "compositional", "hybrid"):
-            raise ValueError(f"unsupported pizza composition mode {self.pizza_mode!r}")
+            raise ValueError(f"unsupported historical composition mode {self.pizza_mode!r}")
         if type(self.latent_dimensions) is not int or self.latent_dimensions < 1:
             raise ValueError("latent_dimensions must be a positive integer")
         if type(self.classifier_seed) is not int or self.classifier_seed < 0:
-            raise ValueError("classifier_seed must be a nonnegative integer")
-        validate_image_model_parameters(
-            self.latent_dimensions,
-            None,
-            family=self.family,
-            pizza_mode=self.pizza_mode,
-            houses=self.houses,
-            windows=self.windows,
-            min_width=self.min_width,
-            window_mode=self.window_mode,
-            window_target_volume=self.window_target_volume,
-        )
+            raise ValueError("historical classifier_seed must be a nonnegative integer")
+        if type(self.houses) is not int or type(self.windows) is not int or self.houses < 1 or self.windows < 1:
+            raise ValueError("historical house and window counts must be positive integers")
+        if self.window_mode != "contained":
+            raise ValueError("unsupported archived window_mode")
+        volume = _finite_real("historical window_target_volume", self.window_target_volume, minimum=0.0, inclusive=False)
+        if volume >= 1.0:
+            raise ValueError("historical window_target_volume must be less than one")
+        _finite_real("historical min_width", self.min_width, minimum=0.0, inclusive=False)
+        if self.family != "town" and (
+            self.houses != 2 or self.windows != 1 or self.window_mode != "contained"
+            or self.window_target_volume != 0.25
+        ):
+            raise ValueError("archived town geometry settings are incompatible with the stored non-town family")
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,12 +174,13 @@ class ObjectiveConfig:
     pizza_coefficient: float = 1.0
 
     def validate(self, family: str) -> None:
+        """Validate archived objective metadata; this selects no executable loss."""
         if self.baseline_loss != "bce":
-            raise ValueError("baseline classifier supports unreduced BCEWithLogits only")
+            raise ValueError("unsupported archived baseline_loss metadata")
         if family == "baseline" and self.geometry_loss not in ("signed_bce", "signed_distance"):
-            raise ValueError("baseline ignores geometric losses; select signed_bce or signed_distance as the configured geometric reference")
+            raise ValueError("unsupported archived geometry_loss metadata for the baseline family identity")
         if family != "baseline" and self.geometry_loss not in ("signed_bce", "signed_distance"):
-            raise ValueError("Phase 3 geometric classifiers support signed_bce or signed_distance")
+            raise ValueError("unsupported archived geometry_loss metadata")
         _finite_real("signed BCE temperature", self.temperature, minimum=0.0, inclusive=False)
         _finite_real("hinge margin", self.hinge_margin, minimum=0.0, inclusive=True)
         if self.positive_weighting == "inverse_frequency":
@@ -318,7 +330,10 @@ class ImageExperimentConfig:
         return self
 
     def objective_identity(self) -> dict[str, object]:
-        """Return the effective family loss formulas and their resolved parameters."""
+        """Return historical formula metadata needed to preserve run identity.
+
+        These labels are not executable scoring logic or a future objective spec.
+        """
         if self.model.family == "baseline":
             component_loss = pizza_loss = _loss_identity("bce", temperature=self.objective.temperature, hinge_margin=self.objective.hinge_margin)
         else:

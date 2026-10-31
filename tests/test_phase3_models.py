@@ -1,303 +1,55 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
-from types import SimpleNamespace
-
-import numpy as np
 import pytest
 import torch
-from torch import Tensor
 
-from town_model.contracts import ImageModelResult, VisionFeatureBatch
-from town_model.dataset.image_data import deterministic_subset, load_prepared_dataset
-from town_model.models import BoxClassifier, ClassifierOutput, DeepSetsComposition, ImageOntologyModel, TownClassifier
-from town_model.training.image_objectives import (
+from town_model.contracts import FeatureDiagnostics, VisionFeatureBatch
+from town_model.models import DeepSetsComposition, ImagePointModel
+from town_model.training.supervision import (
     ImageObjectiveTerms,
     UndefinedImageObjective,
     aggregate_effective_batch,
-    image_objective_terms,
+    reduce_weighted_instances,
 )
-from town_model.vision.backbone import MobileNetV3LargeFPN
-from town_model.vision.batching import collate_image_records
-from town_model.vision.features import SharedVisualFeatureExtractor
-from town_model.vision.roi import ExplicitROIProvider
 
 
-@pytest.fixture(scope="module")
-def image_examples():
-    torch.set_num_threads(2)
-    dataset = load_prepared_dataset(Path(__file__).parents[1] / "examples" / "pizza-48")
-    subset = deterministic_subset(dataset, "train", size=2, seed=117)
-    batch = collate_image_records(dataset, subset.records)
-    extractor = SharedVisualFeatureExtractor(MobileNetV3LargeFPN(pretrained=True))
-    extractor.backbone.set_trainable(trainable_fpn=False)
-    extractor.eval()
-    with torch.no_grad():
-        features = extractor(batch)
-    return dataset, batch, features, extractor
+def _features(batch: int = 2, components: int = 3) -> VisionFeatureBatch:
+    generator = torch.Generator().manual_seed(784)
+    valid = torch.ones((batch, components), dtype=torch.bool)
+    if components:
+        valid[-1, -1] = False
+    ids = tuple(
+        tuple(f"component-{row}-{column}" if valid[row, column] else None for column in range(components))
+        for row in range(batch)
+    )
+    return VisionFeatureBatch(
+        component_vectors=torch.randn((batch, components, 260), generator=generator),
+        component_valid_mask=valid,
+        global_spatial_features=torch.randn((batch, 256, 7, 7), generator=generator),
+        component_ids=ids,
+        diagnostics=FeatureDiagnostics(),
+    )
 
 
 @pytest.mark.parametrize("dimensions", [2, 8, 16, 5])
-def test_model_projection_shapes_and_bounded_point_contract(dimensions, image_examples):
-    dataset, batch, features, _ = image_examples
-    model = ImageOntologyModel(dimensions, dataset.class_names, family="baseline", pizza_mode="hybrid")
-    result = model(features, batch.sample_ids)
-    assert result.component_points.shape == (*features.component_valid_mask.shape, dimensions)
-    assert result.global_pizza_points.shape == (len(batch.sample_ids), dimensions)
-    assert result.composed_pizza_points.shape == (len(batch.sample_ids), dimensions)
-    assert result.final_pizza_points.shape == (len(batch.sample_ids), dimensions)
-    assert torch.all(result.component_points >= -1) and torch.all(result.component_points <= 1)
-    assert torch.all(result.final_pizza_points >= -1) and torch.all(result.final_pizza_points <= 1)
-
-
-@pytest.mark.parametrize("family", ["baseline", "box", "town"])
-@pytest.mark.parametrize("mode", ["global", "compositional", "hybrid"])
-def test_all_nine_image_model_configurations_forward_and_backpropagate(family, mode, image_examples):
-    dataset, batch, features, _ = image_examples
-    model = ImageOntologyModel(8, dataset.class_names, family=family, pizza_mode=mode, seed=17, classifier_seed=29)
-    result = model(features, batch.sample_ids)
-    assert result.sample_ids == batch.sample_ids
+def test_model_projection_shapes_and_bounded_point_contract(dimensions: int) -> None:
+    features = _features()
+    model = ImagePointModel(dimensions, pizza_mode="hybrid", seed=17)
+    result = model(features, ("sample-1", "sample-2"))
+    assert result.component_points.shape == (2, 3, dimensions)
+    assert result.global_pizza_points.shape == (2, dimensions)
+    assert result.composed_pizza_points.shape == (2, dimensions)
+    assert result.final_pizza_points.shape == (2, dimensions)
+    assert result.sample_ids == ("sample-1", "sample-2")
     assert result.component_ids == features.component_ids
     assert result.component_valid_mask.equal(features.component_valid_mask)
-    assert result.component_classifier.contains.shape == (*result.component_valid_mask.shape, len(dataset.class_names))
-    assert result.pizza_classifier.contains.shape == (len(batch.sample_ids), len(dataset.class_names))
-    terms = image_objective_terms(result, batch, family=family, geometry_loss="signed_bce")
-    objective = aggregate_effective_batch([terms])
-    assert torch.isfinite(objective.total)
-    objective.total.backward()
-    assert any(p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0 for p in model.classifier.parameters())
-    assert any(p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0 for p in model.component_projection.parameters())
-    if mode in ("compositional", "hybrid"):
-        assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in model.composition.parameters())
-    if mode in ("global", "hybrid"):
-        assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in model.global_projection.parameters())
+    for points in (result.component_points, result.global_pizza_points, result.composed_pizza_points, result.final_pizza_points):
+        assert torch.all(points >= -1) and torch.all(points <= 1)
+    assert not hasattr(result, "contains")
+    assert not hasattr(result, "logits")
 
 
-def test_hybrid_pizza_supervision_alone_reaches_deepsets_and_component_projection(image_examples):
-    dataset, batch, features, _ = image_examples
-    for family in ("baseline", "box", "town"):
-        model = ImageOntologyModel(8, dataset.class_names, family=family, pizza_mode="hybrid", seed=7, classifier_seed=31)
-        result = model(features, batch.sample_ids)
-        terms = image_objective_terms(result, batch, family=family, geometry_loss="signed_bce")
-        pizza_only = aggregate_effective_batch([terms], component_coefficient=0.0, pizza_coefficient=1.0)
-        pizza_only.total.backward()
-        assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in model.composition.parameters()), family
-        assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in model.component_projection.parameters()), family
-
-
-@pytest.mark.parametrize("family", ["baseline", "box", "town"])
-@pytest.mark.parametrize("mode", ["global", "compositional", "hybrid"])
-def test_pizza_objective_has_gradient_paths_to_mode_branches_and_shared_classifier(family, mode, image_examples):
-    dataset, batch, features, _ = image_examples
-    model = ImageOntologyModel(8, dataset.class_names, family=family, pizza_mode=mode, seed=7, classifier_seed=31)
-    result = model(features, batch.sample_ids)
-    scores = result.pizza_classifier.logits if family == "baseline" else result.pizza_classifier.signed_margin
-    assert scores is not None
-    # Select known targets opposite the current classifier decision so every
-    # supported class has a nonzero task penalty; unknowns remain masked.
-    targets = (scores.detach() < 0).to(dtype=batch.pizza_targets.dtype)
-    pizza_only_batch = replace(batch, pizza_targets=targets)
-    terms = image_objective_terms(
-        result, pizza_only_batch, family=family, geometry_loss="signed_distance"
-    )
-    loss = aggregate_effective_batch([terms], component_coefficient=0.0, pizza_coefficient=1.0)
-    assert loss.pizza_loss is not None and loss.pizza_loss.item() > 0
-    loss.total.backward()
-
-    def active(module):
-        return any(parameter.grad is not None and parameter.grad.abs().sum() > 0 for parameter in module.parameters())
-
-    assert active(model.classifier), family
-    if mode in ("global", "hybrid"):
-        assert active(model.global_projection), (family, mode)
-    else:
-        assert not active(model.global_projection), (family, mode)
-    if mode in ("compositional", "hybrid"):
-        assert active(model.composition), (family, mode)
-        assert active(model.component_projection), (family, mode)
-    else:
-        assert not active(model.composition), (family, mode)
-        assert not active(model.component_projection), (family, mode)
-    assert active(model.fusion) == (mode == "hybrid"), (family, mode)
-
-
-def test_component_classifier_reshaping_preserves_box_parameters_and_reshapes_town_activity():
-    from town_model.models.image_embeddings import _reshape_classifier_output
-
-    points = torch.zeros((6, 2), dtype=torch.float32)
-    box = _reshape_classifier_output(BoxClassifier(2, ("A", "B"), seed=7)(points, diagnostics=True), 2, 3)
-    assert box.contains.shape == (2, 3, 2)
-    assert box.diagnostics is not None
-    assert box.diagnostics["box_low"].shape == (2, 2)
-    assert box.diagnostics["box_high"].shape == (2, 2)
-
-    town = _reshape_classifier_output(TownClassifier(2, ("A", "B"), seed=7)(points, diagnostics=True), 2, 3)
-    assert town.contains.shape == (2, 3, 2)
-    assert town.diagnostics is not None
-    assert town.diagnostics["frame_low"].shape == (2, 2, 2)
-    assert town.diagnostics["house_margin"].shape == (2, 3, 2, 2)
-    assert town.diagnostics["window_contains"].shape == (2, 3, 2, 2, 1)
-
-
-def test_snapshot_diagnostic_axes_roundtrip_preserve_class_geometry_and_instance_activity(tmp_path, image_examples, capsys):
-    import json
-    from town_model.experiments.image_config import DiagnosticsConfig, ImageExperimentConfig, ImageModelConfig, TrainingConfig, VisionConfig
-    from town_model.inspection.image_snapshots import load_image_snapshot, reference_panel, save_image_snapshot
-    from town_model.dashboard.image_embeddings import build_image_geometry_figure, point_rows
-    from town_model.vision.preprocessing import ImageNetLetterbox
-
-    dataset, _, _, visual = image_examples
-    train = deterministic_subset(dataset, "train", size=4, seed=301)
-    validation = deterministic_subset(dataset, "validation", size=2, seed=302)
-    names = dataset.class_names[:4]
-    ids = dataset.canonical_class_ids[:4]
-    town_config = ImageExperimentConfig(
-        vision=VisionConfig(visual_policy="frozen"),
-        model=ImageModelConfig(family="town", pizza_mode="hybrid", latent_dimensions=2, houses=2, windows=2),
-        training=TrainingConfig(epochs=1, physical_batch_size=4, accumulation_steps=1),
-        diagnostics=DiagnosticsConfig(max_reference_samples=4, max_component_traces_per_sample=64, include_roi_feature_means=False),
-        purpose="smoke",
-    ).validate()
-    town_model = ImageOntologyModel(2, names, family="town", pizza_mode="hybrid", houses=2, windows=2, seed=19)
-    checkpoint = tmp_path / "checkpoint.pt"
-    checkpoint.write_bytes(b"immutable-source-checkpoint")
-    town_snapshot = save_image_snapshot(
-        tmp_path / "town-b-equals-c", dataset=dataset, train_subset=train, validation_subset=validation,
-        visual=visual, model=town_model, config=town_config, class_ids=ids, class_indices=(0, 1, 2, 3),
-        epoch=1, optimizer_step=1, latest_checkpoint=checkpoint, identity_hash="town-b-equals-c",
-    )
-    loaded = load_image_snapshot(town_snapshot.path)
-    assert len(loaded.header["sample_ids"]) == 4  # B=C=4 in one physical batch.
-    assert loaded.header["family"] == "town"
-    assert loaded.arrays["classifier_geometry_frame_low"].shape == (4, 2, 2)
-    assert loaded.arrays["classifier_geometry_window_low"].shape == (4, 2, 2, 2)
-    assert loaded.arrays["classifier_geometry_window_high"].shape == (4, 2, 2, 2)
-    assert loaded.header["diagnostic_axes_schema"]["classifier_geometry_frame_low"] == ["class", "house", "coordinate"]
-    assert loaded.header["diagnostic_axes_schema"]["component_activity_house_margin"] == ["component_occurrence", "class", "house"]
-    expected_geometry = town_model.classifier.geometry.physical_geometry()[0].detach().cpu().numpy()
-    assert np.array_equal(loaded.arrays["classifier_geometry_frame_low"], expected_geometry)
-
-    panel = reference_panel(train, validation, 4)
-    by_id = {record.sample_id: record for record in (*train.records, *validation.records)}
-    batch = collate_image_records(dataset, [by_id[sample_id] for _, sample_id in panel], transform=ImageNetLetterbox(224))
-    town_model.eval()
-    with torch.no_grad():
-        source_features = visual(batch, diagnostics=False)
-        source_output = town_model(source_features, batch.sample_ids, diagnostics=True)
-    expected_component_activity = np.concatenate([
-        source_output.component_classifier.diagnostics["house_margin"][row, :int(source_output.component_valid_mask[row].sum())].detach().cpu().numpy()
-        for row in range(len(panel))
-    ], axis=0)
-    expected_pizza_activity = source_output.pizza_classifier.diagnostics["frame_margin"].detach().cpu().numpy()
-    assert np.array_equal(loaded.arrays["component_activity_house_margin"], expected_component_activity)
-    assert np.array_equal(loaded.arrays["pizza_activity_frame_margin"], expected_pizza_activity)
-    assert loaded.arrays["component_activity_house_margin"].shape[1:] == (4, 2)
-    assert loaded.arrays["pizza_activity_frame_margin"].shape == (4, 4, 2)
-    from town_model.cli import main as cli_main
-    result_path = tmp_path / "town-relation.json"
-    assert cli_main([
-        "experiment", "image", "relations", str(loaded.path),
-        "--source-class-id", str(ids[0]), "--target-class-id", str(ids[1]),
-        "--relation", "containment", "--sample-count", "50", "--seed", "9",
-        "--output", str(result_path),
-    ]) == 0
-    relation_output = json.loads(capsys.readouterr().out)
-    assert relation_output["status"] == "saved"
-    persisted_relation = json.loads(result_path.read_text())
-    assert persisted_relation["decision_scope"] == "sampled_empirical"
-    assert persisted_relation["geometry_references"]["source"]["arrays_sha256"] == loaded.header["arrays_sha256"]
-    assert point_rows(loaded, 0, level="pizza", class_index=0)
-    import matplotlib.pyplot as plt
-    figure = build_image_geometry_figure(loaded, sample_index=0, level="pizza", class_index=0)
-    plt.close(figure)
-
-    # B=2,C=1 exercises a different first-axis collision shape with exact box
-    # parameters retained as [C,d], not reshaped into image dimensions.
-    box_config = replace(
-        town_config,
-        model=ImageModelConfig(family="box", pizza_mode="global", latent_dimensions=2),
-        diagnostics=DiagnosticsConfig(max_reference_samples=2, include_roi_feature_means=False),
-    ).validate()
-    box_model = ImageOntologyModel(2, dataset.class_names[:1], family="box", pizza_mode="global", seed=23)
-    box_snapshot = save_image_snapshot(
-        tmp_path / "box-b-not-c", dataset=dataset, train_subset=train, validation_subset=validation,
-        visual=visual, model=box_model, config=box_config, class_ids=(dataset.canonical_class_ids[0],),
-        class_indices=(0,), epoch=1, optimizer_step=1, latest_checkpoint=checkpoint, identity_hash="box-b-not-c",
-    )
-    box_loaded = load_image_snapshot(box_snapshot.path)
-    assert len(box_loaded.header["sample_ids"]) == 2
-    assert len(box_loaded.header["class_ids"]) == 1
-    assert box_loaded.arrays["classifier_geometry_box_low"].shape == (1, 2)
-    assert np.array_equal(
-        box_loaded.arrays["classifier_geometry_box_low"],
-        box_model.classifier.geometry.physical_boxes()[0].detach().cpu().numpy(),
-    )
-
-    # One image/one class with an explicitly empty component set retains empty
-    # occurrence axes while still storing per-pizza activity and class geometry.
-    empty_record = replace(train.records[0], components=())
-    empty_train = replace(train, records=(empty_record,))
-    empty_config = replace(
-        town_config,
-        model=ImageModelConfig(family="town", pizza_mode="compositional", latent_dimensions=2, houses=2, windows=2),
-        training=TrainingConfig(epochs=1, physical_batch_size=1, accumulation_steps=1),
-        diagnostics=DiagnosticsConfig(max_reference_samples=1, max_component_traces_per_sample=64, include_roi_feature_means=False),
-    ).validate()
-    one_class_model = ImageOntologyModel(2, dataset.class_names[:1], family="town", pizza_mode="compositional", houses=2, windows=2, seed=29)
-    empty_snapshot = save_image_snapshot(
-        tmp_path / "town-empty-components", dataset=dataset, train_subset=empty_train, validation_subset=validation,
-        visual=visual, model=one_class_model, config=empty_config, class_ids=(dataset.canonical_class_ids[0],),
-        class_indices=(0,), epoch=1, optimizer_step=1, latest_checkpoint=checkpoint, identity_hash="town-empty-components",
-    )
-    empty_loaded = load_image_snapshot(empty_snapshot.path)
-    assert len(empty_loaded.header["sample_ids"]) == len(empty_loaded.header["class_ids"]) == 1
-    assert empty_loaded.arrays["component_offsets"].tolist() == [0, 0]
-    assert empty_loaded.arrays["component_activity_house_margin"].shape == (0, 1, 2)
-    assert empty_loaded.arrays["pizza_activity_frame_margin"].shape == (1, 1, 2)
-
-
-def test_old_snapshot_without_explicit_diagnostic_axes_is_rejected_clearly(tmp_path, image_examples):
-    import json
-    from town_model.inspection.image_snapshots import load_image_snapshot
-
-    dataset, _, _, visual = image_examples
-    from town_model.experiments.image_config import DiagnosticsConfig, ImageExperimentConfig, ImageModelConfig
-    from town_model.inspection.image_snapshots import save_image_snapshot
-
-    train = deterministic_subset(dataset, "train", size=1, seed=331)
-    validation = deterministic_subset(dataset, "validation", size=1, seed=332)
-    model = ImageOntologyModel(2, dataset.class_names[:1], family="box", pizza_mode="global")
-    config = ImageExperimentConfig(
-        model=ImageModelConfig(family="box", pizza_mode="global", latent_dimensions=2),
-        diagnostics=DiagnosticsConfig(max_reference_samples=1, include_roi_feature_means=False),
-    ).validate()
-    checkpoint = tmp_path / "checkpoint.pt"
-    checkpoint.write_bytes(b"checkpoint")
-    snapshot = save_image_snapshot(
-        tmp_path / "versioned-snapshot", dataset=dataset, train_subset=train, validation_subset=validation,
-        visual=visual, model=model, config=config, class_ids=(dataset.canonical_class_ids[0],), class_indices=(0,),
-        epoch=0, optimizer_step=0, latest_checkpoint=checkpoint, identity_hash="versioned",
-    )
-    header_path = snapshot.path / "header.json"
-    header = json.loads(header_path.read_text())
-    header["schema_version"] = "image-research-snapshot-v1"
-    header_path.write_text(json.dumps(header))
-    with pytest.raises(ValueError, match="expected image-research-snapshot-v2 with explicit diagnostic axes"):
-        load_image_snapshot(snapshot.path)
-
-
-def test_common_neural_modules_are_byte_identical_and_classifiers_are_independent(image_examples):
-    dataset, _, _, _ = image_examples
-    models = [ImageOntologyModel(2, dataset.class_names, family=family, pizza_mode="hybrid", seed=88, classifier_seed=101) for family in ("baseline", "box", "town")]
-    states = [model.common_state_dict() for model in models]
-    assert states[0].keys() == states[1].keys() == states[2].keys()
-    assert all(torch.equal(states[0][key], states[i][key]) for i in (1, 2) for key in states[0])
-    assert len({id(model.classifier) for model in models}) == 3
-    assert [model.classifier.family for model in models] == ["baseline", "box", "town"]
-
-
-def test_deepsets_is_permutation_invariant_multiplicity_sensitive_and_empty_safe():
+def test_deepsets_is_permutation_invariant_multiplicity_sensitive_and_empty_safe() -> None:
     torch.manual_seed(3)
     model = DeepSetsComposition(8).eval()
     points = torch.randn(2, 4, 8).tanh()
@@ -315,21 +67,16 @@ def test_deepsets_is_permutation_invariant_multiplicity_sensitive_and_empty_safe
     assert torch.all(value <= 1) and torch.all(value >= -1)
 
 
-def test_zero_roi_models_produce_rho_zero_pizza_point(image_examples):
-    dataset, batch, _, extractor = image_examples
-    boxes = tuple(torch.empty((0, 4), dtype=torch.float32) for _ in batch.sample_ids)
-    identities = tuple(() for _ in batch.sample_ids)
-    with torch.no_grad():
-        features = extractor(batch, ExplicitROIProvider(boxes, identities))
-    for family in ("baseline", "box", "town"):
-        model = ImageOntologyModel(2, dataset.class_names, family=family, pizza_mode="compositional")
-        result = model(features, batch.sample_ids)
-        assert result.component_points.shape == (len(batch.sample_ids), 0, 2)
-        assert result.component_classifier.contains.shape == (len(batch.sample_ids), 0, len(dataset.class_names))
-        assert torch.equal(result.composed_pizza_points, model.composition.rho(torch.zeros((len(batch.sample_ids), 128))))
+def test_zero_roi_image_points_produce_the_empty_deepsets_point() -> None:
+    features = _features(batch=2, components=0)
+    model = ImagePointModel(2, pizza_mode="compositional").eval()
+    result = model(features, ("empty-1", "empty-2"))
+    assert result.component_points.shape == (2, 0, 2)
+    assert torch.equal(result.composed_pizza_points, model.composition.rho(torch.zeros((2, 128))))
+    assert torch.equal(result.final_pizza_points, result.composed_pizza_points)
 
 
-def test_effective_batch_aggregation_matches_full_batch_gradient_with_heterogeneous_eligibility():
+def test_effective_batch_aggregation_matches_full_batch_gradient_with_heterogeneous_eligibility() -> None:
     component = torch.tensor([0.2, 1.0, 5.0, 8.0, 3.0], requires_grad=True)
     pizza = torch.tensor([1.0, 4.0, 2.0, 9.0, 6.0], requires_grad=True)
     component_eligible = torch.tensor([True, False, True, True, False])
@@ -341,210 +88,109 @@ def test_effective_batch_aggregation_matches_full_batch_gradient_with_heterogene
     component_split = component.detach().clone().requires_grad_()
     pizza_split = pizza.detach().clone().requires_grad_()
     micros = []
-    # The last microbatch has one image, exercising a partial final window.
     for start, end in ((0, 2), (2, 4), (4, 5)):
         micros.append(ImageObjectiveTerms(
             component_split[start:end], component_eligible[start:end],
             pizza_split[start:end], pizza_eligible[start:end],
             int(component_eligible[start:end].sum()), int(pizza_eligible[start:end].sum()),
         ))
-    accumulated_loss = aggregate_effective_batch(micros).total
-    accumulated_grad = torch.autograd.grad(accumulated_loss, (component_split, pizza_split))
-    assert torch.allclose(full_loss, accumulated_loss)
+    accumulated = aggregate_effective_batch(micros).total
+    accumulated_grad = torch.autograd.grad(accumulated, (component_split, pizza_split))
+    assert torch.allclose(full_loss, accumulated)
     assert torch.allclose(full_grad[0], accumulated_grad[0])
     assert torch.allclose(full_grad[1], accumulated_grad[1])
 
 
-def test_default_family_objective_penalties_and_signed_distance_hinge_are_numerically_exact():
-    from town_model.training.image_objectives import _penalties
-
-    targets = torch.tensor([[1.0, 0.0]])
-    margins = torch.tensor([[0.02, 0.05]], requires_grad=True)
-    hinge = _penalties(
-        margins, targets, family="box", geometry_loss="signed_distance", temperature=0.1, hinge_margin=0.1
-    )
-    assert hinge.flatten().tolist() == pytest.approx([0.08, 0.15])
-    hinge.sum().backward()
-    assert torch.allclose(margins.grad, torch.tensor([[-1.0, 1.0]]))
-
-    zero_margin = _penalties(
-        torch.zeros((1, 2)), targets, family="town", geometry_loss="signed_distance", temperature=0.1, hinge_margin=0.0
-    )
-    assert zero_margin.tolist() == [[0.0, 0.0]]
-    baseline = _penalties(
-        torch.zeros((1, 2)), targets, family="baseline", geometry_loss="signed_distance", temperature=0.1, hinge_margin=0.1
-    )
-    assert baseline.flatten().tolist() == pytest.approx([0.6931472, 0.6931472])
-
-
-def test_image_objective_masks_unknowns_uses_positive_weights_and_omits_empty_components(image_examples):
-    dataset, batch, features, _ = image_examples
-    # A real model result supplies class scores; the reducer must honor the
-    # actual dataset masks, including no fabricated loss for empty/unknown rows.
-    model = ImageOntologyModel(2, dataset.class_names, family="baseline", pizza_mode="global")
-    result = model(features, batch.sample_ids)
-    terms = image_objective_terms(
-        result, batch, family="baseline", geometry_loss="signed_bce",
-        component_positive_weights=torch.full((len(dataset.class_names),), 3.0),
-        pizza_positive_weights=torch.ones((len(dataset.class_names),)),
-    )
-    assert terms.component_eligible_images.sum().item() <= len(batch.sample_ids)
-    assert terms.pizza_eligible_images.shape == (len(batch.sample_ids),)
-    assert terms.component_instance_count <= sum(len(row) for row in batch.component_ids)
-    result2 = ImageModelResult(
-        sample_ids=result.sample_ids,
-        component_ids=result.component_ids,
-        component_valid_mask=torch.zeros_like(result.component_valid_mask),
-        component_points=result.component_points,
-        global_pizza_points=result.global_pizza_points,
-        composed_pizza_points=result.composed_pizza_points,
-        final_pizza_points=result.final_pizza_points,
-        component_classifier=ClassifierOutput(contains=result.component_classifier.contains, logits=result.component_classifier.logits),
-        pizza_classifier=result.pizza_classifier,
-        pizza_mode=result.pizza_mode,
-    )
-    empty_terms = image_objective_terms(result2, batch, family="baseline", geometry_loss="signed_bce")
-    assert empty_terms.component_instance_count == 0
-    reduced = aggregate_effective_batch([empty_terms])
-    assert reduced.component_loss is None
-    assert "component" in reduced.undefined_tasks
-
-
-def test_weighted_instance_reduction_uses_sum_of_known_class_weights_and_masks_unknown_gradients():
-    from town_model.training.image_objectives import _instance_terms
-
-    penalties = torch.tensor([[2.0, 10.0, 4.0]], requires_grad=True)
+def test_weighted_instance_reduction_masks_unknown_values_and_gradients() -> None:
+    values = torch.tensor([[2.0, 10.0, 4.0]], requires_grad=True)
     targets = torch.tensor([[1.0, 0.0, 0.0]])
     known = torch.tensor([[True, True, False]])
-    values, eligible = _instance_terms(
-        penalties, targets, known, positive_weights=torch.tensor([9.0, 1.0, 100.0])
+    reduced, eligible = reduce_weighted_instances(
+        values, targets, known, positive_weights=torch.tensor([9.0, 1.0, 100.0])
     )
-    # Contract: (9*2 + 1*10) / (9+1) = 2.8. The former count
-    # denominator gave 14, a five-fold scale change for this known negative.
-    assert values.item() == pytest.approx(2.8)
-    assert values.item() != pytest.approx((9 * 2 + 10) / 2)
+    assert reduced.item() == pytest.approx(2.8)
     assert eligible.tolist() == [True]
-    values.sum().backward()
-    assert torch.allclose(penalties.grad, torch.tensor([[0.9, 0.1, 0.0]]))
-
-    changed_unknown = torch.tensor([[2.0, 10.0, 1_000_000.0]], requires_grad=True)
-    changed_target = torch.tensor([[1.0, 0.0, 1.0]])
-    changed_values, _ = _instance_terms(
-        changed_unknown, changed_target, known, positive_weights=torch.tensor([9.0, 1.0, 100.0])
-    )
-    changed_values.sum().backward()
-    assert changed_values.item() == pytest.approx(values.item())
-    assert torch.allclose(changed_unknown.grad, torch.tensor([[0.9, 0.1, 0.0]]))
+    reduced.sum().backward()
+    assert torch.allclose(values.grad, torch.tensor([[0.9, 0.1, 0.0]]))
 
 
-def test_weighted_effective_batch_accumulation_matches_full_batch_gradients():
-    from town_model.training.image_objectives import _instance_terms
-
+def test_weighted_effective_batch_accumulation_matches_full_batch_gradients() -> None:
     weights = torch.tensor([9.0, 1.0, 3.0])
     targets = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
     known = torch.tensor([[True, True, False], [True, True, True], [True, False, True], [False, False, False]])
-    full_penalties = torch.tensor([[2.0, 10.0, 7.0], [4.0, 1.0, 9.0], [3.0, 6.0, 2.0], [50.0, 40.0, 30.0]], requires_grad=True)
-    full_values, full_eligible = _instance_terms(full_penalties, targets, known, positive_weights=weights)
-    full_terms = ImageObjectiveTerms(full_values, full_eligible, full_values.detach(), torch.zeros(4, dtype=torch.bool), 3, 0)
+    full_values = torch.tensor([[2.0, 10.0, 7.0], [4.0, 1.0, 9.0], [3.0, 6.0, 2.0], [50.0, 40.0, 30.0]], requires_grad=True)
+    values, eligible = reduce_weighted_instances(full_values, targets, known, positive_weights=weights)
+    full_terms = ImageObjectiveTerms(values, eligible, values.detach(), torch.zeros(4, dtype=torch.bool), int(eligible.sum()), 0)
     full_loss = aggregate_effective_batch([full_terms], component_coefficient=1.0, pizza_coefficient=0.0).total
-    full_gradient = torch.autograd.grad(full_loss, full_penalties)[0]
+    full_gradient = torch.autograd.grad(full_loss, full_values)[0]
 
-    split_penalties = full_penalties.detach().clone().requires_grad_()
+    split_values = full_values.detach().clone().requires_grad_()
     windows = []
     for indices in ((0,), (1, 2), (3,)):
         index = torch.tensor(indices)
-        values, eligible = _instance_terms(
-            split_penalties.index_select(0, index),
-            targets.index_select(0, index),
-            known.index_select(0, index),
-            positive_weights=weights,
+        part, mask = reduce_weighted_instances(
+            split_values.index_select(0, index), targets.index_select(0, index),
+            known.index_select(0, index), positive_weights=weights,
         )
-        windows.append(ImageObjectiveTerms(values, eligible, values.detach(), torch.zeros(len(indices), dtype=torch.bool), int(eligible.sum()), 0))
+        windows.append(ImageObjectiveTerms(part, mask, part.detach(), torch.zeros(len(indices), dtype=torch.bool), int(mask.sum()), 0))
     split_loss = aggregate_effective_batch(windows, component_coefficient=1.0, pizza_coefficient=0.0).total
-    split_gradient = torch.autograd.grad(split_loss, split_penalties)[0]
+    split_gradient = torch.autograd.grad(split_loss, split_values)[0]
     assert torch.allclose(full_loss, split_loss)
     assert torch.allclose(full_gradient, split_gradient)
     assert torch.equal(full_gradient[3], torch.zeros_like(full_gradient[3]))
 
 
-def test_all_unit_image_weights_reproduce_unweighted_known_label_mean():
-    from town_model.training.image_objectives import _instance_terms
+def test_known_mask_values_reduce_per_instance_then_per_image_without_score_conversion() -> None:
+    component_values = torch.tensor([[[2.0, 10.0], [3.0, 4.0]], [[8.0, 9.0], [0.0, 0.0]]], requires_grad=True)
+    component_targets = torch.tensor([[[1.0, 0.0], [0.0, 1.0]], [[1.0, 0.0], [0.0, 0.0]]])
+    component_known = torch.tensor([[[True, True], [True, False]], [[False, False], [False, False]]])
+    flattened, eligible = reduce_weighted_instances(
+        component_values.reshape(-1, 2), component_targets.reshape(-1, 2),
+        component_known.reshape(-1, 2), positive_weights=torch.tensor([3.0, 2.0]),
+    )
+    per_component = flattened.reshape(2, 2)
+    component_eligible = eligible.reshape(2, 2)
+    counts = component_eligible.sum(dim=1)
+    component_per_image = (per_component * component_eligible).sum(dim=1) / counts.clamp_min(1)
+    component_images = counts > 0
+    assert component_per_image.tolist() == pytest.approx([3.5, 0.0])
+    assert component_images.tolist() == [True, False]
 
-    penalties = torch.tensor([[1.0, 3.0, 99.0], [4.0, 8.0, 10.0]])
+    pizza_values = torch.tensor([[4.0, 99.0], [99.0, -99.0]], requires_grad=True)
+    pizza_targets = torch.tensor([[1.0, 0.0], [0.0, 0.0]])
+    pizza_known = torch.tensor([[True, False], [False, False]])
+    pizza_per_image, pizza_eligible = reduce_weighted_instances(
+        pizza_values, pizza_targets, pizza_known,
+        positive_weights=torch.tensor([3.0, 2.0]),
+    )
+    terms = ImageObjectiveTerms(component_per_image, component_images, pizza_per_image, pizza_eligible, 2, 1)
+    aggregate = aggregate_effective_batch([terms])
+    assert pizza_per_image.tolist() == [4.0, 0.0]
+    assert pizza_eligible.tolist() == [True, False]
+    assert aggregate.component_loss.item() == pytest.approx(3.5)
+    assert aggregate.pizza_loss.item() == 4.0
+    assert aggregate.total.item() == pytest.approx(7.5)
+    aggregate.total.backward()
+    assert component_values.grad[1].abs().sum() == 0
+    assert component_values.grad[0, 0, 1] != 0
+    assert component_values.grad[0, 1, 1] == 0
+    assert pizza_values.grad[0, 1] == 0
+    assert pizza_values.grad[1].abs().sum() == 0
+
+
+def test_unit_weights_reproduce_unweighted_known_value_mean() -> None:
+    values = torch.tensor([[1.0, 3.0, 99.0], [4.0, 8.0, 10.0]])
     targets = torch.tensor([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
     known = torch.tensor([[True, True, False], [True, False, True]])
-    unweighted, _ = _instance_terms(penalties, targets, known, positive_weights=None)
-    unit_weighted, _ = _instance_terms(penalties, targets, known, positive_weights=torch.ones(3))
+    unweighted, _ = reduce_weighted_instances(values, targets, known)
+    unit_weighted, _ = reduce_weighted_instances(values, targets, known, positive_weights=torch.ones(3))
     assert torch.equal(unweighted, unit_weighted)
     assert unweighted.tolist() == pytest.approx([2.0, 7.0])
 
 
-def test_objective_undefined_for_entire_effective_batch_is_actionable():
+def test_undefined_effective_batch_is_reported_without_fabricated_zero_objective() -> None:
     values = torch.zeros(2)
     mask = torch.zeros(2, dtype=torch.bool)
     terms = ImageObjectiveTerms(values, mask, values, mask, 0, 0)
-    with pytest.raises(UndefinedImageObjective, match="no supervised"):
+    with pytest.raises(UndefinedImageObjective, match="no eligible"):
         aggregate_effective_batch([terms])
-
-
-def test_hand_computed_known_mask_positive_weight_and_per_image_component_reduction():
-    component_logits = torch.tensor([[[2.0, 2.0], [-2.0, 0.0]], [[-9.0, 9.0], [0.0, 0.0]]], requires_grad=True)
-    pizza_logits = torch.tensor([[2.0, 99.0], [99.0, -99.0]], requires_grad=True)
-    component_targets = (
-        torch.tensor([[1.0, 0.0], [0.0, 1.0]]),
-        torch.tensor([[0.0, 0.0]]),
-    )
-    component_known = (
-        torch.tensor([[True, True], [True, False]]),
-        torch.tensor([[False, False]]),
-    )
-    batch = SimpleNamespace(
-        sample_ids=("many-components", "no-known-components"),
-        pizza_targets=torch.tensor([[1.0, 0.0], [0.0, 0.0]]),
-        pizza_known_masks=torch.tensor([[True, False], [False, False]]),
-        component_targets=component_targets,
-        component_known_masks=component_known,
-    )
-    result = ImageModelResult(
-        sample_ids=batch.sample_ids,
-        component_ids=(("a", "b"), ("c", None)),
-        component_valid_mask=torch.tensor([[True, True], [True, False]]),
-        component_points=torch.zeros((2, 2, 2)),
-        global_pizza_points=torch.zeros((2, 2)),
-        composed_pizza_points=torch.zeros((2, 2)),
-        final_pizza_points=torch.zeros((2, 2)),
-        component_classifier=ClassifierOutput(
-            contains=component_logits >= 0,
-            logits=component_logits,
-        ),
-        pizza_classifier=ClassifierOutput(contains=pizza_logits >= 0, logits=pizza_logits),
-        pizza_mode="global",
-    )
-    terms = image_objective_terms(
-        result,
-        batch,
-        family="baseline",
-        geometry_loss="signed_bce",
-        component_positive_weights=torch.tensor([3.0, 2.0]),
-        pizza_positive_weights=torch.tensor([3.0, 2.0]),
-    )
-    expected_positive = torch.nn.functional.softplus(torch.tensor(-2.0))
-    expected_negative_inside = torch.nn.functional.softplus(torch.tensor(2.0))
-    first_component = (3 * expected_positive + expected_negative_inside) / 4
-    second_component = expected_positive
-    assert terms.component_eligible_images.tolist() == [True, False]
-    assert terms.component_per_image[0].item() == pytest.approx(((first_component + second_component) / 2).item())
-    assert terms.component_per_image[1].item() == 0  # not eligible and excluded from the mean
-    assert terms.pizza_eligible_images.tolist() == [True, False]
-    assert terms.pizza_per_image[0].item() == pytest.approx(expected_positive.item())
-    objective = aggregate_effective_batch([terms])
-    assert objective.component_eligible_images == 1
-    assert objective.pizza_eligible_images == 1
-    assert objective.total.item() == pytest.approx((terms.component_per_image[0] + terms.pizza_per_image[0]).item())
-    objective.total.backward()
-    assert component_logits.grad[0, 0, 0].abs() > 0
-    assert component_logits.grad[0, 0, 1].abs() > 0
-    assert component_logits.grad[0, 1, 1] == 0  # unknown second class
-    assert component_logits.grad[1].abs().sum() == 0  # no eligible component for this image
-    assert pizza_logits.grad[0, 1] == 0  # unknown target has no gradient
-    assert pizza_logits.grad[1].abs().sum() == 0  # unknown pizza row is omitted

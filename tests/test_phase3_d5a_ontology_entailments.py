@@ -13,7 +13,6 @@ from town_model.dataset.ontology import (
     OntologySnapshot,
     build_class_vocabulary,
 )
-from town_model.inspection.relation_diagnostics import box_region, diagnose_region_relation
 
 
 XML = "http://www.w3.org/XML/1998/namespace"
@@ -276,14 +275,9 @@ def test_existing_disjointness_metadata_is_unchanged() -> None:
     )["status"] == "entailed"
 
 
-def test_geometric_violation_does_not_change_ontology_entailment() -> None:
+def test_mushroom_vegetarian_ontology_entailment_is_independent_of_geometry() -> None:
     ontology = OntologySnapshot.load(require_pinned_hash=True)
-    mushroom_region = box_region(26, "MushroomTopping", [0.4, 0.4], [0.7, 0.7])
-    vegetarian_region = box_region(63, "VegetarianTopping", [-0.8, -0.8], [0.3, 0.3])
 
-    result = diagnose_region_relation(
-        mushroom_region, vegetarian_region, "containment", ontology=ontology
-    )
-
-    assert result["outcome"] is False
-    assert result["ontology_relation"]["status"] == "entailed"
+    assert ontology.geometric_relation_metadata(
+        "MushroomTopping", "VegetarianTopping", "containment"
+    )["status"] == "entailed"

@@ -17,7 +17,7 @@ from town_model.experiments.image_config import (
     TrainingConfig,
     VisionConfig,
 )
-from town_model.training.image_trainer import build_visual_feature_extractor, train_image_model
+from town_model.experiments.visual_features import build_visual_feature_extractor
 from town_model.vision.batching import collate_image_records
 from town_model.vision.preprocessing import ImageNetLetterbox
 
@@ -82,21 +82,3 @@ def test_feature_cache_lock_recovers_a_dead_local_writer_and_rejects_a_live_writ
     with pytest.raises(RuntimeError, match="already creating"):
         _acquire_cache_lock(lock)
     lock.unlink()
-
-
-def test_frozen_feature_cache_does_not_change_training_trajectory(tmp_path):
-    repository = Path(__file__).parents[1]
-    dataset = load_prepared_dataset(repository / "examples" / "pizza-48")
-    train = deterministic_subset(dataset, "train", size=4, seed=31)
-    validation = deterministic_subset(dataset, "validation", size=2, seed=32)
-    uncached_config = _fixture_config()
-    cached_config = _fixture_config(str(tmp_path / "cache"))
-    visual = build_visual_feature_extractor(cached_config)
-    cache = prepare_frozen_feature_cache(tmp_path / "cache", dataset, train, validation, visual, cached_config, device=torch.device("cpu"))
-    uncached = train_image_model(dataset, train, validation, uncached_config, tmp_path / "uncached")
-    cached = train_image_model(dataset, train, validation, cached_config, tmp_path / "cached", feature_cache=cache)
-    uncached_payload = torch.load(uncached.latest_checkpoint, map_location="cpu", weights_only=False)
-    cached_payload = torch.load(cached.latest_checkpoint, map_location="cpu", weights_only=False)
-    for key, value in uncached_payload["model_state"].items():
-        torch.testing.assert_close(value, cached_payload["model_state"][key], rtol=5e-3, atol=3e-5)
-    assert uncached_payload["optimizer_step"] == cached_payload["optimizer_step"]

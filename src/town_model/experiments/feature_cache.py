@@ -17,7 +17,7 @@ import torch
 from town_model.contracts import FeatureDiagnostics, FrozenImageFeatureCache, ImageBatch, VisionFeatureBatch
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset
 from town_model.experiments.image_config import IMAGE_FEATURE_EXTRACTION_CONTRACT, ImageExperimentConfig
-from town_model.training.image_trainer import _hash_state
+from town_model.identity import hash_tensor_state
 from town_model.vision.backbone import MobileNetV3LargeFPN
 from town_model.vision.batching import collate_image_records
 from town_model.vision.features import SharedVisualFeatureExtractor
@@ -204,7 +204,7 @@ def prepare_frozen_feature_cache(
     if set(record.split for record in records_by_id.values()) & {"test"}:
         raise ValueError("feature cache may not contain test-partition records")
     sample_ids = list(records_by_id)
-    visual_state_hash = _hash_state(visual.state_dict())
+    visual_state_hash = hash_tensor_state(visual.state_dict())
     identity: dict[str, Any] = {
         "dataset_id": dataset.dataset_id,
         "dataset_manifest_id": dataset.manifest_id,

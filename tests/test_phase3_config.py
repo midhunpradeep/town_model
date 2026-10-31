@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from town_model.experiments.image_config import (
@@ -34,7 +37,6 @@ def test_invalid_model_vision_and_split_combinations_fail_before_execution():
         ImageExperimentConfig(vision=VisionConfig(roi_source="predicted")),
         ImageExperimentConfig(vision=VisionConfig(roi_size=5)),
         ImageExperimentConfig(dataset=DatasetSubsetConfig(train_split="test")),
-        ImageExperimentConfig(model=ImageModelConfig(family="town", min_width=0.7)),
         ImageExperimentConfig(model=ImageModelConfig(family="box", window_mode="independent")),
         ImageExperimentConfig(model=ImageModelConfig(latent_dimensions=0)),
     ]
@@ -61,7 +63,7 @@ def test_config_mapping_restores_sequence_fields():
     assert config.vision.trainable_backbone_blocks == (12, 16)
 
 
-def test_default_and_selectable_image_objective_identities_and_scientific_hashes():
+def test_historical_objective_metadata_and_run_identity_compatibility_are_stable():
     expected = {
         "baseline": "binary_cross_entropy_with_logits",
         "box": "signed_distance_hinge",
@@ -90,6 +92,8 @@ def test_default_and_selectable_image_objective_identities_and_scientific_hashes
         "parameters": {"temperature": 0.1},
     }
     assert signed_bce.identity_hash() != configs["box"].identity_hash()
+    smoke_mapping = json.loads((Path(__file__).parents[1] / "configs" / "phase3_image_smoke.json").read_text())
+    assert image_config_from_mapping(smoke_mapping).identity_hash() == "394452225dc600041b25818f9edc3fcb0cccb7b8d79771b898ce88a4191109ff"
     changed_margin = ImageExperimentConfig(
         model=ImageModelConfig(family="box"), objective=ObjectiveConfig(hinge_margin=0.2)
     ).validate()

@@ -58,20 +58,22 @@ def test_training_and_dataset_preparation_do_not_import_presentation_or_torchvis
     assert not violations, "forbidden dependency directions:\n" + "\n".join(violations)
 
 
-def test_image_dashboard_delegates_training_to_detached_execution_service():
+def test_image_dashboard_is_metadata_only_and_has_no_model_execution_or_geometry():
     path = ROOT / "dashboard" / "image_embeddings.py"
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     imported = _imports(path)
     assert "town_model.experiments.image_runs" in imported
+    assert "town_model.inspection.image_snapshots" in imported
     assert all(not value.startswith("town_model.training") for value in imported)
     names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
-    assert "train_image_model" not in names
-    assert "Popen" not in names
-    attributes = [node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)]
-    assert "process" not in attributes
+    assert not names & {
+        "train_image_model", "launch_image_experiment", "request_stop",
+        "BoxGeometry", "TownGeometry", "evaluate_town_corners",
+        "diagnose_region_relation", "torch",
+    }
     source = path.read_text(encoding="utf-8")
-    assert "launch_image_experiment" in source
-    assert "start_new_session" not in source  # the shared service owns detached process creation.
+    assert "Persisted values only" in source
+    assert "load_image_snapshot" in source
 
 
 def test_new_layer_import_graph_has_no_cycles():

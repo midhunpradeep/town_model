@@ -1,38 +1,18 @@
-"""Lazy public model exports.
-
-The package namespace preserves historical imports without importing concrete
-classifier implementations when callers only need vision-to-point components or
-transport contracts.
-"""
+"""Classifier-independent point and supervision infrastructure."""
 
 from __future__ import annotations
 
 from importlib import import_module
 
 _EXPORTS = {
-    "BoxClassifier": ".classifiers",
     "ComponentPointProjection": ".image_points",
     "DeepSetsComposition": ".image_points",
-    "BoxGeometry": ".geometry",
-    "ClassifierOutput": ".classifier_transport",
-    "GeometryEvaluation": ".geometry",
     "GlobalPointProjection": ".image_points",
     "HybridPointFusion": ".image_points",
-    "ImageOntologyModel": ".image_embeddings",
     "ImagePointModel": ".image_points",
-    "NeuralBaseline": ".classifiers",
-    "PointClassifier": ".classifiers",
     "PizzaMode": ".image_points",
     "SupervisionReduction": ".losses",
-    "SyntheticPointEncoder": ".classifiers",
-    "TownClassifier": ".classifiers",
-    "TownGeometry": ".geometry",
-    "evaluate_town_corners": ".geometry",
-    "make_classifier": ".classifiers",
     "reduce_supervision": ".losses",
-    "unreduced_penalties": ".classifiers",
-    "validate_min_width": ".geometry",
-    "validate_signed_distance_margin": ".losses",
 }
 
 __all__ = list(_EXPORTS)
