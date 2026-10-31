@@ -9,6 +9,7 @@ proves a universal relation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import errno
 import hashlib
 import json
 import os
@@ -397,21 +398,77 @@ def diagnose_region_relation(
     }
 
 
-def save_relation_diagnostic(result: dict[str, Any], destination: Path | str) -> Path:
-    """Atomically publish a bounded, reproducible JSON result without overwrite."""
-    path = Path(destination).expanduser().resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        raise FileExistsError(f"relation diagnostic is immutable and already exists: {path}")
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+def _fsync_directory(directory: Path) -> None:
+    """Persist directory-entry changes where directory fsync is supported."""
+    if os.name == "nt":
+        # Python does not expose a portable directory-handle fsync on Windows.
+        return
+    unsupported = {
+        errno.EINVAL,
+        errno.ENOSYS,
+        getattr(errno, "ENOTSUP", errno.EINVAL),
+        getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+    }
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+        descriptor = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    except OSError as error:
+        if error.errno in unsupported:
+            return
+        raise
+    try:
+        try:
+            os.fsync(descriptor)
+        except OSError as error:
+            if error.errno not in unsupported:
+                raise
+    finally:
+        os.close(descriptor)
+
+
+def save_relation_diagnostic(result: dict[str, Any], destination: Path | str) -> Path:
+    """Atomically publish immutable JSON using same-directory no-clobber linking.
+
+    The temporary file and destination share a directory, so ``os.link`` is a
+    same-filesystem atomic create-if-absent operation on supported local
+    filesystems. There is deliberately no replacement fallback. Hard-link or
+    filesystem errors fail closed. A post-publication cleanup error can leave a
+    hidden temporary hard link; it is harmless and recoverable by removing it
+    only after confirming it is the same inode as the published destination.
+    """
+    # Normalize to an absolute lexical path without resolving the final entry:
+    # an existing (including dangling) symlink is itself an occupied name.
+    path = Path(os.path.abspath(os.fspath(Path(destination).expanduser())))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    descriptor_open = True
+    try:
+        stream = os.fdopen(descriptor, "w", encoding="utf-8")
+        descriptor_open = False
+        with stream:
             json.dump(result, stream, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False)
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except Exception:
+
+        try:
+            os.link(temporary, path)
+        except FileExistsError as error:
+            raise FileExistsError(
+                f"relation diagnostic is immutable and already exists: {path}"
+            ) from error
+        except OSError as error:
+            raise type(error)(
+                f"atomic no-clobber hard-link publication failed for {path}: {error}"
+            ) from error
+        _fsync_directory(path.parent)
+        os.unlink(temporary)
+        _fsync_directory(path.parent)
+    except BaseException:
+        if descriptor_open:
+            os.close(descriptor)
         try:
             os.unlink(temporary)
         except OSError:

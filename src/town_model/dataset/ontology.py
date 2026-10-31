@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 from .constants import (
     BASE_CATEGORIES,
@@ -140,6 +141,7 @@ class OntologySnapshot:
         return frozenset(self.individual_types)
 
     def ancestors(self, class_name: str, *, include_self: bool = True) -> frozenset[str]:
+        """Return closure of named ``rdfs:subClassOf`` edges only."""
         if class_name not in self.class_iris:
             raise ValueError(f"{class_name!r} is not a named OWL class")
         found: set[str] = {class_name} if include_self else set()
@@ -166,7 +168,7 @@ class OntologySnapshot:
         return "unknown"
 
     def geometric_relation_metadata(self, source_class: str, target_class: str, relation: str) -> dict[str, str]:
-        """Describe represented ontology metadata without treating absence as false."""
+        """Describe supported ontology metadata without treating absence as false."""
         if source_class not in self.class_iris or target_class not in self.class_iris:
             return {"status": "unknown", "basis": "one or both class IDs are absent from the pinned ontology"}
         if relation == "containment":
@@ -174,7 +176,12 @@ class OntologySnapshot:
                 return {"status": "asserted", "basis": "direct named rdfs:subClassOf axiom"}
             if target_class in self.ancestors(source_class):
                 return {"status": "entailed", "basis": "transitive closure of named rdfs:subClassOf axioms"}
-            return {"status": "unknown", "basis": "no asserted/entailed named subclass relationship found"}
+            if target_class in self._supported_subclass_closure(source_class):
+                return {
+                    "status": "entailed",
+                    "basis": "sound consequence of a recognized named equivalent-class fragment",
+                }
+            return {"status": "unknown", "basis": "no supported asserted/entailed named subclass relationship found"}
         if relation == "disjointness":
             status = self.disjointness_status(source_class, target_class)
             basis = {
@@ -187,52 +194,168 @@ class OntologySnapshot:
             return {"status": "unknown", "basis": "the pinned ontology metadata does not assert named region-overlap existence"}
         raise ValueError(f"unsupported geometric relation {relation!r}")
 
+    def _resolved_iri(self, reference: str | None) -> str | None:
+        return urljoin(self.base_iri, reference) if reference else None
+
+    def _named_class_reference(self, element: ET.Element) -> str | None:
+        if element.tag != f"{{{RDF}}}Description" or len(element) != 0:
+            return None
+        reference = element.get(f"{{{RDF}}}about")
+        name = _local_name(reference)
+        if name not in self.class_iris or self._resolved_iri(reference) != self.class_iris[name]:
+            return None
+        return name
+
+    def _named_intersection_union_equivalence(
+        self, class_name: str
+    ) -> tuple[frozenset[str], frozenset[str]] | None:
+        """Parse only ``named intersection (named union)`` equivalent axioms."""
+        element = self.class_elements[class_name]
+        equivalences = element.findall("owl:equivalentClass", NS)
+        if len(equivalences) != 1 or len(equivalences[0]) != 1:
+            return None
+        expression = equivalences[0][0]
+        if expression.tag != f"{{{OWL}}}Class" or len(expression) != 1:
+            return None
+        intersection = expression[0]
+        if (
+            intersection.tag != f"{{{OWL}}}intersectionOf"
+            or intersection.get(f"{{{RDF}}}parseType") != "Collection"
+        ):
+            return None
+
+        required: list[str] = []
+        union_expressions: list[ET.Element] = []
+        for operand in intersection:
+            name = self._named_class_reference(operand)
+            if name is not None:
+                required.append(name)
+                continue
+            if operand.tag != f"{{{OWL}}}Class" or len(operand) != 1:
+                return None
+            union = operand[0]
+            if (
+                union.tag != f"{{{OWL}}}unionOf"
+                or union.get(f"{{{RDF}}}parseType") != "Collection"
+            ):
+                return None
+            union_expressions.append(union)
+        if not required or len(set(required)) != len(required) or len(union_expressions) != 1:
+            return None
+
+        members = [self._named_class_reference(member) for member in union_expressions[0]]
+        if not members or any(member is None for member in members) or len(set(members)) != len(members):
+            return None
+        return frozenset(required), frozenset(members)
+
     def _vegetarian_equivalence_sources(self) -> frozenset[str]:
-        element = self.class_elements["VegetarianTopping"]
-        equivalence = element.find("owl:equivalentClass", NS)
-        if equivalence is None:
-            raise ValueError("VegetarianTopping is missing its equivalent-class axiom")
-        named = {
-            name
-            for child in equivalence.iter()
-            if (name := _local_name(child.get(f"{{{RDF}}}about"))) in self.class_iris
-        }
-        required = {"CheeseTopping", "FruitTopping", "VegetableTopping"}
-        if not required.issubset(named):
-            raise ValueError("VegetarianTopping equivalent-class categories changed")
-        return frozenset(required)
+        """Return union operands only for the exact supported VegetarianTopping axiom."""
+        definition = self._named_intersection_union_equivalence("VegetarianTopping")
+        expected = {"CheeseTopping", "FruitTopping", "VegetableTopping"}
+        if definition != (frozenset({"PizzaTopping"}), frozenset(expected)):
+            return frozenset()
+        return frozenset(expected)
 
     def _spicy_values(self, class_name: str) -> frozenset[str]:
         element = self.class_elements[class_name]
         values: set[str] = set()
         for restriction in element.findall("rdfs:subClassOf/owl:Restriction", NS):
             prop_element = restriction.find("owl:onProperty", NS)
-            prop = _local_name(prop_element.get(f"{{{RDF}}}resource")) if prop_element is not None else None
-            if prop != "hasSpiciness":
+            prop_reference = prop_element.get(f"{{{RDF}}}resource") if prop_element is not None else None
+            if self._resolved_iri(prop_reference) != self._resolved_iri("#hasSpiciness"):
                 continue
             for value in restriction.findall("owl:someValuesFrom", NS):
-                named = _local_name(value.get(f"{{{RDF}}}resource"))
-                if named:
+                value_reference = value.get(f"{{{RDF}}}resource")
+                named = _local_name(value_reference)
+                if named in self.class_iris and self._resolved_iri(value_reference) == self.class_iris[named]:
                     values.add(named)
         return frozenset(values)
 
-    def _has_spicy_equivalence(self) -> None:
+    def _spicy_equivalence_sources(self) -> frozenset[str] | None:
+        """Parse the supported ``PizzaTopping ∩ hasSpiciness some (Hot ∪ Medium)`` axiom."""
         element = self.class_elements["SpicyTopping"]
-        equivalence = element.find("owl:equivalentClass", NS)
-        if equivalence is None:
-            raise ValueError("SpicyTopping is missing its equivalent-class axiom")
-        values = {
-            _local_name(node.get(f"{{{RDF}}}about"))
-            for node in equivalence.iter()
-            if node.tag == f"{{{RDF}}}Description"
-        }
-        properties = {
-            _local_name(node.get(f"{{{RDF}}}resource"))
-            for node in equivalence.iter()
-            if node.tag == f"{{{OWL}}}onProperty"
-        }
-        if not {"Hot", "Medium"}.issubset(values) or "hasSpiciness" not in properties:
-            raise ValueError("SpicyTopping equivalent-class axiom no longer uses Hot/Medium")
+        equivalences = element.findall("owl:equivalentClass", NS)
+        if len(equivalences) != 1 or len(equivalences[0]) != 1:
+            return None
+        expression = equivalences[0][0]
+        if expression.tag != f"{{{OWL}}}Class" or len(expression) != 1:
+            return None
+        intersection = expression[0]
+        if (
+            intersection.tag != f"{{{OWL}}}intersectionOf"
+            or intersection.get(f"{{{RDF}}}parseType") != "Collection"
+            or len(intersection) != 2
+        ):
+            return None
+
+        bases: list[str] = []
+        restrictions: list[ET.Element] = []
+        for operand in intersection:
+            name = self._named_class_reference(operand)
+            if name is not None:
+                bases.append(name)
+            elif operand.tag == f"{{{OWL}}}Restriction":
+                restrictions.append(operand)
+            else:
+                return None
+        if set(bases) != {"PizzaTopping"} or len(bases) != 1 or len(restrictions) != 1:
+            return None
+
+        restriction = restrictions[0]
+        properties = restriction.findall("owl:onProperty", NS)
+        fillers = restriction.findall("owl:someValuesFrom", NS)
+        if (
+            len(restriction) != 2
+            or len(properties) != 1
+            or self._resolved_iri(properties[0].get(f"{{{RDF}}}resource"))
+            != self._resolved_iri("#hasSpiciness")
+            or len(fillers) != 1
+            or len(fillers[0]) != 1
+            or fillers[0][0].tag != f"{{{OWL}}}Class"
+            or len(fillers[0][0]) != 1
+        ):
+            return None
+        union = fillers[0][0][0]
+        if (
+            union.tag != f"{{{OWL}}}unionOf"
+            or union.get(f"{{{RDF}}}parseType") != "Collection"
+        ):
+            return None
+        values = [self._named_class_reference(member) for member in union]
+        if values != ["Medium", "Hot"] and values != ["Hot", "Medium"]:
+            return None
+        return frozenset(values)
+
+    def _supported_subclass_closure(self, class_name: str) -> frozenset[str]:
+        """Named closure plus consequences of the two audited equivalent fragments.
+
+        The supported directions are (1) a subclass of PizzaTopping and any
+        VegetarianTopping union member is a VegetarianTopping, and (2) a
+        PizzaTopping subclass carrying a named ``hasSpiciness some Hot/Medium``
+        restriction is a SpicyTopping. Union membership alone is never reversed.
+        """
+        derived = set(self.ancestors(class_name))
+        vegetarian_sources = self._vegetarian_equivalence_sources()
+        spicy_sources = self._spicy_equivalence_sources()
+        while True:
+            additional: set[str] = set()
+            for name in derived:
+                additional.update(self.direct_parents.get(name, ()))
+            if vegetarian_sources:
+                if "VegetarianTopping" in derived:
+                    additional.add("PizzaTopping")
+                if "PizzaTopping" in derived and derived.intersection(vegetarian_sources):
+                    additional.add("VegetarianTopping")
+            if spicy_sources:
+                if "SpicyTopping" in derived:
+                    additional.add("PizzaTopping")
+                inherited_spiciness = set().union(*(self._spicy_values(name) for name in derived))
+                if "PizzaTopping" in derived and inherited_spiciness.intersection(spicy_sources):
+                    additional.add("SpicyTopping")
+            additional.difference_update(derived)
+            if not additional:
+                return frozenset(derived)
+            derived.update(additional)
 
     def component_class_targets(self, category_name: str) -> frozenset[str]:
         """Return verified class targets for a rendered detector category.
@@ -253,15 +376,7 @@ class OntologySnapshot:
         if category_name not in (*TOPPING_COLUMNS, *BASE_CATEGORIES):
             raise ValueError(f"Unsupported detector category {category_name!r}")
 
-        targets = set(self.ancestors(category_name))
-        if category_name in TOPPING_COLUMNS:
-            vegetarian_sources = self._vegetarian_equivalence_sources()
-            if targets.intersection(vegetarian_sources):
-                targets.add("VegetarianTopping")
-            self._has_spicy_equivalence()
-            if self._spicy_values(category_name).intersection({"Hot", "Medium"}):
-                targets.add("SpicyTopping")
-        return frozenset(targets)
+        return self._supported_subclass_closure(category_name)
 
     def validate_component_memberships(self) -> list[str]:
         errors: list[str] = []
