@@ -18,11 +18,12 @@ import subprocess
 import sys
 import tempfile
 import uuid
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, NoReturn
 
 if fcntl is None:  # pragma: no cover - exercised on Windows CI only
     import msvcrt
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset, deterministic_subset, load_prepared_dataset
 from town_model.experiments.feature_cache import FrozenFeatureCache, prepare_frozen_feature_cache
 from town_model.experiments.image_config import IMAGE_POSITIVE_WEIGHTING_POLICY, ImageExperimentConfig
@@ -136,8 +137,8 @@ def resolve_image_experiment(
     config: ImageExperimentConfig,
     *,
     repository_root: Path | str | None = None,
-) -> ResolvedImageExperiment:
-    """Validate all inputs and identities before an output run directory exists."""
+) -> NoReturn:
+    """Validate independent config/data inputs, then reject unavailable execution."""
     config.validate()
     _device_for(config)
     base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
@@ -162,25 +163,6 @@ def resolve_image_experiment(
     class_ids = tuple(config.dataset.trainable_class_ids or dataset.canonical_class_ids)
     if len(set(class_ids)) != len(class_ids) or tuple(sorted(class_ids)) != class_ids or any(class_id not in dataset.canonical_class_ids for class_id in class_ids):
         raise ValueError("explicit class IDs must be a unique canonical-order subset of trainable ontology class IDs")
-    from town_model.models.image_embeddings import ImageOntologyModel
-
-    names_by_id = dict(zip(dataset.canonical_class_ids, dataset.class_names, strict=True))
-    # Constructor-equivalent model preflight is cheap and has no filesystem or
-    # Torchvision-model side effects. It catches drift between config and model
-    # requirements before caches, run manifests, reservations, or workers exist.
-    ImageOntologyModel(
-        config.model.latent_dimensions,
-        tuple(names_by_id[class_id] for class_id in class_ids),
-        family=config.model.family,
-        pizza_mode=config.model.pizza_mode,
-        seed=config.training.seed,
-        classifier_seed=config.model.classifier_seed,
-        houses=config.model.houses,
-        windows=config.model.windows,
-        min_width=config.model.min_width,
-        window_mode=config.model.window_mode,
-        window_target_volume=config.model.window_target_volume,
-    )
     validate_image_training_data(
         dataset,
         train_subset,
@@ -189,30 +171,9 @@ def resolve_image_experiment(
         require_training_coverage=config.purpose == "comparison",
         require_primary_monitor=config.purpose != "smoke",
     )
-    identity = {
-        "training_config": config.identity_dict(),
-        "dataset_id": dataset.dataset_id,
-        "manifest_id": dataset.manifest_id,
-        "dataset_manifest_sha256": dataset.dataset_manifest_sha256,
-        "class_manifest_sha256": dataset.class_manifest_sha256,
-        "train_subset_id": train_subset.subset_id,
-        "validation_subset_id": validation_subset.subset_id,
-        "train_sample_ids": [record.sample_id for record in train_subset.records],
-        "validation_sample_ids": [record.sample_id for record in validation_subset.records],
-        "canonical_trainable_class_ids": list(class_ids),
-        "roi_source": config.vision.roi_source,
-    }
-    identity_hash = _sha256_json(identity)
-    return ResolvedImageExperiment(
-        config=config,
-        dataset=dataset,
-        train_subset=train_subset,
-        validation_subset=validation_subset,
-        class_ids=class_ids,
-        identity=identity,
-        identity_hash=identity_hash,
-        run_id=f"image-{identity_hash[:20]}",
-    )
+    # Dataset/vision settings and authoritative IDs have been checked, but
+    # execution preflight cannot establish availability without a classifier.
+    raise_classifier_backend_unavailable("image classifier experiment preflight")
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,7 +251,8 @@ def launch_image_experiment(
     repository_root: Path | str | None = None,
     resume: bool = False,
 ) -> ImageWorkerLaunch:
-    """Preflight and launch the shared CLI execution path in a detached process."""
+    """Launch a historical image worker (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("launching an image classifier background worker")
     resolved = resolve_image_experiment(config, repository_root=repository_root)
     base = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[3]
     output = Path(output_root).expanduser().resolve()
@@ -579,34 +541,18 @@ def reconcile_worker_status(run_directory: Path | str) -> dict[str, Any] | None:
     return status
 
 
-def inspect_run(run_directory: Path | str, *, refresh_interrupted: bool = True) -> dict[str, Any]:
-    root = Path(run_directory).expanduser().resolve()
-    manifest = _read_manifest(root)
-    if refresh_interrupted and manifest["state"] == "running":
-        recovery_lock = RunWriterLock(root / ".writer.lock")
-        try:
-            recovery_lock.acquire()
-        except RunLifecycleError:
-            # A live flock owner is authoritative even if a stale status/manifest
-            # PID could have been reused. Never update state beneath a writer.
-            manifest = _read_manifest(root)
-        else:
-            try:
-                manifest = _read_manifest(root)
-                if manifest["state"] == "running" and not _process_alive(manifest):
-                    manifest = transition_run(root, "interrupted", details={
-                        "interruption_reason": "writer process is no longer alive; latest atomic checkpoint remains authoritative",
-                        "process_exit_status": "unknown; abrupt termination prevented wrapper exit-code observation",
-                        "exit_code": None,
-                    })
-            finally:
-                recovery_lock.release()
-            manifest = _read_manifest(root)
-    _reconcile_worker_status_file(root, manifest)
-    return manifest
+def inspect_run(run_directory: Path | str, *, refresh_interrupted: bool = False) -> dict[str, Any]:
+    """Read persisted lifecycle metadata without changing run or worker state.
+
+    ``refresh_interrupted`` is retained for call compatibility but no longer
+    enables reconciliation writes during classifier reconstruction.
+    """
+    del refresh_interrupted
+    return _read_manifest(Path(run_directory).expanduser().resolve())
 
 
 def request_stop(run_directory: Path | str) -> None:
+    raise_classifier_backend_unavailable("controlling a historical image classifier worker")
     root = Path(run_directory).expanduser().resolve()
     manifest = inspect_run(root, refresh_interrupted=True)
     if manifest["state"] != "running":
@@ -622,7 +568,8 @@ def run_image_experiment(
     resume: bool = False,
     stop_requested: Callable[[], bool] | None = None,
 ) -> tuple[Path, ImageTrainingResult]:
-    """Run/resume one validated config; run artifacts are immutable by identity."""
+    """Run or resume a historical classifier experiment (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("image-to-ontology classifier training or resume")
     resolved = resolve_image_experiment(config, repository_root=repository_root)
     feature_cache: FrozenFeatureCache | None = None
     if config.execution.feature_cache_directory:
@@ -801,7 +748,8 @@ def run_image_matrix(
     families: Iterable[str] = ("baseline", "box", "town"),
     pizza_modes: Iterable[str] = ("global", "compositional", "hybrid"),
 ) -> Path:
-    """Run a paired family × composition matrix on identical real-image subsets."""
+    """Run a historical classifier matrix (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("automatic image classifier matrix execution")
     if config.purpose != "comparison":
         raise ValueError("image family×composition matrices require purpose='comparison' and its strict support/checkpoint rules")
     selected_families = tuple(families)

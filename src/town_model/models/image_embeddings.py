@@ -1,4 +1,4 @@
-"""Temporary compatibility adapter applying the historical classifier to points."""
+"""Historical image classifier adapter retained as source but disabled in T2."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from typing import Literal
 
 from torch import Tensor, nn
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.contracts import ImageModelResult, VisionFeatureBatch
 
 from .classifier_transport import ClassifierOutput
@@ -56,11 +57,10 @@ def _reshape_classifier_output(output: ClassifierOutput, batch: int, count: int)
 
 
 class ImageOntologyModel(ImagePointModel):
-    """Compatibility adapter for the currently active classifier families.
+    """Historical classifier adapter; construction and inference fail closed.
 
-    Point extraction/composition lives in ``ImagePointModel`` and does not
-    construct or require a classifier. This adapter preserves the historical
-    model behavior until model execution is disconnected in a later pass.
+    Classifier-independent point extraction/composition remains in
+    ``ImagePointModel``. This source is retained for T3's removal pass only.
     """
 
     def __init__(
@@ -78,6 +78,7 @@ class ImageOntologyModel(ImagePointModel):
         window_mode: str = "contained",
         window_target_volume: float = 0.25,
     ) -> None:
+        raise_classifier_backend_unavailable("historical image classifier model construction")
         validate_image_model_parameters(
             dimensions,
             class_names,
@@ -117,6 +118,7 @@ class ImageOntologyModel(ImagePointModel):
         *,
         diagnostics: bool = False,
     ) -> ImageModelResult:
+        raise_classifier_backend_unavailable("historical image classifier inference")
         points = super().forward(features, sample_ids, diagnostics=diagnostics)
         batch, count = points.component_valid_mask.shape
         flat_components = points.component_points.reshape(batch * count, self.dimensions)

@@ -17,6 +17,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.models import (
     PointClassifier,
     SyntheticPointEncoder,
@@ -337,6 +338,7 @@ def _classification_metrics(output, targets: Tensor, known: Tensor, class_names:
 
 
 def _loss_for(model: PointClassifier, output, targets: Tensor, known: Tensor, margin: float):
+    raise_classifier_backend_unavailable("historical synthetic classifier loss computation")
     mode = "bce" if model.family == "baseline" else "signed_distance"
     penalties = unreduced_penalties(output, targets, mode=mode, margin=margin)
     return reduce_supervision(penalties, targets, known), mode
@@ -357,6 +359,7 @@ def _evaluate_split(
     margin: float,
     device: torch.device,
 ) -> tuple[dict[str, Any], Tensor]:
+    raise_classifier_backend_unavailable("historical synthetic classifier evaluation")
     features, targets, known = _subset_tensors(fixture, indices, device=device)
     model.eval()
     if encoder is not None:
@@ -395,6 +398,7 @@ def _gradient_report(model: PointClassifier, encoder: SyntheticPointEncoder | No
 
 
 def _geometry_activity(model: PointClassifier, points: Tensor) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("historical synthetic classifier geometry diagnostics")
     with torch.no_grad():
         output = model(points, diagnostics=True)
     if model.family == "baseline":
@@ -436,6 +440,7 @@ def _snapshot(
     *,
     step: int,
 ) -> None:
+    raise_classifier_backend_unavailable("historical synthetic classifier snapshot generation")
     snapshot_dir = run_dir / "snapshots"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     model.eval()
@@ -503,6 +508,7 @@ def _run_one(
     base_encoder_state: dict[str, Tensor] | None,
     encoder_seed: int,
 ) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("historical synthetic classifier training")
     run_dir = group_dir / family
     run_dir.mkdir(parents=True, exist_ok=False)
     model = make_classifier(
@@ -666,7 +672,8 @@ def run_experiment(
     device: str = "cpu",
     input_dimensions: int = 4,
 ) -> Path:
-    """Train all three families on one shared fixture and persist a run group."""
+    """Train historical classifier families on one shared synthetic fixture."""
+    raise_classifier_backend_unavailable("synthetic classifier training")
     resolved_config = config or SyntheticConfig()
     resolved_config.validate()
     if device != "cpu":
@@ -726,6 +733,7 @@ def run_experiment(
 
 
 def run_fixed_experiments(output_root: Path | str, *, config: SyntheticConfig | None = None) -> list[Path]:
+    raise_classifier_backend_unavailable("fixed synthetic classifier matrix training")
     resolved = config or SyntheticConfig()
     return [run_experiment("fixed", scenario, output_root, config=resolved) for scenario in ("simple", "window")]
 
@@ -741,7 +749,8 @@ def _load_fixture(group_dir: Path) -> tuple[dict[str, Any], dict[str, np.ndarray
 
 
 def load_saved_run(run_path: Path | str, *, checkpoint: Path | str | None = None) -> tuple[PointClassifier, SyntheticPointEncoder | None, dict[str, Any], dict[str, np.ndarray]]:
-    """Restore classifier/encoder and fixture arrays without invoking training."""
+    """Restore historical classifier objects (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical synthetic classifier checkpoint loading")
     run_dir = Path(run_path).expanduser().resolve()
     group_dir = run_dir.parent
     metadata = json.loads((run_dir / "resolved_config.json").read_text(encoding="utf-8"))
@@ -839,6 +848,7 @@ def load_saved_run(run_path: Path | str, *, checkpoint: Path | str | None = None
 
 
 def evaluate_saved_run(run_path: Path | str, split: str = "validation", *, checkpoint: Path | str | None = None) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("synthetic classifier evaluation")
     if split not in {"train", "validation"}:
         raise ValueError("synthetic run evaluation split must be train or validation")
     model, encoder, bundle, arrays = load_saved_run(run_path, checkpoint=checkpoint)
@@ -864,11 +874,8 @@ def evaluate_saved_run(run_path: Path | str, split: str = "validation", *, check
 
 
 def resume_saved_run(run_path: Path | str, additional_steps: int) -> dict[str, Any]:
-    """Continue a completed Adam run from its checkpoint after config validation.
-
-    Resumed steps append history and snapshots; the immutable resolved config is
-    not edited. The checkpoint's saved optimizer state is restored verbatim.
-    """
+    """Resume historical synthetic classifier training (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("synthetic classifier training resume")
     if isinstance(additional_steps, bool) or not isinstance(additional_steps, int) or additional_steps < 1:
         raise ValueError("additional_steps must be a positive integer")
     model, encoder, bundle, arrays = load_saved_run(run_path)
@@ -968,7 +975,8 @@ def inspect_saved_run(run_path: Path | str) -> dict[str, Any]:
 
 
 def saved_geometry(run_path: Path | str, snapshot: str | None = None) -> dict[str, Any]:
-    """Restore actual model state and snapshot-specific activity when available."""
+    """Restore historical classifier geometry (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical synthetic classifier geometry loading or export")
     run_dir = Path(run_path).expanduser().resolve()
     chosen = snapshot or "final"
     model, encoder, bundle, arrays = load_saved_run(run_dir)

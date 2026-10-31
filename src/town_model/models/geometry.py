@@ -16,6 +16,8 @@ from typing import Iterable
 import torch
 from torch import Tensor, nn
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
+
 # Re-exported for callers using the historical geometry module path.
 from .geometry_diagnostics import GEOMETRY_DIAGNOSTIC_AXES
 
@@ -148,6 +150,7 @@ def evaluate_town_corners(
     of windows. Trainable Phase 2 towns use strictly-contained windows.
     Per-house/per-window diagnostic arrays are built only when requested.
     """
+    raise_classifier_backend_unavailable("historical town membership and margin computation")
     if frame_low.ndim != 3 or frame_high.shape != frame_low.shape:
         raise ValueError("frame corners must have matching [C,H,d] shapes")
     if window_low.ndim != 4 or window_high.shape != window_low.shape:
@@ -229,6 +232,7 @@ class BoxGeometry(nn.Module):
     """One bounded closed axis-aligned trainable box per class."""
 
     def __init__(self, dimensions: int, classes: int, *, seed: int = 42, min_width: float = 1e-5):
+        raise_classifier_backend_unavailable("historical box geometry construction")
         super().__init__()
         if type(dimensions) is not int or type(classes) is not int or dimensions < 1 or classes < 1:
             raise ValueError("dimensions and classes must be positive integers")
@@ -257,6 +261,7 @@ class BoxGeometry(nn.Module):
     @classmethod
     def from_physical(cls, lows: Tensor, highs: Tensor, *, min_width: float = 1e-5) -> "BoxGeometry":
         """Build a fixed-corner geometry for boundary tests and exact diagnostics."""
+        raise_classifier_backend_unavailable("historical box geometry construction")
         _as_float32_tensor(lows, "lows")
         _as_float32_tensor(highs, "highs")
         if lows.ndim != 3 or highs.shape != lows.shape:
@@ -275,6 +280,7 @@ class BoxGeometry(nn.Module):
         return result
 
     def physical_boxes(self) -> tuple[Tensor, Tensor]:
+        raise_classifier_backend_unavailable("historical box geometry interpretation or export")
         if hasattr(self, "fixed_low"):
             return self.fixed_low, self.fixed_high
         return _bounded_corners(self.raw_low, self.raw_width, self.width_floor)
@@ -293,6 +299,7 @@ class BoxGeometry(nn.Module):
         for name, size in (("point_chunk_size", point_chunk_size), ("class_chunk_size", class_chunk_size)):
             if size is not None and (isinstance(size, bool) or not isinstance(size, int) or size < 1):
                 raise ValueError(f"{name} must be a positive integer")
+        raise_classifier_backend_unavailable("historical box membership and margin computation")
         lows, highs = self.physical_boxes()
         if points.shape[0] == 0:
             empty = torch.empty((0, self.classes), dtype=torch.bool, device=points.device)
@@ -342,6 +349,7 @@ class TownGeometry(nn.Module):
         window_mode: str = "contained",
         window_target_volume: float = 0.25,
     ):
+        raise_classifier_backend_unavailable("historical town geometry construction")
         super().__init__()
         if any(type(value) is not int for value in (dimensions, classes, houses, windows)) or dimensions < 1 or classes < 1 or houses < 1 or windows < 1:
             raise ValueError("dimensions, classes, houses, and windows must be positive integers")
@@ -431,6 +439,7 @@ class TownGeometry(nn.Module):
             self.raw_window_position.copy_(_logit_fraction(position_fraction))
 
     def physical_geometry(self) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+        raise_classifier_backend_unavailable("historical town geometry interpretation or export")
         frame_low, frame_high = _bounded_corners(self.raw_frame_low, self.raw_frame_width, self.frame_floor)
         frame_width = frame_high - frame_low
         interior = frame_width - 2.0 * self.clearance
@@ -456,6 +465,7 @@ class TownGeometry(nn.Module):
         for name, size in (("point_chunk_size", point_chunk_size), ("class_chunk_size", class_chunk_size)):
             if size is not None and (isinstance(size, bool) or not isinstance(size, int) or size < 1):
                 raise ValueError(f"{name} must be a positive integer")
+        raise_classifier_backend_unavailable("historical town membership and margin computation")
         frame_low, frame_high, window_low, window_high = self.physical_geometry()
         if points.shape[0] == 0:
             empty = torch.empty((0, self.classes), dtype=torch.bool, device=points.device)

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import torch
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.models.geometry_diagnostics import GEOMETRY_DIAGNOSTIC_AXES
 
 if TYPE_CHECKING:
@@ -57,6 +58,7 @@ def _numpy(value: torch.Tensor | None, *, dtype=None) -> np.ndarray | None:
 
 
 def _classifier_geometry(model: ImageOntologyModel) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("historical image classifier geometry snapshot generation")
     from town_model.models.classifiers import BoxClassifier, NeuralBaseline, TownClassifier
 
     classifier = model.classifier
@@ -114,7 +116,8 @@ def save_image_snapshot(
     identity_hash: str,
     feature_cache=None,
 ) -> ImageResearchSnapshot:
-    """Persist a bounded deterministic inference trace without optimizer state."""
+    """Persist a historical classifier inference trace (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical image classifier snapshot generation")
     from town_model.vision.batching import collate_image_records
     from town_model.vision.preprocessing import ImageNetLetterbox
     from town_model.vision.roi import GroundTruthROIProvider

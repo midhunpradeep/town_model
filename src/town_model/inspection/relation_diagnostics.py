@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import torch
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.dataset.ontology import OntologySnapshot, build_class_vocabulary
 
 if TYPE_CHECKING:
@@ -164,7 +165,8 @@ def region_from_classifier(
     class_index: int,
     geometry_reference: dict[str, Any] | None = None,
 ) -> GeometryRegion:
-    """Adapt existing classifier geometry; baseline hyperplanes are not regions here."""
+    """Adapt historical classifier geometry (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical classifier-to-region geometry export")
     from town_model.models.classifiers import BoxClassifier, TownClassifier
 
     if not 0 <= class_index < len(classifier.class_names):
@@ -197,7 +199,8 @@ def validate_snapshot_ontology_mapping(snapshot, ontology: OntologySnapshot) -> 
 
 
 def region_from_snapshot(snapshot, class_index: int, *, ontology: OntologySnapshot | None = None) -> GeometryRegion:
-    """Build a query region from immutable snapshot geometry without loading a checkpoint."""
+    """Adapt stored historical geometry for relation queries (unavailable)."""
+    raise_classifier_backend_unavailable("historical snapshot geometry interpretation")
     if ontology is not None:
         validate_snapshot_ontology_mapping(snapshot, ontology)
     header = snapshot.header
@@ -227,11 +230,13 @@ def region_from_snapshot(snapshot, class_index: int, *, ontology: OntologySnapsh
 
 
 def _box_contains(region: GeometryRegion, points: np.ndarray) -> np.ndarray:
+    raise_classifier_backend_unavailable("historical box membership computation")
     assert region.box_low is not None and region.box_high is not None
     return np.all((points >= region.box_low) & (points <= region.box_high), axis=-1)
 
 
 def _town_contains(region: GeometryRegion, points: np.ndarray) -> np.ndarray:
+    raise_classifier_backend_unavailable("historical town membership computation")
     assert region.frame_low is not None and region.frame_high is not None
     assert region.window_low is not None and region.window_high is not None
     from town_model.models.geometry import evaluate_town_corners
@@ -247,7 +252,8 @@ def _town_contains(region: GeometryRegion, points: np.ndarray) -> np.ndarray:
 
 
 def evaluate_region_membership(region: GeometryRegion, points: np.ndarray | list) -> np.ndarray:
-    """Evaluate exact hard membership using the existing box/town semantics."""
+    """Evaluate historical hard membership (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical geometric membership evaluation")
     values = np.asarray(points, dtype=np.float32)
     if values.ndim != 2 or values.shape[1] != region.dimensions or not np.isfinite(values).all():
         raise ValueError("membership points must be finite [N,d] within the region dimension")
@@ -261,6 +267,7 @@ def _contains(region: GeometryRegion, points: np.ndarray) -> np.ndarray:
 
 
 def _box_pair(source: GeometryRegion, target: GeometryRegion, relation: Relation) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("historical exact box relation computation")
     assert source.box_low is not None and source.box_high is not None
     assert target.box_low is not None and target.box_high is not None
     source_low, source_high = source.box_low, source.box_high
@@ -333,6 +340,7 @@ def _town_samples(region: GeometryRegion, count: int, rng: np.random.Generator) 
 
 
 def _sampled_pair(source: GeometryRegion, target: GeometryRegion, relation: Relation, *, sample_count: int, seed: int) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("historical sampled town relation computation")
     rng = np.random.default_rng(seed)
     uniform_domain = rng.uniform(-1.0, 1.0, size=(sample_count, source.dimensions)).astype(np.float32)
     source_frame_draws = _town_samples(source, sample_count, rng)
@@ -401,7 +409,8 @@ def diagnose_region_relation(
     seed: int = 0,
     ontology: OntologySnapshot | None = None,
 ) -> dict[str, Any]:
-    """Diagnose A⊆B, A∩B≠∅, or A∩B=∅ with explicit proof scope."""
+    """Diagnose historical classifier-region relations (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical ontology-region relation diagnosis")
     if relation not in ("containment", "intersection", "disjointness"):
         raise ValueError(f"unsupported region relation {relation!r}")
     if source.dimensions != target.dimensions:

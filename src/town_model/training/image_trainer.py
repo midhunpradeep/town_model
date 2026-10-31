@@ -19,6 +19,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.contracts import FrozenImageFeatureCache, ImageBatch, VisionFeatureBatch
 from town_model.dataset.image_data import DatasetSubset, PreparedDataset
 from town_model.experiments.image_config import IMAGE_FEATURE_EXTRACTION_CONTRACT, ImageExperimentConfig
@@ -111,13 +112,30 @@ def _device_for(config: ImageExperimentConfig) -> torch.device:
     return device
 
 
+def build_visual_feature_extractor(config: ImageExperimentConfig) -> SharedVisualFeatureExtractor:
+    """Construct the retained classifier-independent MobileNetV3/FPN feature path."""
+    config.vision.validate()
+    _set_seed(config.training.seed)
+    visual_backbone = MobileNetV3LargeFPN(
+        pretrained=config.vision.pretrained_imagenet,
+        trainable_backbone_blocks=config.vision.trainable_backbone_blocks,
+    )
+    policy = config.vision.visual_policy
+    visual_backbone.set_trainable(
+        trainable_fpn=policy != "frozen",
+        trainable_backbone_blocks=(config.vision.trainable_backbone_blocks if policy == "trainable_fpn_last_blocks" else ()),
+    )
+    return SharedVisualFeatureExtractor(visual_backbone)
+
+
 def build_image_modules(
     dataset: PreparedDataset,
     config: ImageExperimentConfig,
     *,
     class_ids: tuple[int, ...] | None = None,
 ) -> tuple[SharedVisualFeatureExtractor, ImageOntologyModel, tuple[int, ...]]:
-    """Construct matched shared modules and one independent classifier copy."""
+    """Construct historical classifier modules (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical image classifier module construction")
     config.validate()
     _set_seed(config.training.seed)
     visual_backbone = MobileNetV3LargeFPN(
@@ -154,6 +172,7 @@ def build_image_modules(
 
 
 def _optimizer(visual: SharedVisualFeatureExtractor, model: ImageOntologyModel, config: ImageExperimentConfig) -> torch.optim.Optimizer:
+    raise_classifier_backend_unavailable("historical image classifier training optimizer construction")
     groups: list[dict[str, Any]] = []
 
     def add(parameters, name: str, lr: float, weight_decay: float) -> None:
@@ -307,7 +326,8 @@ def evaluate_image_model(
     component_positive_weights: Tensor | None = None,
     pizza_positive_weights: Tensor | None = None,
 ) -> dict[str, Any]:
-    """Known-mask GT-ROI metrics and objective losses for one original split."""
+    """Historical classifier evaluation for one GT-ROI split."""
+    raise_classifier_backend_unavailable("historical image classifier evaluation")
     old_visual_mode = visual.training
     old_model_mode = model.training
     visual.eval()
@@ -479,6 +499,7 @@ def _gradient_activity(visual: SharedVisualFeatureExtractor, model: ImageOntolog
 
 
 def _geometry_is_valid(model: ImageOntologyModel) -> None:
+    raise_classifier_backend_unavailable("historical image classifier geometry validation")
     geometry = getattr(model.classifier, "geometry", None)
     if geometry is None:
         return
@@ -569,6 +590,7 @@ def _checkpoint_payload(
 
 
 def _load_checkpoint(path: Path, expected_identity: dict[str, Any], device: torch.device) -> dict[str, Any]:
+    raise_classifier_backend_unavailable("historical image classifier checkpoint loading")
     try:
         payload = torch.load(path, map_location=device, weights_only=False)
     except (OSError, EOFError, RuntimeError, ValueError, TypeError, pickle.UnpicklingError, zipfile.BadZipFile) as error:
@@ -747,7 +769,8 @@ def train_image_model(
     snapshot_callback: Callable[[int, int, SharedVisualFeatureExtractor, ImageOntologyModel, bool], None] | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> ImageTrainingResult:
-    """Train one classifier/composition pair on real prepared RGB images."""
+    """Train one historical classifier/composition pair on prepared RGB images."""
+    raise_classifier_backend_unavailable("image-to-ontology classifier training")
     config.validate()
     if train_subset.dataset.dataset_id != dataset.dataset_id or validation_subset.dataset.dataset_id != dataset.dataset_id:
         raise ValueError("train/validation subsets must reference the loaded canonical dataset")
@@ -1128,7 +1151,8 @@ def _evaluate_image_checkpoint(
     *,
     class_ids: tuple[int, ...],
 ) -> dict[str, Any]:
-    """Load a compatible saved checkpoint and evaluate without training/updating it."""
+    """Load and evaluate a historical image classifier checkpoint."""
+    raise_classifier_backend_unavailable("historical image classifier checkpoint evaluation")
     config.validate()
     if train_subset.dataset.dataset_id != dataset.dataset_id or validation_subset.dataset.dataset_id != dataset.dataset_id:
         raise ValueError("training/validation subsets belong to a different canonical dataset")
@@ -1206,7 +1230,8 @@ def evaluate_image_checkpoint(
     *,
     class_ids: tuple[int, ...],
 ) -> dict[str, Any]:
-    """Evaluate a saved checkpoint without changing global RNG/runtime settings."""
+    """Evaluate a saved historical checkpoint without changing runtime settings."""
+    raise_classifier_backend_unavailable("historical image classifier checkpoint evaluation")
     rng = _rng_state()
     deterministic = torch.backends.cudnn.deterministic
     benchmark = torch.backends.cudnn.benchmark

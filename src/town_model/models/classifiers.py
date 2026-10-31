@@ -8,6 +8,8 @@ import torch
 from torch import Tensor, nn
 import torch.nn.functional as F
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
+
 from .classifier_transport import ClassifierOutput
 from .geometry import BoxGeometry, TownGeometry
 from .losses import validate_signed_distance_margin
@@ -19,6 +21,7 @@ class PointClassifier(nn.Module):
     family: str
 
     def __init__(self, dimensions: int, class_names: tuple[str, ...], *, fixed_classes: tuple[str, ...] = ("DomainThing",)):
+        raise_classifier_backend_unavailable("historical point classifier construction")
         super().__init__()
         if type(dimensions) is not int or dimensions < 1:
             raise ValueError("dimensions must be a positive integer")
@@ -49,7 +52,7 @@ class PointClassifier(nn.Module):
         return sum(parameter.numel() for parameter in self.parameters() if parameter.requires_grad)
 
     def forward(self, points: Tensor, *, diagnostics: bool = False) -> ClassifierOutput:
-        raise NotImplementedError
+        raise_classifier_backend_unavailable("historical point classifier inference")
 
 
 class NeuralBaseline(PointClassifier):
@@ -65,6 +68,7 @@ class NeuralBaseline(PointClassifier):
         self.seed = int(seed)
 
     def forward(self, points: Tensor, *, diagnostics: bool = False) -> ClassifierOutput:
+        raise_classifier_backend_unavailable("historical neural classifier inference")
         self._validate_points(points)
         logits = self.linear(points)
         return ClassifierOutput(
@@ -93,6 +97,7 @@ class BoxClassifier(PointClassifier):
         self.seed = int(seed)
 
     def forward(self, points: Tensor, *, diagnostics: bool = False) -> ClassifierOutput:
+        raise_classifier_backend_unavailable("historical box classifier inference")
         self._validate_points(points)
         result = self.geometry.evaluate(points, diagnostics=diagnostics)
         return ClassifierOutput(
@@ -135,6 +140,7 @@ class TownClassifier(PointClassifier):
         self.seed = int(seed)
 
     def forward(self, points: Tensor, *, diagnostics: bool = False) -> ClassifierOutput:
+        raise_classifier_backend_unavailable("historical town classifier inference")
         self._validate_points(points)
         result = self.geometry.evaluate(points, diagnostics=diagnostics)
         return ClassifierOutput(
@@ -157,7 +163,8 @@ def make_classifier(
     window_mode: str = "contained",
     window_target_volume: float = 0.25,
 ) -> PointClassifier:
-    """Factory for the three comparable public classifier implementations."""
+    """Historical factory retained only as source during the T2 transition."""
+    raise_classifier_backend_unavailable(f"historical {family} classifier construction")
     if family == "baseline":
         return NeuralBaseline(dimensions, class_names, seed=seed)
     if family == "box":
@@ -210,7 +217,8 @@ def unreduced_penalties(
     mode: str,
     margin: float = 0.1,
 ) -> Tensor:
-    """Return one [N,C] penalty tensor; the common reducer owns aggregation."""
+    """Return historical penalties (unavailable during classifier reconstruction)."""
+    raise_classifier_backend_unavailable("historical classifier loss computation")
     margin = validate_signed_distance_margin(margin)
     if output.logits is not None:
         if mode != "bce":

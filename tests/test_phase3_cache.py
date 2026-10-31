@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import socket
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,7 +17,7 @@ from town_model.experiments.image_config import (
     TrainingConfig,
     VisionConfig,
 )
-from town_model.training.image_trainer import build_image_modules, train_image_model
+from town_model.training.image_trainer import build_visual_feature_extractor, train_image_model
 from town_model.vision.batching import collate_image_records
 from town_model.vision.preprocessing import ImageNetLetterbox
 
@@ -40,7 +39,7 @@ def test_frozen_cache_has_strict_identity_and_only_deterministic_train_validatio
     train = deterministic_subset(dataset, "train", size=4, seed=31)
     validation = deterministic_subset(dataset, "validation", size=2, seed=32)
     config = _fixture_config(str(tmp_path / "cache"))
-    visual, _, _ = build_image_modules(dataset, config)
+    visual = build_visual_feature_extractor(config)
     cache = prepare_frozen_feature_cache(tmp_path / "cache", dataset, train, validation, visual, config, device=torch.device("cpu"))
     assert set(cache.identity["sample_splits"].values()) == {"train", "validation"}
     assert not any(split == "test" for split in cache.identity["sample_splits"].values())
@@ -56,16 +55,12 @@ def test_frozen_cache_has_strict_identity_and_only_deterministic_train_validatio
     for actual, expected in zip(features.component_ids, batch.component_ids, strict=True):
         assert actual[:len(expected)] == expected
 
-    changed_config = replace(config, vision=replace(config.vision, resolution=256))
-    with pytest.raises(ValueError, match="identity fields differ.*preprocessing"):
-        train_image_model(
-            dataset,
-            train,
-            validation,
-            changed_config,
-            tmp_path / "incompatible-cache-run",
-            feature_cache=cache,
-        )
+    changed_identity = {
+        **cache.identity,
+        "preprocessing": {**cache.identity["preprocessing"], "resolution": 256},
+    }
+    with pytest.raises(ValueError, match="incompatible producer identity"):
+        FrozenFeatureCache.open(cache.directory, changed_identity)
 
     manifest = json.loads((cache.directory / "manifest.json").read_text())
     with pytest.raises(ValueError, match="incompatible producer identity"):
@@ -96,7 +91,7 @@ def test_frozen_feature_cache_does_not_change_training_trajectory(tmp_path):
     validation = deterministic_subset(dataset, "validation", size=2, seed=32)
     uncached_config = _fixture_config()
     cached_config = _fixture_config(str(tmp_path / "cache"))
-    visual, _, _ = build_image_modules(dataset, cached_config)
+    visual = build_visual_feature_extractor(cached_config)
     cache = prepare_frozen_feature_cache(tmp_path / "cache", dataset, train, validation, visual, cached_config, device=torch.device("cpu"))
     uncached = train_image_model(dataset, train, validation, uncached_config, tmp_path / "uncached")
     cached = train_image_model(dataset, train, validation, cached_config, tmp_path / "cached", feature_cache=cache)

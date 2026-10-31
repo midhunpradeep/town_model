@@ -12,6 +12,7 @@ import sys
 import traceback
 from typing import Callable, Sequence
 
+from town_model.classifier_backend import ClassifierBackendUnavailableError, raise_classifier_backend_unavailable
 from town_model.cli import main as cli_main
 from town_model.experiments.image_runs import _atomic_json, _process_start_token
 
@@ -31,7 +32,8 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def run_worker(argv: Sequence[str] | None = None, *, command_main: Callable[[Sequence[str]], int] = cli_main) -> int:
-    """Run the same validated CLI command and persist its subprocess outcome."""
+    """Run a historical classifier worker (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("image classifier background worker execution")
     args = _parser().parse_args(argv)
     try:
         current = json.loads(args.status.read_text(encoding="utf-8"))
@@ -81,7 +83,11 @@ def run_worker(argv: Sequence[str] | None = None, *, command_main: Callable[[Seq
 
 
 def main() -> int:
-    return run_worker()
+    try:
+        return run_worker()
+    except ClassifierBackendUnavailableError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
