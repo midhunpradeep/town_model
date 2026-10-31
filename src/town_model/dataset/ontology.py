@@ -34,6 +34,7 @@ from .constants import (
 RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 RDFS = "http://www.w3.org/2000/01/rdf-schema#"
 OWL = "http://www.w3.org/2002/07/owl#"
+XML = "http://www.w3.org/XML/1998/namespace"
 NS = {"rdf": RDF, "rdfs": RDFS, "owl": OWL}
 ASSET_ONTOLOGY_PATH = Path(__file__).with_name("assets") / ONTOLOGY_FILENAME
 
@@ -42,6 +43,28 @@ def _local_name(iri: str | None) -> str | None:
     if not iri:
         return None
     return iri.rsplit("#", 1)[-1].rsplit("/", 1)[-1]
+
+
+def _resolve_iri(base_iri: str, reference: str | None) -> str | None:
+    return urljoin(base_iri, reference) if reference is not None else None
+
+
+def _effective_base_iri(
+    element: ET.Element,
+    parent_by_element: dict[ET.Element, ET.Element],
+    document_iri: str,
+) -> str:
+    lineage: list[ET.Element] = []
+    current: ET.Element | None = element
+    while current is not None:
+        lineage.append(current)
+        current = parent_by_element.get(current)
+    base_iri = document_iri
+    for current in reversed(lineage):
+        xml_base = current.get(f"{{{XML}}}base")
+        if xml_base is not None:
+            base_iri = urljoin(base_iri, xml_base)
+    return base_iri
 
 
 def _hash_file(path: Path) -> str:
@@ -73,7 +96,11 @@ class OntologySnapshot:
             )
         tree = ET.parse(path)
         root = tree.getroot()
-        base_iri = root.get("{http://www.w3.org/XML/1998/namespace}base", "")
+        document_iri = path.as_uri()
+        parent_by_element = {
+            child: parent for parent in root.iter() for child in parent
+        }
+        base_iri = _effective_base_iri(root, parent_by_element, document_iri)
         class_iris: dict[str, str] = {}
         class_elements: dict[str, ET.Element] = {}
         named_individual_types: dict[str, str] = {}
@@ -82,7 +109,11 @@ class OntologySnapshot:
             about = element.get(f"{{{RDF}}}about")
             name = _local_name(about)
             if element.tag == f"{{{OWL}}}Class" and name and about:
-                class_iris[name] = f"{base_iri}{about}" if about.startswith("#") else about
+                class_iri = _resolve_iri(
+                    _effective_base_iri(element, parent_by_element, document_iri), about
+                )
+                assert class_iri is not None
+                class_iris[name] = class_iri
                 class_elements[name] = element
             named_individual = element.find("rdf:type[@rdf:resource='" + OWL + "NamedIndividual']", NS)
             if named_individual is not None and name:
@@ -93,14 +124,21 @@ class OntologySnapshot:
             if type_name in class_iris
         }
 
+        declared_class_names_by_iri = {
+            iri: name for name, iri in class_iris.items()
+        }
         direct_parents: dict[str, frozenset[str]] = {}
         disjoint_pairs: set[tuple[str, str]] = set()
         for name, element in class_elements.items():
-            parents = {
-                parent
-                for child in element.findall("rdfs:subClassOf", NS)
-                if (parent := _local_name(child.get(f"{{{RDF}}}resource"))) in class_iris
-            }
+            parents: set[str] = set()
+            for child in element.findall("rdfs:subClassOf", NS):
+                reference = child.get(f"{{{RDF}}}resource")
+                resolved_iri = _resolve_iri(
+                    _effective_base_iri(child, parent_by_element, document_iri),
+                    reference,
+                )
+                if resolved_iri in declared_class_names_by_iri:
+                    parents.add(declared_class_names_by_iri[resolved_iri])
             direct_parents[name] = frozenset(parents)
             for child in element.findall("owl:disjointWith", NS):
                 other = _local_name(child.get(f"{{{RDF}}}resource"))

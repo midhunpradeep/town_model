@@ -9,7 +9,10 @@ import threading
 import pytest
 
 import town_model.inspection.relation_diagnostics as relation_diagnostics
-from town_model.inspection.relation_diagnostics import save_relation_diagnostic
+from town_model.inspection.relation_diagnostics import (
+    RelationDiagnosticPostPublicationError,
+    save_relation_diagnostic,
+)
 
 
 def _publish_process(result, destination, outcome_queue, barrier=None):
@@ -177,6 +180,24 @@ def test_serialization_failure_removes_temporary_file_and_publishes_nothing(tmp_
     assert _temporary_entries(destination) == []
 
 
+def test_file_fsync_failure_is_prepublication_and_cleans_temporary_file(tmp_path, monkeypatch) -> None:
+    destination = tmp_path / "file-fsync-failure.json"
+    failure = OSError("simulated file fsync failure")
+
+    def fail_fsync(_descriptor):
+        raise failure
+
+    monkeypatch.setattr(relation_diagnostics.os, "fsync", fail_fsync)
+    with pytest.raises(OSError, match="simulated file fsync failure") as error:
+        save_relation_diagnostic(_large_result("not-published"), destination)
+
+    assert error.value is failure
+    assert not isinstance(error.value, RelationDiagnosticPostPublicationError)
+    assert "published" not in str(error.value).lower()
+    assert not destination.exists()
+    assert _temporary_entries(destination) == []
+
+
 def test_failure_before_publication_preserves_destination_and_cleans_temp(tmp_path, monkeypatch) -> None:
     destination = tmp_path / "permission-failure.json"
 
@@ -191,20 +212,56 @@ def test_failure_before_publication_preserves_destination_and_cleans_temp(tmp_pa
     assert _temporary_entries(destination) == []
 
 
-def test_post_publication_cleanup_failure_leaves_safe_hardlink_for_recovery(tmp_path, monkeypatch) -> None:
+def test_first_directory_fsync_failure_reports_visible_published_result(tmp_path, monkeypatch) -> None:
+    destination = tmp_path / "first-directory-fsync-failure.json"
+    result = _large_result("published-before-directory-sync")
+    failure = OSError("simulated first directory fsync failure")
+
+    def fail_directory_fsync(_directory):
+        raise failure
+
+    monkeypatch.setattr(relation_diagnostics, "_fsync_directory", fail_directory_fsync)
+    with pytest.raises(RelationDiagnosticPostPublicationError) as error:
+        save_relation_diagnostic(result, destination)
+
+    assert error.value.destination == destination
+    assert error.value.published is True
+    assert error.value.durability_confirmed is False
+    assert error.value.cleanup_completed is False
+    assert error.value.stage == "initial_directory_sync"
+    assert error.value.__cause__ is failure
+    assert str(destination) in str(error.value)
+    assert "complete JSON result is visible" in str(error.value)
+    assert "durability is not confirmed" in str(error.value)
+    assert json.loads(destination.read_text(encoding="utf-8")) == result
+    leftovers = _temporary_entries(destination)
+    assert len(leftovers) == 1
+    assert os.path.samefile(leftovers[0], destination)
+
+
+def test_post_publication_cleanup_failure_reports_result_and_leaves_recoverable_link(tmp_path, monkeypatch) -> None:
     destination = tmp_path / "cleanup-failure.json"
     real_unlink = os.unlink
 
+    result = _large_result("published-before-cleanup")
+    failure = PermissionError("simulated interruption before temporary unlink")
+
     def fail_temporary_unlink(path, *args, **kwargs):
         if Path(path).name.startswith(f".{destination.name}."):
-            raise PermissionError("simulated interruption before temporary unlink")
+            raise failure
         return real_unlink(path, *args, **kwargs)
 
     monkeypatch.setattr(relation_diagnostics.os, "unlink", fail_temporary_unlink)
-    result = _large_result("published-before-cleanup")
-    with pytest.raises(PermissionError, match="simulated interruption"):
+    with pytest.raises(RelationDiagnosticPostPublicationError) as error:
         save_relation_diagnostic(result, destination)
 
+    assert error.value.destination == destination
+    assert error.value.published is True
+    assert error.value.durability_confirmed is True
+    assert error.value.cleanup_completed is False
+    assert error.value.stage == "temporary_cleanup"
+    assert error.value.__cause__ is failure
+    assert "complete JSON result is visible" in str(error.value)
     leftovers = _temporary_entries(destination)
     assert len(leftovers) == 1
     assert destination.is_file()
@@ -218,3 +275,75 @@ def test_post_publication_cleanup_failure_leaves_safe_hardlink_for_recovery(tmp_
     assert _temporary_entries(destination) == []
     with pytest.raises(FileExistsError):
         save_relation_diagnostic(_large_result("must-not-replace"), destination)
+
+
+def test_final_directory_fsync_failure_reports_completed_cleanup(tmp_path, monkeypatch) -> None:
+    destination = tmp_path / "final-directory-fsync-failure.json"
+    result = _large_result("published-and-cleaned")
+    real_fsync_directory = relation_diagnostics._fsync_directory
+    calls = 0
+    failure = OSError("simulated final directory fsync failure")
+
+    def fail_final_directory_fsync(directory):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise failure
+        return real_fsync_directory(directory)
+
+    monkeypatch.setattr(relation_diagnostics, "_fsync_directory", fail_final_directory_fsync)
+    with pytest.raises(RelationDiagnosticPostPublicationError) as error:
+        save_relation_diagnostic(result, destination)
+
+    assert error.value.destination == destination
+    assert error.value.published is True
+    assert error.value.durability_confirmed is True
+    assert error.value.cleanup_completed is True
+    assert error.value.cleanup_durability_confirmed is False
+    assert error.value.stage == "final_directory_sync"
+    assert error.value.__cause__ is failure
+    assert "complete JSON result is visible" in str(error.value)
+    assert json.loads(destination.read_text(encoding="utf-8")) == result
+    assert _temporary_entries(destination) == []
+
+
+def test_cli_surfaces_actionable_post_publication_failure(tmp_path, monkeypatch, capsys) -> None:
+    from town_model import cli
+    from town_model.dataset.ontology import OntologySnapshot
+    import town_model.inspection.image_snapshots as image_snapshots
+
+    destination = tmp_path / "cli-published-result.json"
+    snapshot = type("Snapshot", (), {"header": {"class_ids": [1, 2]}})()
+    monkeypatch.setattr(image_snapshots, "load_image_snapshot", lambda _path: snapshot)
+    monkeypatch.setattr(
+        OntologySnapshot,
+        "load",
+        classmethod(lambda cls, *args, **kwargs: object()),
+    )
+    monkeypatch.setattr(relation_diagnostics, "region_from_snapshot", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        relation_diagnostics,
+        "diagnose_region_relation",
+        lambda *args, **kwargs: {"outcome": True, "result": "complete"},
+    )
+
+    def fail_directory_fsync(_directory):
+        raise OSError("simulated CLI directory fsync failure")
+
+    monkeypatch.setattr(relation_diagnostics, "_fsync_directory", fail_directory_fsync)
+    with pytest.raises(SystemExit) as exit_error:
+        cli.main([
+            "experiment", "image", "relations", str(tmp_path / "snapshot.npz"),
+            "--source-class-id", "1", "--target-class-id", "2",
+            "--relation", "containment", "--output", str(destination),
+        ])
+
+    assert exit_error.value.code == 2
+    diagnostic = capsys.readouterr().err
+    assert str(destination) in diagnostic
+    assert "complete JSON result is visible" in diagnostic
+    assert "directory-entry durability is not confirmed" in diagnostic
+    assert json.loads(destination.read_text(encoding="utf-8")) == {
+        "outcome": True,
+        "result": "complete",
+    }

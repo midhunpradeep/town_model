@@ -29,6 +29,41 @@ RELATION_SCHEMA = "ontology-region-relation-diagnostic-v1"
 _MAX_REPORTED_POINTS = 8
 
 
+class RelationDiagnosticPostPublicationError(RuntimeError):
+    """A result is visible, but a later durability or cleanup operation failed."""
+
+    def __init__(
+        self,
+        destination: Path,
+        *,
+        published: bool,
+        stage: str,
+        durability_confirmed: bool,
+        cleanup_completed: bool,
+        cleanup_durability_confirmed: bool,
+        cause: Exception,
+    ) -> None:
+        self.destination = destination
+        self.published = published
+        self.stage = stage
+        self.durability_confirmed = durability_confirmed
+        self.cleanup_completed = cleanup_completed
+        self.cleanup_durability_confirmed = cleanup_durability_confirmed
+        self.cause = cause
+        message = (
+            f"relation diagnostic was published at {destination}; complete JSON result is visible. "
+            f"Post-publication {stage.replace('_', ' ')} failed: {cause}. "
+            "Do not retry as if no result were published."
+        )
+        if not durability_confirmed:
+            message += " Destination directory-entry durability is not confirmed."
+        if not cleanup_completed:
+            message += " The temporary hard link may remain."
+        elif stage == "final_directory_sync":
+            message += " Temporary cleanup completed, but its directory durability is not confirmed."
+        super().__init__(message)
+
+
 @dataclass(frozen=True, slots=True)
 class GeometryRegion:
     class_id: int
@@ -398,11 +433,11 @@ def diagnose_region_relation(
     }
 
 
-def _fsync_directory(directory: Path) -> None:
-    """Persist directory-entry changes where directory fsync is supported."""
+def _fsync_directory(directory: Path) -> bool:
+    """Persist directory-entry changes and report whether fsync was available."""
     if os.name == "nt":
         # Python does not expose a portable directory-handle fsync on Windows.
-        return
+        return False
     unsupported = {
         errno.EINVAL,
         errno.ENOSYS,
@@ -413,7 +448,7 @@ def _fsync_directory(directory: Path) -> None:
         descriptor = os.open(directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     except OSError as error:
         if error.errno in unsupported:
-            return
+            return False
         raise
     try:
         try:
@@ -421,8 +456,10 @@ def _fsync_directory(directory: Path) -> None:
         except OSError as error:
             if error.errno not in unsupported:
                 raise
+            return False
     finally:
         os.close(descriptor)
+    return True
 
 
 def save_relation_diagnostic(result: dict[str, Any], destination: Path | str) -> Path:
@@ -431,9 +468,11 @@ def save_relation_diagnostic(result: dict[str, Any], destination: Path | str) ->
     The temporary file and destination share a directory, so ``os.link`` is a
     same-filesystem atomic create-if-absent operation on supported local
     filesystems. There is deliberately no replacement fallback. Hard-link or
-    filesystem errors fail closed. A post-publication cleanup error can leave a
-    hidden temporary hard link; it is harmless and recoverable by removing it
-    only after confirming it is the same inode as the published destination.
+    filesystem errors fail closed. A failure after linking raises
+    ``RelationDiagnosticPostPublicationError``: the complete destination is
+    visible, but directory durability or temporary cleanup may be incomplete.
+    A hidden temporary hard link is harmless and recoverable only after
+    confirming it is the same inode as the published destination.
     """
     # Normalize to an absolute lexical path without resolving the final entry:
     # an existing (including dangling) symlink is itself an occupied name.
@@ -444,6 +483,19 @@ def save_relation_diagnostic(result: dict[str, Any], destination: Path | str) ->
     )
     temporary = Path(temporary_name)
     descriptor_open = True
+    published = False
+
+    def clean_up_before_publication() -> None:
+        if descriptor_open:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+
     try:
         stream = os.fdopen(descriptor, "w", encoding="utf-8")
         descriptor_open = False
@@ -452,26 +504,63 @@ def save_relation_diagnostic(result: dict[str, Any], destination: Path | str) ->
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-
-        try:
-            os.link(temporary, path)
-        except FileExistsError as error:
-            raise FileExistsError(
-                f"relation diagnostic is immutable and already exists: {path}"
-            ) from error
-        except OSError as error:
-            raise type(error)(
-                f"atomic no-clobber hard-link publication failed for {path}: {error}"
-            ) from error
-        _fsync_directory(path.parent)
-        os.unlink(temporary)
-        _fsync_directory(path.parent)
     except BaseException:
-        if descriptor_open:
-            os.close(descriptor)
-        try:
-            os.unlink(temporary)
-        except OSError:
-            pass
+        clean_up_before_publication()
         raise
+
+    try:
+        os.link(temporary, path)
+        published = True
+    except FileExistsError as error:
+        clean_up_before_publication()
+        raise FileExistsError(
+            f"relation diagnostic is immutable and already exists: {path}"
+        ) from error
+    except OSError as error:
+        clean_up_before_publication()
+        raise type(error)(
+            f"atomic no-clobber hard-link publication failed for {path}: {error}"
+        ) from error
+    except BaseException:
+        clean_up_before_publication()
+        raise
+
+    try:
+        durability_confirmed = _fsync_directory(path.parent)
+    except Exception as error:
+        raise RelationDiagnosticPostPublicationError(
+            path,
+            published=published,
+            stage="initial_directory_sync",
+            durability_confirmed=False,
+            cleanup_completed=False,
+            cleanup_durability_confirmed=False,
+            cause=error,
+        ) from error
+
+    try:
+        os.unlink(temporary)
+    except Exception as error:
+        raise RelationDiagnosticPostPublicationError(
+            path,
+            published=published,
+            stage="temporary_cleanup",
+            durability_confirmed=durability_confirmed,
+            cleanup_completed=False,
+            cleanup_durability_confirmed=False,
+            cause=error,
+        ) from error
+
+    try:
+        _fsync_directory(path.parent)
+    except Exception as error:
+        raise RelationDiagnosticPostPublicationError(
+            path,
+            published=published,
+            stage="final_directory_sync",
+            durability_confirmed=durability_confirmed,
+            cleanup_completed=True,
+            cleanup_durability_confirmed=False,
+            cause=error,
+        ) from error
     return path
