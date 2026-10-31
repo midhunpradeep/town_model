@@ -15,14 +15,15 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import torch
 
 from town_model.dataset.ontology import OntologySnapshot, build_class_vocabulary
-from town_model.models.classifiers import BoxClassifier, PointClassifier, TownClassifier
-from town_model.models.geometry import evaluate_town_corners
+
+if TYPE_CHECKING:
+    from town_model.models.classifiers import PointClassifier
 
 Relation = Literal["containment", "intersection", "disjointness"]
 RELATION_SCHEMA = "ontology-region-relation-diagnostic-v1"
@@ -164,6 +165,8 @@ def region_from_classifier(
     geometry_reference: dict[str, Any] | None = None,
 ) -> GeometryRegion:
     """Adapt existing classifier geometry; baseline hyperplanes are not regions here."""
+    from town_model.models.classifiers import BoxClassifier, TownClassifier
+
     if not 0 <= class_index < len(classifier.class_names):
         raise IndexError("class index is outside the classifier vocabulary")
     name = classifier.class_names[class_index]
@@ -231,6 +234,8 @@ def _box_contains(region: GeometryRegion, points: np.ndarray) -> np.ndarray:
 def _town_contains(region: GeometryRegion, points: np.ndarray) -> np.ndarray:
     assert region.frame_low is not None and region.frame_high is not None
     assert region.window_low is not None and region.window_high is not None
+    from town_model.models.geometry import evaluate_town_corners
+
     values = evaluate_town_corners(
         torch.as_tensor(points, dtype=torch.float32),
         torch.as_tensor(region.frame_low[None, ...], dtype=torch.float32),

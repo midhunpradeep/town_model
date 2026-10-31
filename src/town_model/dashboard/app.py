@@ -26,16 +26,6 @@ from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
 from town_model.dashboard.runtime import submit_generation
-from town_model.dashboard.image_embeddings import render_image_embeddings
-from town_model.dashboard.geometry import (
-    build_comparison_figure,
-    build_history_figure,
-    build_motion_figure,
-    build_region_figure,
-    comparison_rows,
-    discover_run_groups,
-    load_geometry_view,
-)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_CONFIG = REPOSITORY_ROOT / "dataset.toml"
@@ -382,6 +372,16 @@ def _render_generation_monitor(st) -> None:
 
 
 def _render_geometry_laboratory(st, runs_root: Path) -> None:
+    from town_model.dashboard.geometry import (
+        build_comparison_figure,
+        build_history_figure,
+        build_motion_figure,
+        build_region_figure,
+        comparison_rows,
+        discover_run_groups,
+        load_geometry_view,
+    )
+
     st.subheader("Geometry Laboratory")
     st.caption("Saved CPU synthetic runs only. Widget changes load persisted checkpoints/snapshots; they never retrain a model. Region plots evaluate the actual classifier state.")
     groups = discover_run_groups(runs_root)
@@ -565,6 +565,8 @@ def main() -> None:
     elif page == "Geometry Laboratory":
         _render_geometry_laboratory(st, runs_root)
     else:
+        from town_model.dashboard.image_embeddings import render_image_embeddings
+
         render_image_embeddings(st, image_runs_root, dataset_path)
 
 

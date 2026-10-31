@@ -16,25 +16,12 @@ from typing import Iterable
 import torch
 from torch import Tensor, nn
 
+# Re-exported for callers using the historical geometry module path.
+from .geometry_diagnostics import GEOMETRY_DIAGNOSTIC_AXES
+
 _RAW_LIMIT = 12.0
 _FLOAT32_RESERVE = 16.0 * torch.finfo(torch.float32).eps
 
-# Semantic axes are part of the diagnostic API; they are never inferred from
-# tensor extents because batch and class counts may coincide.
-GEOMETRY_DIAGNOSTIC_AXES: dict[str, tuple[str, ...]] = {
-    "box_low": ("class", "coordinate"),
-    "box_high": ("class", "coordinate"),
-    "frame_low": ("class", "house", "coordinate"),
-    "frame_high": ("class", "house", "coordinate"),
-    "window_low": ("class", "house", "window", "coordinate"),
-    "window_high": ("class", "house", "window", "coordinate"),
-    "frame_margin": ("point", "class", "house"),
-    "frame_contains": ("point", "class", "house"),
-    "window_margin": ("point", "class", "house", "window"),
-    "window_contains": ("point", "class", "house", "window"),
-    "house_margin": ("point", "class", "house"),
-    "house_contains": ("point", "class", "house"),
-}
 
 
 @dataclass(frozen=True, slots=True)

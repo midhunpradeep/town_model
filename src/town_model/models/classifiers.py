@@ -2,26 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Literal
 
 import torch
 from torch import Tensor, nn
 import torch.nn.functional as F
 
+from .classifier_transport import ClassifierOutput
 from .geometry import BoxGeometry, TownGeometry
 from .losses import validate_signed_distance_margin
-
-
-@dataclass(frozen=True, slots=True)
-class ClassifierOutput:
-    """Typed predictions for trainable and fixed-positive concepts."""
-
-    contains: Tensor
-    logits: Tensor | None = None
-    signed_margin: Tensor | None = None
-    diagnostics: dict[str, Tensor] | None = None
-    fixed_positive: dict[str, Tensor] | None = None
 
 
 class PointClassifier(nn.Module):

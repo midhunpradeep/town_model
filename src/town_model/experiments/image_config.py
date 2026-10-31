@@ -10,7 +10,7 @@ from numbers import Real
 from pathlib import Path
 from typing import Literal
 
-from town_model.models.image_embeddings import validate_image_model_parameters
+from town_model.models.image_model_validation import validate_image_model_parameters
 from town_model.vision_validation import validate_mobilenet_block_indices, validate_mobilenet_runtime
 
 

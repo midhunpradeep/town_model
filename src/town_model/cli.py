@@ -12,19 +12,6 @@ from typing import Sequence
 
 from .application import generate_dataset, inspect_dataset, validate_dataset_operation
 from .config import DEFAULT_CONFIG_PATH, DEFAULT_PIZZA_TYPES, load_config
-from .dataset.image_data import deterministic_subset
-from .experiments.image_config import image_config_from_mapping
-from .experiments.image_runs import inspect_run as inspect_image_run, request_stop as request_image_stop, resolve_image_experiment, run_image_experiment, run_image_matrix
-from .training.image_trainer import evaluate_image_checkpoint
-from .experiments.synthetic import (
-    SyntheticConfig,
-    evaluate_saved_run,
-    inspect_saved_run,
-    run_experiment,
-    run_fixed_experiments,
-    resume_saved_run,
-    saved_geometry,
-)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -134,6 +121,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _load_image_config(path: Path):
+    from .experiments.image_config import image_config_from_mapping
+
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("image experiment config must be a JSON object")
@@ -206,6 +195,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "experiment":
             repository_root = Path(__file__).resolve().parents[2]
             if args.experiment_kind == "image":
+                from .dataset.image_data import deterministic_subset
+                from .experiments.image_runs import (
+                    inspect_run as inspect_image_run,
+                    request_stop as request_image_stop,
+                    resolve_image_experiment,
+                    run_image_experiment,
+                    run_image_matrix,
+                )
+                from .training.image_trainer import evaluate_image_checkpoint
+
                 if args.image_command == "preflight":
                     image_config = _load_image_config(args.config)
                     resolved = resolve_image_experiment(image_config, repository_root=repository_root)
@@ -321,6 +320,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.is_file() else None
                     print(json.dumps({"manifest": manifest, "metrics": metrics}, indent=2, sort_keys=True))
                     return 0
+            from .experiments.synthetic import SyntheticConfig, run_experiment, run_fixed_experiments
+
             config = SyntheticConfig(
                 seed=args.seed,
                 points=args.points,
@@ -339,17 +340,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps({"status": "completed", "run_groups": [str(path) for path in groups]}, indent=2))
             return 0
         if args.command == "evaluate":
+            from .experiments.synthetic import evaluate_saved_run
+
             result = evaluate_saved_run(args.run, args.split, checkpoint=args.checkpoint)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command == "resume":
+            from .experiments.synthetic import resume_saved_run
+
             metrics = resume_saved_run(args.run, args.additional_steps)
             print(json.dumps({"run": str(args.run.resolve()), "step": metrics["history"][-1]["step"], "resume_segments": metrics.get("resume_segments", [])}, indent=2))
             return 0
         if args.command == "inspect-run":
+            from .experiments.synthetic import inspect_saved_run
+
             print(json.dumps(inspect_saved_run(args.run), indent=2, sort_keys=True))
             return 0
         if args.command == "export-geometry":
+            from .experiments.synthetic import saved_geometry
+
             snapshot = saved_geometry(args.run, args.snapshot)
             model = snapshot["model"]
             output = snapshot["output"]

@@ -9,20 +9,18 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
 
-from town_model.dataset.image_data import DatasetSubset, PreparedDataset
-from town_model.experiments.image_config import ImageExperimentConfig
-from town_model.models.classifiers import BoxClassifier, NeuralBaseline, TownClassifier
-from town_model.models.geometry import GEOMETRY_DIAGNOSTIC_AXES
-from town_model.models.image_embeddings import ImageOntologyModel
-from town_model.vision.batching import collate_image_records
-from town_model.vision.features import SharedVisualFeatureExtractor
-from town_model.vision.preprocessing import ImageNetLetterbox
-from town_model.vision.roi import GroundTruthROIProvider
+from town_model.models.geometry_diagnostics import GEOMETRY_DIAGNOSTIC_AXES
+
+if TYPE_CHECKING:
+    from town_model.dataset.image_data import DatasetSubset, PreparedDataset
+    from town_model.experiments.image_config import ImageExperimentConfig
+    from town_model.models.image_embeddings import ImageOntologyModel
+    from town_model.vision.features import SharedVisualFeatureExtractor
 
 SNAPSHOT_SCHEMA = "image-research-snapshot-v2"
 
@@ -59,6 +57,8 @@ def _numpy(value: torch.Tensor | None, *, dtype=None) -> np.ndarray | None:
 
 
 def _classifier_geometry(model: ImageOntologyModel) -> dict[str, Any]:
+    from town_model.models.classifiers import BoxClassifier, NeuralBaseline, TownClassifier
+
     classifier = model.classifier
     if isinstance(classifier, NeuralBaseline):
         return {
@@ -115,6 +115,10 @@ def save_image_snapshot(
     feature_cache=None,
 ) -> ImageResearchSnapshot:
     """Persist a bounded deterministic inference trace without optimizer state."""
+    from town_model.vision.batching import collate_image_records
+    from town_model.vision.preprocessing import ImageNetLetterbox
+    from town_model.vision.roi import GroundTruthROIProvider
+
     root = Path(destination).expanduser().resolve()
     if root.exists():
         existing = load_image_snapshot(root)
