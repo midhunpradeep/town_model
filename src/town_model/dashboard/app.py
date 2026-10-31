@@ -16,6 +16,7 @@ import pandas as pd
 from PIL import Image, ImageDraw
 import torch
 
+from town_model.classifier_backend import ClassifierBackendUnavailableError
 from town_model.application import (
     DatasetSnapshotChangedError,
     load_verified_sample_image,
@@ -372,6 +373,10 @@ def _render_generation_monitor(st) -> None:
 
 
 def _render_geometry_laboratory(st, runs_root: Path) -> None:
+    st.subheader("Geometry Laboratory")
+    st.info(str(ClassifierBackendUnavailableError("historical synthetic geometry visualization")))
+    return
+
     from town_model.dashboard.geometry import (
         build_comparison_figure,
         build_history_figure,
@@ -548,7 +553,7 @@ def main() -> None:
 
     st.set_page_config(page_title="Town Embeddings Research", layout="wide")
     st.title("Representing Ontologies Using Town Embeddings")
-    st.caption(f"Phase 1 dataset explorer + Phase 2 Geometry Laboratory + Phase 3 image embeddings · dataset wire schema {SCHEMA_VERSION}")
+    st.caption(f"Dataset explorer remains available. Historical classifier execution, geometry interpretation, and image embedding operations are disconnected during classifier reconstruction · dataset wire schema {SCHEMA_VERSION}")
     page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset", "Geometry Laboratory", "Image Embeddings"))
     default_path = DEFAULT_EXAMPLE_DATASET if DEFAULT_EXAMPLE_DATASET.is_dir() else REPOSITORY_ROOT / "artifacts" / "datasets" / "pizza-48"
     dataset_path = Path(st.sidebar.text_input("Prepared dataset path", value=str(default_path))).expanduser()

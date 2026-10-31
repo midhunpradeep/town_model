@@ -15,6 +15,7 @@ from matplotlib.patches import Patch, Rectangle
 import numpy as np
 import torch
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.experiments.synthetic import MODEL_FAMILIES, saved_geometry
 
 
@@ -49,7 +50,8 @@ def load_geometry_view(
     sample_position: int = 0,
     snapshot: str = "final",
 ) -> GeometryViewResult:
-    """Load a saved run/snapshot and its actual model-state predictions."""
+    """Load historical model state/predictions (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical synthetic classifier geometry inspection")
     if split not in {"train", "validation"}:
         return GeometryViewResult(None, "Geometry Laboratory exposes train and validation splits only.")
     run = Path(run_path).expanduser().resolve()
@@ -164,12 +166,13 @@ def build_region_figure(
     axes: tuple[int, int] = (0, 1),
     grid_size: int = 90,
 ):
-    """Return a plot and selected-point facts; the region is an exact 2D slice.
+    """Return historical classifier region facts (unavailable during reconstruction).
 
     For d>2, region values are evaluated on full-dimensional points with the
     remaining coordinates fixed to zero or the selected sample. Point markers
     are projections onto the displayed coordinates and are labeled as such.
     """
+    raise_classifier_backend_unavailable("historical synthetic classifier region visualization")
     model = view["model"]
     class_index = view["class_names"].index(class_name)
     dims = model.dimensions
@@ -271,7 +274,8 @@ def build_history_figure(group_path: Path | str):
 
 
 def build_motion_figure(view: dict[str, Any], *, class_name: str):
-    """Plot persisted point trajectory and actual classifier/region parameter motion."""
+    """Plot historical classifier parameter motion (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical synthetic classifier geometry motion visualization")
     run = view["run_dir"]
     run_meta = view["metrics"]
     names = ["initial", *[name for name in run_meta.get("snapshot_names", []) if name.startswith("step_")], "final"]
@@ -326,6 +330,7 @@ def build_comparison_figure(
     snapshot: str = "final",
     anchor_mode: str = "zero",
 ):
+    raise_classifier_backend_unavailable("historical synthetic classifier geometry comparison")
     group = Path(group_path)
     fig, axes = plt.subplots(1, 3, figsize=(18, 5.5), constrained_layout=True)
     facts = {}

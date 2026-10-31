@@ -11,13 +11,14 @@ from pathlib import Path
 from typing import Sequence
 
 from .application import generate_dataset, inspect_dataset, validate_dataset_operation
+from .classifier_backend import raise_classifier_backend_unavailable
 from .config import DEFAULT_CONFIG_PATH, DEFAULT_PIZZA_TYPES, load_config
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="town",
-        description="Prepare Pizzaïolo datasets and run controlled synthetic town-embedding experiments.",
+        description="Prepare Pizzaïolo datasets; historical classifier execution is unavailable during classifier reconstruction.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -43,10 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("dataset", type=Path)
     inspect.add_argument("--json", action="store_true", help="Print machine-readable summary JSON")
 
-    experiment = commands.add_parser("experiment", help="Run paired synthetic Phase 2 experiments (all three classifiers)")
+    experiment = commands.add_parser("experiment", help="Historical classifier experiments (execution unavailable during classifier reconstruction)")
     experiment_commands = experiment.add_subparsers(dest="experiment_kind", required=True)
-    fixed = experiment_commands.add_parser("fixed", help="Fixed-point classifier-only experiment; runs simple and nonconvex fixtures")
-    mapping = experiment_commands.add_parser("mapping", help="Jointly train matched synthetic point encoders and classifiers")
+    fixed = experiment_commands.add_parser("fixed", help="Historical fixed-point classifier experiment (currently unavailable)")
+    mapping = experiment_commands.add_parser("mapping", help="Historical synthetic point-mapping experiment (currently unavailable)")
     for command in (fixed, mapping):
         command.add_argument("--output", type=Path, required=True, help="Parent directory for immutable synthetic run groups")
         command.add_argument("--seed", type=int, default=42)
@@ -60,34 +61,34 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--snapshot-interval", type=int, default=10)
     mapping.add_argument("--scenario", choices=("simple", "window"), default="window")
 
-    image = experiment_commands.add_parser("image", help="Run/resume/inspect real-image Phase 3 embeddings; all runs are pre-detector GT-ROI exploratory work")
+    image = experiment_commands.add_parser("image", help="Historical image classifier operations; only persisted run inspection remains available")
     image_commands = image.add_subparsers(dest="image_command", required=True)
-    image_preflight = image_commands.add_parser("preflight", help="Validate config, dataset, model, support, and resolved weights without creating a run")
+    image_preflight = image_commands.add_parser("preflight", help="Validate an image classifier execution request (currently unavailable)")
     image_preflight.add_argument("--config", type=Path, required=True, help="JSON image experiment configuration")
 
-    image_run = image_commands.add_parser("run", help="Run one validated image experiment configuration")
+    image_run = image_commands.add_parser("run", help="Train an image classifier (currently unavailable)")
     image_run.add_argument("--config", type=Path, required=True, help="JSON image experiment configuration")
     image_run.add_argument("--output", type=Path, required=True, help="Parent directory for immutable image runs")
     image_run.add_argument("--resume", action="store_true", help="Resume a stopped/interrupted/failed run with its exact config")
 
-    image_matrix = image_commands.add_parser("matrix", help="Run a paired family × pizza-composition image experiment matrix")
+    image_matrix = image_commands.add_parser("matrix", help="Run an image classifier matrix (currently unavailable)")
     image_matrix.add_argument("--config", type=Path, required=True, help="JSON base configuration shared across all matrix cells")
     image_matrix.add_argument("--output", type=Path, required=True, help="Parent directory for immutable image runs and matrix manifest")
     image_matrix.add_argument("--families", nargs="+", choices=("baseline", "box", "town"), default=("baseline", "box", "town"))
     image_matrix.add_argument("--pizza-modes", nargs="+", choices=("global", "compositional", "hybrid"), default=("global", "compositional", "hybrid"))
 
-    image_resume = image_commands.add_parser("resume", help="Resume from the run's persisted resolved configuration")
+    image_resume = image_commands.add_parser("resume", help="Resume historical image classifier training (currently unavailable)")
     image_resume.add_argument("run", type=Path)
     image_resume.add_argument("--config", type=Path, help="Optional JSON config override; identity must still match")
-    image_evaluate = image_commands.add_parser("evaluate", help="Evaluate a saved image checkpoint without training or optimizer updates")
+    image_evaluate = image_commands.add_parser("evaluate", help="Evaluate a historical image classifier checkpoint (currently unavailable)")
     image_evaluate.add_argument("run", type=Path)
     image_evaluate.add_argument("--split", choices=("train", "validation", "test"), default="validation")
     image_evaluate.add_argument("--checkpoint", default="best", help="best, latest, or an explicit trusted checkpoint path")
-    image_stop = image_commands.add_parser("stop", help="Request a graceful stop at the next optimizer boundary")
+    image_stop = image_commands.add_parser("stop", help="Control a historical image classifier worker (currently unavailable)")
     image_stop.add_argument("run", type=Path)
     image_inspect = image_commands.add_parser("inspect", help="Read JSON run lifecycle and metrics without loading checkpoint optimizer state")
     image_inspect.add_argument("run", type=Path)
-    image_relations = image_commands.add_parser("relations", help="Run reproducible exact-box or sampled-town relation diagnostics from a saved snapshot")
+    image_relations = image_commands.add_parser("relations", help="Interpret historical classifier geometry (currently unavailable)")
     image_relations.add_argument("snapshot", type=Path)
     image_relations.add_argument("--source-class-id", type=int, required=True)
     image_relations.add_argument("--target-class-id", type=int, required=True)
@@ -96,19 +97,19 @@ def build_parser() -> argparse.ArgumentParser:
     image_relations.add_argument("--seed", type=int, default=0)
     image_relations.add_argument("--output", type=Path, help="Optional immutable JSON result path")
 
-    evaluate = commands.add_parser("evaluate", help="Evaluate a saved Phase 2 checkpoint without training")
+    evaluate = commands.add_parser("evaluate", help="Evaluate a historical synthetic classifier checkpoint (currently unavailable)")
     evaluate.add_argument("run", type=Path)
     evaluate.add_argument("--split", choices=("train", "validation"), default="validation")
     evaluate.add_argument("--checkpoint", type=Path)
 
-    resume = commands.add_parser("resume", help="Resume a saved Adam checkpoint with its immutable resolved configuration")
+    resume = commands.add_parser("resume", help="Resume historical synthetic classifier training (currently unavailable)")
     resume.add_argument("run", type=Path)
     resume.add_argument("--additional-steps", type=int, required=True)
 
     inspect_run = commands.add_parser("inspect-run", help="Print resolved settings, metrics and environment for one saved model run")
     inspect_run.add_argument("run", type=Path)
 
-    export = commands.add_parser("export-geometry", help="Export actual saved class geometry and predictions as JSON")
+    export = commands.add_parser("export-geometry", help="Export historical classifier geometry (currently unavailable)")
     export.add_argument("run", type=Path)
     export.add_argument("--snapshot", default="final", help="final, initial, or a saved step name such as step_00010")
     export.add_argument("--output", type=Path, help="Optional JSON output file (defaults to stdout)")
@@ -194,7 +195,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0 if summary.integrity_status == "current_pass" else 1
         if args.command == "experiment":
             repository_root = Path(__file__).resolve().parents[2]
+            if args.experiment_kind in ("fixed", "mapping"):
+                raise_classifier_backend_unavailable("synthetic classifier training")
             if args.experiment_kind == "image":
+                unavailable_image_operations = {
+                    "preflight": "image classifier experiment preflight",
+                    "run": "image-to-ontology classifier training",
+                    "matrix": "automatic image classifier matrix execution",
+                    "resume": "image-to-ontology classifier training resume",
+                    "evaluate": "historical image classifier checkpoint evaluation",
+                    "relations": "historical ontology-region relation diagnosis",
+                    "stop": "control a historical image classifier worker",
+                }
+                operation = unavailable_image_operations.get(args.image_command)
+                if operation is not None:
+                    raise_classifier_backend_unavailable(operation)
                 from .dataset.image_data import deterministic_subset
                 from .experiments.image_runs import (
                     inspect_run as inspect_image_run,
@@ -340,12 +355,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps({"status": "completed", "run_groups": [str(path) for path in groups]}, indent=2))
             return 0
         if args.command == "evaluate":
+            raise_classifier_backend_unavailable("synthetic classifier evaluation")
             from .experiments.synthetic import evaluate_saved_run
 
             result = evaluate_saved_run(args.run, args.split, checkpoint=args.checkpoint)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.command == "resume":
+            raise_classifier_backend_unavailable("synthetic classifier training resume")
             from .experiments.synthetic import resume_saved_run
 
             metrics = resume_saved_run(args.run, args.additional_steps)
@@ -357,6 +374,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(inspect_saved_run(args.run), indent=2, sort_keys=True))
             return 0
         if args.command == "export-geometry":
+            raise_classifier_backend_unavailable("synthetic classifier geometry export")
             from .experiments.synthetic import saved_geometry
 
             snapshot = saved_geometry(args.run, args.snapshot)

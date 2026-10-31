@@ -16,6 +16,7 @@ from matplotlib.patches import Rectangle
 from PIL import Image, ImageDraw
 import torch
 
+from town_model.classifier_backend import ClassifierBackendUnavailableError, raise_classifier_backend_unavailable
 from town_model.dashboard.data import find_sample, load_dashboard_data
 from town_model.experiments.image_config import IMAGE_OBJECTIVE_REDUCTION, image_config_from_mapping
 from town_model.experiments.image_runs import (
@@ -29,7 +30,6 @@ from town_model.experiments.image_runs import (
 from town_model.dataset.ontology import OntologySnapshot
 from town_model.inspection.image_snapshots import ImageResearchSnapshot, load_image_snapshot
 from town_model.inspection.relation_diagnostics import diagnose_region_relation, region_from_snapshot
-from town_model.models.geometry import BoxGeometry, evaluate_town_corners
 
 
 def discover_image_runs(root: Path | str) -> list[Path]:
@@ -111,6 +111,7 @@ def point_rows(snapshot: ImageResearchSnapshot, sample_index: int, *, level: Lit
 
 
 def _exact_region(snapshot: ImageResearchSnapshot, class_index: int, points: np.ndarray, *, axes: tuple[int, int], anchor: np.ndarray):
+    raise_classifier_backend_unavailable("historical image classifier geometry interpretation")
     geometry = snapshot.header["geometry"]
     family = geometry["family"]
     dimensions = int(snapshot.header["latent_dimensions"])
@@ -199,7 +200,8 @@ def build_image_geometry_figure(
     axes: tuple[int, int] = (0, 1),
     anchor_mode: Literal["zero", "sample"] = "sample",
 ):
-    """Plot an exact raw-coordinate slice, retaining model coordinates and masks."""
+    """Plot historical classifier geometry (unavailable during reconstruction)."""
+    raise_classifier_backend_unavailable("historical image classifier geometry visualization")
     arrays = snapshot.arrays
     dimensions = int(snapshot.header["latent_dimensions"])
     if dimensions < 2 or len(set(axes)) != 2 or min(axes) < 0 or max(axes) >= dimensions:
@@ -383,6 +385,43 @@ def _render_image_run_controls(st, runs_root: Path) -> None:
 
 
 def render_image_embeddings(st, runs_root: Path, dataset_path: Path) -> None:
+    st.subheader("Image Embeddings")
+    st.info(str(ClassifierBackendUnavailableError("image classifier training, evaluation, resume, and geometry dashboard actions")))
+    runs = discover_image_runs(runs_root)
+    if not runs:
+        st.info(f"No persisted image-run metadata was found under `{runs_root}`.")
+        return
+    selected_run = st.selectbox("Historical image run metadata", runs, format_func=lambda path: path.name)
+    try:
+        manifest = inspect_run(selected_run, refresh_interrupted=False)
+        resolved_config = json.loads((selected_run / "resolved-config.json").read_text(encoding="utf-8"))
+        metrics_path = selected_run / "metrics.json"
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.is_file() else None
+    except (OSError, ValueError, RunLifecycleError, json.JSONDecodeError) as error:
+        st.error(f"Could not read persisted historical run metadata: {error}")
+        return
+    st.caption("Persisted values only: no classifier, checkpoint, optimizer, prediction, score, or geometry interpretation is recomputed. Lifecycle state is not reconciled or modified.")
+    st.json({"run_manifest": manifest, "resolved_configuration": resolved_config, "stored_metrics": metrics})
+
+    snapshots = discover_snapshots(selected_run)
+    if not snapshots:
+        st.info("No persisted image snapshots are available for checksum-validated metadata inspection.")
+        return
+    selected_snapshot = st.selectbox("Checksummed historical snapshot metadata", snapshots, format_func=lambda path: path.name)
+    try:
+        snapshot = load_image_snapshot(selected_snapshot)
+    except (OSError, ValueError) as error:
+        st.error(f"Snapshot failed its read-only integrity checks: {error}")
+        return
+    header = snapshot.header
+    st.json({key: header.get(key) for key in (
+        "schema_version", "epoch", "optimizer_step", "identity_hash", "dataset_id",
+        "manifest_id", "source_checkpoint_sha256", "arrays_sha256", "sample_ids",
+        "source_splits", "class_ids", "class_names", "component_count_original",
+        "component_count_traced",
+    )})
+    return
+
     st.subheader("Image Embeddings · pre-detector GT-ROI exploratory work")
     st.warning("Every run on this page uses ground-truth component ROIs. These are pre-detector exploratory embeddings, not detector-pretrained Phase 3 acceptance evidence and not Phase 4.")
     _render_image_run_controls(st, runs_root)
