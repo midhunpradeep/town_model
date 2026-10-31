@@ -1,6 +1,8 @@
 # Representing Ontologies Using Town Embeddings
 
-The repository contains the accepted Phase 1 Pizzaïolo dataset-preparation package, the independently accepted Phase 2 synthetic geometry/classification subsystem, and an **incomplete, unaccepted Phase 3 implementation branch** for real-image ontology embeddings. Phase 3 currently uses pre-detector ground-truth ROIs and is exploratory only; it is not the specification's detector-pretrained embedding stage and does not implement an image detector.
+The repository contains independently accepted Phase 1 (Pizzaïolo dataset preparation), Phase 2 (synthetic geometry/classification), and Phase 3 (**pre-detector, GT-ROI image-to-ontology**) implementation milestones. Phase 3 acceptance is not evidence for scientific superiority or final RQ1/RQ2 conclusions: detector pretraining, predicted-ROI learning, joint training, and final scientific comparisons remain outstanding. **No image detector has been implemented or trained in the accepted Phase 3 system.** Phase 4 is authorized but intentionally on hold pending the author's model-consolidation work.
+
+**Authoritative acceptance:** [Definitive Phase 3 acceptance review](reviews/phase_03_definitive_acceptance_review.md) reviews implementation `a098a0a3c66a30200bd85906212cb07ef8bd19eb` and records **292 passed, 0 failed, 0 skipped** in its environment. The acceptance record is commit `2de9c5f29b436f727720e87132d0b4be25a40768`; the accepted implementation SHA remains distinct from this report-only review commit. See the [acceptance index](docs/ACCEPTANCE_INDEX.md) and [current project status](docs/CURRENT_PROJECT_STATUS.md).
 
 ## Install and run
 
@@ -52,7 +54,7 @@ Launch the existing dashboard with `town dashboard`. The **Geometry Laboratory**
 
 Read [Phase 2 scope](docs/PHASE_2_SCOPE.md) for the sequencing amendment and explicit deferrals, and [Phase 2 implementation report](docs/PHASE_2_IMPLEMENTATION_REPORT.md) for formulas, test results, sample outcomes, and limitations.
 
-## Phase 3 image-to-ontology embeddings (incomplete; pre-detector only)
+## Phase 3 image-to-ontology embeddings (independently accepted; pre-detector GT-ROI only)
 
 Create the canonical dataset explicitly, then run a real-image exploratory config:
 
@@ -64,7 +66,7 @@ town validate artifacts/datasets/pizza-4800-phase3
 town experiment image run --config configs/phase3_image_exploratory.json --output artifacts/phase3/runs
 ```
 
-The prepared dataset and run/checkpoint/cache artifacts are local, ignored data. Small smoke and controlled-overfit examples are in `configs/phase3_image_smoke.json` and `configs/phase3_image_overfit.json`. Run `town experiment image matrix --config <comparison-config.json> --output artifacts/phase3/runs` for a paired family × composition matrix; the config must set `purpose` to `comparison`, retain best-validation checkpoints, and have known-positive train support for each selected in-scope class. Use `town experiment image stop|resume|inspect <run>` for local run lifecycle operations. All of these image runs are explicitly labelled **pre-detector exploratory GT-ROI work**.
+The prepared dataset and run/checkpoint/cache artifacts are local, ignored data. Small smoke and controlled-overfit examples are in `configs/phase3_image_smoke.json` and `configs/phase3_image_overfit.json`. Run `town experiment image matrix --config <comparison-config.json> --output artifacts/phase3/runs` for a paired family × composition matrix; the config must set `purpose` to `comparison`, retain best-validation checkpoints, and have known-positive train support for each selected in-scope class. For local run lifecycle operations, use `town experiment image stop <run>`, `town experiment image resume <run>`, and `town experiment image inspect <run>`. All of these image runs are explicitly labelled **pre-detector exploratory GT-ROI work**.
 
 Evaluate a saved checkpoint explicitly after training; a final test-partition evaluation is a separate post-selection command, never part of training/early stopping:
 
@@ -73,7 +75,7 @@ town experiment image evaluate artifacts/phase3/runs/<run-id> --split validation
 # Only after model selection: town experiment image evaluate artifacts/phase3/runs/<run-id> --split test --checkpoint best
 ```
 
-The **Image Embeddings** dashboard includes validated config drafting/preflight, detached local run launch, status/progress/log inspection, graceful stop, and compatible resume. Saved snapshot inspection remains read-only and does not deserialize checkpoint optimizer state; exact geometry slices use raw saved latent coordinates and optional PCA is display-only. See [Phase 3 scope](docs/PHASE_3_SCOPE.md), [architecture](docs/PHASE_3_ARCHITECTURE.md), [implementation report](docs/PHASE_3_IMPLEMENTATION_REPORT.md), and [pre-review remediation report](docs/PHASE_3_PRE_REVIEW_REMEDIATION_REPORT.md). Phase 3 has not been independently accepted. Detector pretraining, predicted-ROI fine-tuning, and Phase 4 remain out of scope; the installed PyTorch runtime is CPU-only.
+The **Image Embeddings** dashboard includes validated config drafting/preflight, detached local run launch, status/progress/log inspection, graceful stop, and compatible resume. Saved snapshot inspection remains read-only and does not deserialize checkpoint optimizer state; exact geometry slices use raw saved latent coordinates and optional PCA is display-only. See [Phase 3 scope](docs/PHASE_3_SCOPE.md), [architecture](docs/PHASE_3_ARCHITECTURE.md), [implementation report](docs/PHASE_3_IMPLEMENTATION_REPORT.md), and the [definitive acceptance review](reviews/phase_03_definitive_acceptance_review.md). The accepted milestone uses ImageNet-initialized visual features and ground-truth ROIs before detector pretraining; **it contains no implemented or trained image detector**. Detector pretraining, predicted-ROI learning, joint detector/ontology training, full scientific comparisons, and final held-out evaluation remain outstanding. Phase 4 was authorized by the independent review but is intentionally on hold pending author-directed model-consolidation work. CUDA execution was not verified in the acceptance environment.
 
 ## Tests
 
@@ -83,4 +85,4 @@ pytest
 
 ## Scope
 
-Phase 1 and Phase 2 acceptance remains unchanged. Phase 3 is a separate, incomplete implementation branch with pre-detector GT-ROI embedding experiments; it does not claim canonical detector-pretrained training, end-to-end detection, Phase 3 acceptance, or Phase 4 functionality. See [Phase 3 scope](docs/PHASE_3_SCOPE.md) and its [implementation report](docs/PHASE_3_IMPLEMENTATION_REPORT.md) for evidence and explicit gaps.
+Phase 1, Phase 2, and the bounded Phase 3 pre-detector GT-ROI implementation milestone are independently accepted; acceptance does not turn exploratory results into scientific conclusions. The accepted Phase 3 system does not provide canonical detector-pretrained training, predicted-ROI learning, joint detector/ontology training, or end-to-end detection. Phase 4 is authorized but on hold. See the [current project status](docs/CURRENT_PROJECT_STATUS.md), [acceptance index](docs/ACCEPTANCE_INDEX.md), and [Phase 3 scope](docs/PHASE_3_SCOPE.md) for evidence and remaining requirements.
