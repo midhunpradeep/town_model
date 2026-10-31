@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
+from town_model.classifier_backend import raise_classifier_backend_unavailable
 from town_model.contracts import ImageBatch, ImageModelResult
 
 
@@ -36,6 +37,7 @@ class ImageObjectiveResult:
 
 
 def _penalties(scores: Tensor, targets: Tensor, *, family: str, geometry_loss: str, temperature: float, hinge_margin: float) -> Tensor:
+    raise_classifier_backend_unavailable("historical image classifier penalty computation")
     if family == "baseline":
         return F.binary_cross_entropy_with_logits(scores, targets.float(), reduction="none")
     signs = targets.float() * 2.0 - 1.0
@@ -90,6 +92,7 @@ def image_objective_terms(
     pizza_positive_weights: Tensor | None = None,
 ) -> ImageObjectiveTerms:
     """Return graph-preserving per-image terms before effective-window means."""
+    raise_classifier_backend_unavailable("historical image classifier objective computation")
     batch_size, padded_count = result.component_valid_mask.shape
     if batch_size != len(batch.sample_ids) or result.sample_ids != batch.sample_ids:
         raise ValueError("model result and target batch sample identities differ")

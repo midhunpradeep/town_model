@@ -14,7 +14,13 @@ import torch
 from streamlit.testing.v1 import AppTest
 
 from town_model.classifier_backend import ClassifierBackendUnavailableError
-from town_model.contracts import FeatureDiagnostics, VisionFeatureBatch
+from town_model.contracts import (
+    FeatureDiagnostics,
+    ImageBatch,
+    ImageGeometry,
+    ImageModelResult,
+    VisionFeatureBatch,
+)
 from town_model.experiments.image_config import (
     DatasetSubsetConfig,
     ExecutionConfig,
@@ -445,3 +451,146 @@ def test_image_cli_metadata_inspection_remains_read_only(tmp_path, capsys) -> No
     assert output["manifest"]["identity_hash"] == "stored-id"
     assert output["metrics"] == {"historical_metric": 0.25}
     assert _tree_hash(run) == before
+
+
+def _valid_objective_inputs() -> tuple[ImageBatch, ImageModelResult, tuple[torch.Tensor, ...]]:
+    from town_model.models.classifier_transport import ClassifierOutput
+
+    batch = ImageBatch(
+        images=torch.zeros((1, 3, 8, 8)),
+        original_image_sizes=((8, 8),),
+        processed_image_sizes=((8, 8),),
+        image_geometries=(ImageGeometry((8, 8), (8, 8), (8, 8), (1.0, 1.0), (0, 0)),),
+        sample_ids=("sample-1",),
+        gt_component_boxes_xyxy=(torch.tensor([[1.0, 1.0, 4.0, 4.0]], dtype=torch.float32),),
+        component_ids=(("component-1",),),
+        component_detector_category_ids=((1,),),
+        pizza_targets=torch.tensor([[1.0]], dtype=torch.float32),
+        pizza_known_masks=torch.tensor([[True]], dtype=torch.bool),
+        component_targets=(torch.tensor([[1.0]], dtype=torch.float32),),
+        component_known_masks=(torch.tensor([[True]], dtype=torch.bool),),
+        split_identity=("train",),
+    )
+    component_scores = torch.zeros((1, 1, 1), dtype=torch.float32, requires_grad=True)
+    pizza_scores = torch.zeros((1, 1), dtype=torch.float32, requires_grad=True)
+    result = ImageModelResult(
+        sample_ids=("sample-1",),
+        component_ids=(("component-1",),),
+        component_valid_mask=torch.tensor([[True]], dtype=torch.bool),
+        component_points=torch.zeros((1, 1, 2)),
+        global_pizza_points=torch.zeros((1, 2)),
+        composed_pizza_points=torch.zeros((1, 2)),
+        final_pizza_points=torch.zeros((1, 2)),
+        component_classifier=ClassifierOutput(
+            contains=torch.zeros((1, 1, 1), dtype=torch.bool),
+            signed_margin=component_scores,
+        ),
+        pizza_classifier=ClassifierOutput(
+            contains=torch.zeros((1, 1), dtype=torch.bool),
+            signed_margin=pizza_scores,
+        ),
+        pizza_mode="compositional",
+    )
+    tensors = (
+        batch.images,
+        batch.gt_component_boxes_xyxy[0],
+        batch.pizza_targets,
+        batch.pizza_known_masks,
+        batch.component_targets[0],
+        batch.component_known_masks[0],
+        result.component_valid_mask,
+        result.component_points,
+        result.global_pizza_points,
+        result.composed_pizza_points,
+        result.final_pizza_points,
+        result.component_classifier.contains,
+        result.component_classifier.signed_margin,
+        result.pizza_classifier.contains,
+        result.pizza_classifier.signed_margin,
+    )
+    return batch, result, tensors
+
+
+@pytest.mark.parametrize(
+    ("family", "geometry_loss"),
+    [
+        ("baseline", "signed_bce"),
+        ("box", "signed_bce"),
+        ("box", "signed_distance"),
+    ],
+)
+def test_direct_historical_image_penalty_rejects_every_loss_configuration_without_side_effects(
+    family: str, geometry_loss: str, tmp_path: Path
+) -> None:
+    from town_model.training.image_objectives import _penalties
+
+    scores = torch.tensor([[0.0, -0.25]], dtype=torch.float32, requires_grad=True)
+    targets = torch.tensor([[1.0, 0.0]], dtype=torch.float32)
+    scores_before, targets_before = scores.clone(), targets.clone()
+    artifact_root = tmp_path / "model-artifacts"
+
+    _expect_unavailable(
+        lambda: _penalties(
+            scores,
+            targets,
+            family=family,
+            geometry_loss=geometry_loss,
+            temperature=0.1,
+            hinge_margin=0.1,
+        ),
+        "historical image classifier penalty computation",
+    )
+
+    assert torch.equal(scores, scores_before)
+    assert torch.equal(targets, targets_before)
+    assert not artifact_root.exists()
+
+
+def test_direct_image_objective_rejects_valid_supplied_scores_before_mutation_or_artifacts(tmp_path: Path) -> None:
+    from town_model.training.image_objectives import image_objective_terms
+
+    batch, result, tensors = _valid_objective_inputs()
+    batch.validate()
+    assert result.component_classifier.signed_margin.shape == (1, 1, 1)
+    assert result.pizza_classifier.signed_margin.shape == (1, 1)
+    snapshots = tuple(tensor.clone() for tensor in tensors)
+    artifact_root = tmp_path / "model-artifacts"
+
+    _expect_unavailable(
+        lambda: image_objective_terms(
+            result,
+            batch,
+            family="box",
+            geometry_loss="signed_distance",
+        ),
+        "historical image classifier objective computation",
+    )
+
+    assert all(torch.equal(tensor, snapshot) for tensor, snapshot in zip(tensors, snapshots, strict=True))
+    assert not artifact_root.exists()
+
+
+def test_caller_supplied_objective_terms_still_aggregate_without_scoring(monkeypatch) -> None:
+    import town_model.training.image_objectives as image_objectives
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("score-to-penalty conversion must not be reached by aggregation")
+
+    monkeypatch.setattr(image_objectives, "_penalties", forbidden)
+    terms = image_objectives.ImageObjectiveTerms(
+        component_per_image=torch.tensor([1.0, 9.0]),
+        component_eligible_images=torch.tensor([True, False]),
+        pizza_per_image=torch.tensor([2.0, 6.0]),
+        pizza_eligible_images=torch.tensor([True, True]),
+        component_instance_count=1,
+        pizza_instance_count=2,
+    )
+
+    result = image_objectives.aggregate_effective_batch([terms])
+
+    assert result.component_loss.item() == 1.0
+    assert result.pizza_loss.item() == 4.0
+    assert result.total.item() == 5.0
+    assert result.component_eligible_images == 1
+    assert result.pizza_eligible_images == 2
+    assert result.undefined_tasks == ()
