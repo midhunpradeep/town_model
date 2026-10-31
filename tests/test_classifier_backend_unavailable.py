@@ -131,12 +131,15 @@ def test_classifier_construction_inference_geometry_and_losses_are_unavailable()
 
 def test_image_execution_and_checkpoint_entrypoints_fail_before_model_construction(monkeypatch) -> None:
     import town_model.models.classifiers as classifiers
+    from town_model.vision.backbone import MobileNetV3LargeFPN
 
     def forbidden(*args, **kwargs):
         raise AssertionError("historical classifier constructor/factory was reached")
 
     for name in ("NeuralBaseline", "BoxClassifier", "TownClassifier", "make_classifier"):
         monkeypatch.setattr(classifiers, name, forbidden)
+    monkeypatch.setattr(MobileNetV3LargeFPN, "__init__", forbidden)
+    monkeypatch.setattr(torch.optim, "AdamW", forbidden)
 
     config = _config()
     _expect_unavailable(lambda: build_image_modules(None, config), "module construction")
