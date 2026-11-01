@@ -1,18 +1,18 @@
 # A1 Implementation Readiness and Scientific Dependency Frontier
 
-**Role:** Derived planning frontier, not a scientific specification or implementation authorization. Scientific authority is split by version: the immutable [original A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is canonical for F0–F10; the separate [F11 addendum](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md) records twelve post-R1 approvals and becomes repository authority for F11 only after independent review and integration. Candidate scopes below are not `workflow:ready` tickets.
+**Role:** Derived planning frontier, not a scientific specification or implementation authorization. Scientific authority is versioned: the immutable [original A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is canonical for F0–F10; the separate [F11 addendum](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md) records twelve post-R1 approvals and was independently accepted/integrated under #12; the separate [F12 addendum](A1_F12_SCIENTIFIC_ADDENDUM_2026-11-01.md) records twelve author-reported approvals, with F12.1–F12.8 grouped and their repository addendum pending independent review/integration under [#13](https://github.com/midhunpradeep/town_model/issues/13). Candidate scopes below are not `workflow:ready` tickets.
 
 ## Authority, provenance and status dimensions
 
-The original A1 ledger contains 70 active approvals and remains byte-identical (SHA-256 `f552b60f10f96d9e76585331b99e8543d8b7a81535c261386a93aa697b0489b9`, 34,910 bytes). The author-reported mathematics-session handoff dated 2026-11-01 supplies twelve additional approved summaries, F11.1–F11.12. Together the current supplied-source scientific frontier is **70 + 12 = 82 active approvals**. This does not mean R1 independently reviewed all 82: R1 issue [#10](https://github.com/midhunpradeep/town_model/issues/10) was accepted and integrated at `100d04d4ecae4f58f525bbdac76b87bf28026d5c`, but its review did not cover F11. The F11 repository addendum is submitted separately under issue [#12](https://github.com/midhunpradeep/town_model/issues/12); its fixed repository revision awaits independent review/integration. The original [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) still audits only the original 70-decision source and is not rewritten.
+The original A1 ledger contains 70 active approvals and remains byte-identical (SHA-256 `f552b60f10f96d9e76585331b99e8543d8b7a81535c261386a93aa697b0489b9`, 34,910 bytes). The author-reported F11 and F12 handoffs dated 2026-11-01 each supply twelve additional approvals. The supplied-source scientific frontier is **70 + 12 + 12 = 94 active approvals**. R1/#10 was independently accepted and integrated at `100d04d4ecae4f58f525bbdac76b87bf28026d5c`; its review did not cover F11 or F12. F11/#12 was independently accepted and integrated at `a050234ae490d650e28391f180670d1c38183192`. F12 is recorded separately in the new [F12 addendum](A1_F12_SCIENTIFIC_ADDENDUM_2026-11-01.md), submitted under [#13](https://github.com/midhunpradeep/town_model/issues/13), and awaits its own independent review/integration. F12.1–F12.8 are reported collectively; no per-ID formula mapping is asserted. The original [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) still audits only the original 70-decision source and is not rewritten.
 
 | Dimension | Current state |
 |---|---|
-| **Scientific** | Author-reported approval: original 70 A1 decisions plus twelve F11 summaries. F3.6 remains superseded by F3.6-R; no original decision is superseded by F11. Audit A–J and other omitted formal/experimental details remain open where stated. |
-| **Implementation** | No reconstructed classifier, geometry, objective, optimizer, detector, or F11 evaluator has been implemented. Candidate mathematical slices below are planning only. The accepted T0–T5 classifier-free baseline remains operational. |
-| **Independent review** | R1 (#10) is accepted for its own bounded documentation scope; it did not review F11. This F11 repository addendum is not self-accepted and requires its own independent review. Scientific approval, implementation completion and independent acceptance are distinct. |
+| **Scientific** | Author-reported approval: 70 original F0–F10 decisions plus twelve F11 and twelve F12 approvals (94 total). F3.6 remains superseded by F3.6-R; F11 and F12 supersede no original decisions. F12.1–F12.8 are grouped without a per-ID mapping. Audit A–J and other omitted formal/experimental details remain open where stated. |
+| **Implementation** | No reconstructed classifier, geometry transform/inverse, objective, optimizer transaction, detector, or F12 evaluator has been implemented. Candidate mathematical slices below are planning only. The accepted T0–T5 classifier-free baseline remains operational. |
+| **Independent review** | R1 (#10) is accepted for its bounded documentation scope; it did not review F11/F12. F11 (#12) is accepted/integrated. The F12 repository addendum (#13) is not self-accepted and awaits its own independent review/integration. Scientific approval, implementation completion, and independent acceptance are distinct. |
 
-The handoff source contains concise approval summaries, not the original mathematics-session transcript or formal derivations. Do not fill missing definitions, theorem hypotheses, algorithms, or experimental protocols by inference.
+The F11 source handoff contains concise approval summaries, not the original mathematics-session transcript or formal derivations. The F12 source handoff reports the geometry block collectively for F12.1–F12.8 without per-ID traceability. Neither gap authorizes filling in missing definitions, theorem hypotheses, algorithms, or experimental protocols by inference.
 
 ## Primary comparison and semantic guardrails
 
@@ -34,28 +34,45 @@ F11 reinforces, but does not fully operationalize, distinctions among OWL entail
 
 These decisions are required for the corresponding trainable modules to exhibit mathematically correct, numerically valid, or trainable behavior. They are **not** prerequisites for unrelated pure evaluators whose contracts explicitly take supplied physical endpoints/points and exclude trainable parameterization, optimization, and optimizer state.
 
-### P0-A — Raw-to-physical transforms and numerical feasibility
+### P0-A — Trainable geometry
 
-Still open: exact bounded/unbounded raw-to-physical parameterization/transforms and initialization; finite-precision reserves and validated operating range; geometry feasibility and `ε`/`δ` constraints/defaults; matched physical initialization. These block trainable parameterization/initialization and its numerical validation. They do not block physical-corner Boolean membership or other pure evaluators with explicit valid-input contracts.
+**Scientifically specified; engineering implementation and numerical validation required.** F12.1–F12.8 collectively approve the bounded width-first transform, unbounded center/half-width transform, contained and independent window modes, and seeded label-agnostic physical initialization sequence. The exact equations and `epsilon`/`delta` starting values are in the [F12 addendum](A1_F12_SCIENTIFIC_ADDENDUM_2026-11-01.md#L40). Actual numerical operating envelopes, predeclared ULP matching budgets, initialization robustness, corrective gradients, and numerical extremes still require measured verification. The configurable starting constants are not validated universally across dimensions/capacities. These requirements block trainable parameterization/initialization and their numerical validation, but not physical-corner Boolean membership or other pure evaluators with explicit valid-input contracts.
 
-### P0-B — Transactional invalid optimizer-update rejection
+### P0-B — Atomic optimizer lifecycle
 
-Still open: atomic rejection, rollback and recovery for invalid/nonfinite proposed updates, including model parameters, optimizer state (including AdamW moments), scheduler state and the recorded run/checkpoint disposition. F7.8 approves rejecting invalid updates but does not settle the transaction. This blocks corresponding training/update modules, not pure geometry or objective evaluators that perform no optimizer update.
+**Scientifically specified; implementation and adversarial fault-injection verification required.** F12.9–F12.10 approve all-or-nothing effective updates across model parameters, optimizer moments/state, scheduler advancement, and relevant counters/progress, plus terminal disposition on confirmed numerical invalidity. Later engineering must prove the transaction across all these state components and verify failure recording and explicit recovery from the last complete valid checkpoint. Verification must include incomplete/corrupted-checkpoint recovery and adversarial fault injection. The mechanism is not implemented by the addendum. These requirements block corresponding training/update modules, not pure evaluators that do not perform optimizer updates.
 
-### P0-C — Training stages and optimizer policy
+### P0-C — Stage transitions and initial defaults
 
-Still open: training-stage transitions, optimizer-state policy at transitions, numerical optimizer defaults, and gradient-failure handling. This blocks the corresponding trainable-stage orchestration/configuration; it does not block unrelated deterministic mathematical evaluators.
+**Scientifically specified for an initial training lifecycle; engineering implementation and review required.** F12.11–F12.12 establish fresh optimizer/scheduler/AdamW state at a new stage, complete model/optimizer/scheduler/RNG/progress restoration for same-stage resumption, and configurable initial learning-rate/optimizer/dtype/clipping/accumulation policies. The exact defaults are in the [F12 addendum](A1_F12_SCIENTIFIC_ADDENDUM_2026-11-01.md#L165). Implementations must keep parameter-group policy distinct from stage-specific trainability. Final stage-specific scientific monitors, detector policies, and comparison-quality experiments remain separately scoped. This blocks corresponding stage orchestration/configuration, not unrelated deterministic mathematical evaluators.
 
 ### Classifier-facing integration edges — separate unresolved boundary
 
 Do not merge these integration questions into P0-A/B/C or silently derive answers from retired classifiers:
 
+- the classifier adapter's flat point input contract (`[N,d]`);
 - ownership and ordering of class outputs/class IDs;
-- point-domain behavior, including `Δ=ℝ^d` integration;
-- empty-input behavior;
+- typed output boundaries, including `DomainThing`;
+- point-domain behavior, including bounded/unbounded (`Δ=ℝ^d`) integration;
+- empty-batch behavior;
 - zero-window behavior at classifier/integration boundaries (while F3.11's mathematical `W=0` and single-box equivalence remain approved).
 
 A pure evaluator or a point-only affine slice may be planned only with these edges explicitly scoped out or supplied by an independently approved caller contract. This frontier does not implement or ready that integration work.
+
+## Future engineering acceptance frontier
+
+These are later implementation/test obligations, not acceptance evidence for this documentation task:
+
+1. Valid physical geometry across declared, measured operating ranges.
+2. Bounded/unbounded and contained/independent-window invariants.
+3. Inverse/forward correctness and physically matched initialization.
+4. Finite, corrective gradients through point and geometry parameters.
+5. Exact hard membership distinct from signed-clearance scores.
+6. Atomic invalid-update handling across optimizer moments/state, scheduler, counters/progress, and checkpoint recovery, including incomplete/corrupted checkpoints and adversarial fault injection.
+7. Fresh optimizer/scheduler/moments at stage transitions versus exact complete same-stage continuation, including RNG and progress.
+8. Controlled-fixture loss decrease in the five primary classifier conditions.
+
+Report mathematical correctness, numerical validity, optimization success, and scientific generalization as distinct evidence categories.
 
 ## Evaluation-critical
 
@@ -82,6 +99,8 @@ Keep these supplementary and separate from the five primary classifier condition
 - additional reference losses and ablations.
 
 Approving a theorem, diagnostic category, or optional study does not make its experimental protocol complete or turn it into a primary prerequisite. In particular, the F11.9 higher-order intersection benchmark, F11.10 capacity witnesses, F11.12 affine diagnostics, F10.3 fixed-point benchmark, compactness work, and reference losses must not add hidden terms or conditions to the primary comparison.
+
+Supplementary reference-loss conformance, compactness experiments, auxiliary point organization, fixed-point and higher-order ontology benchmarks, broad capacity/topology theorems, final supervisor-dependent RQ2 aggregation, and optional affine structural diagnostics are not blockers for initial pure classifier reconstruction. Detector/ROI policy, statistical methodology, and final comparison-quality evaluation remain separate dependencies for the stages and claims they affect.
 
 ## Deferred theory
 
@@ -123,7 +142,7 @@ No row above is a new approval or an assertion that the foundational question is
 
 ## Source and hold boundaries
 
-- The [original A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is canonical for F0–F10; the separate [F11 addendum](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md) is the F11-only record, subject to its independent-review/integration condition. The [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) audits only the immutable original source.
+- The [original A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is canonical for F0–F10; the separate [F11 addendum](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md) is the accepted/integrated F11 record; the separate [F12 addendum](A1_F12_SCIENTIFIC_ADDENDUM_2026-11-01.md) records the F12-only handoff and remains subject to independent review/integration under #13. The [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) audits only the immutable original source.
 - The expanded v1.1 specification remains a historical review draft and cannot settle F11 omissions or override A1.
 - The accepted T0–T5 teardown remains the classifier-free execution baseline. Phase 4, detector development, scientific training, and R2 remain on hold/unimplemented.
-- Issues [#2](https://github.com/midhunpradeep/town_model/issues/2) and [#3](https://github.com/midhunpradeep/town_model/issues/3) retain their separate planning/author-decision identities. Issue [#10](https://github.com/midhunpradeep/town_model/issues/10) is accepted R1. Issue [#11](https://github.com/midhunpradeep/town_model/issues/11) remains a separate post-R1 lifecycle-status task; issue [#12](https://github.com/midhunpradeep/town_model/issues/12) tracks this F11 reconciliation.
+- Issues [#2](https://github.com/midhunpradeep/town_model/issues/2) and [#3](https://github.com/midhunpradeep/town_model/issues/3) retain their separate planning/author-decision identities. Issue [#10](https://github.com/midhunpradeep/town_model/issues/10) is accepted R1; [#12](https://github.com/midhunpradeep/town_model/issues/12) is accepted F11; [#13](https://github.com/midhunpradeep/town_model/issues/13) tracks F12 and its independent review. Issue [#11](https://github.com/midhunpradeep/town_model/issues/11) remains a separate lifecycle-status task and is not absorbed into F12.
