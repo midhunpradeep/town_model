@@ -121,3 +121,51 @@ Environment was CPU-only; no CUDA model execution is claimed. Historical model c
 - **Author decisions #2/#3:** remain independent and unresolved; this removal makes no mathematical decision. Phase 4 remains on hold.
 
 Independent review should inspect the exact implementation SHA and branch, source/import scans, active unavailable entrypoints, point/vision/dataset/cache/metadata boundaries, mixed-test replacements, the complete retirement manifest, and the actual 180-test runtime result. No self-acceptance is claimed.
+
+## 11. T3 snapshot-integrity and retirement-accounting remediation (2026-11-01)
+
+### Review finding and scope
+
+The independent review at [`834b2f640fa970f661d0d5070f6928c8adb8695b`](https://github.com/midhunpradeep/town_model/blob/834b2f640fa970f661d0d5070f6928c8adb8695b/reviews/classifier_teardown_t3_independent_review.md) returned **REQUEST CHANGES** on submitted T3 HEAD `8386839e3c258e5f263dd7f07fa3aeaefe731f3d`. Its two blockers were (1) malformed but correctly checksummed geometry metadata escaping as raw `KeyError('box_low')` through the snapshot reader, discovery, and Image Embeddings; and (2) inaccurate/incomplete retirement-manifest replacement references and missing non-empty diagnostic-axis coverage. No classifier-removal defect was found; this remediation does not repeat or undo that teardown.
+
+**Remediation branch:** `reconstruction/t3-snapshot-retirement-remediation` (created directly from `8386839e3c258e5f263dd7f07fa3aeaefe731f3d`). **Source/test/manifest commit:** `97bf379ff035b7bc2c7c1a4789c5474012eff9b6` (`fix: harden T3 snapshot integrity and retirement evidence`).
+
+### Snapshot reader, discovery, and dashboard correction
+
+`src/town_model/inspection/image_snapshots.py` now validates the JSON header container, persisted sample IDs, component-offset/count shapes, diagnostic axis declarations, and each stored `classifier_geometry_*` array's matching `geometry.<field>` before comparing values. A missing/non-mapping field, incompatible shape, malformed value, or disagreement raises a path- and field-specific `ValueError`. Optional geometry metadata remains optional when no corresponding geometry array exists. Known invalid NPZ containers are also normalized to the reader's integrity error; no catch-all exception handling was added. Discovery continues to skip only controlled `ValueError` integrity failures.
+
+The Image Embeddings page retains its metadata-only behavior and states when no snapshots passed checksum-validated inspection, explicitly identifying invalid snapshots as unavailable. It does not add controls, construct models, or calculate geometry. Before the fix, I independently recreated the reviewer's checksummed v2 fixture and observed the raw `KeyError` from all three paths. After the fix, the direct reader reports `header.geometry.box_low`, discovery returns valid siblings while omitting corrupt snapshots (or an empty list when all fail), and AppTest renders a clear no-valid-snapshot state with no uncaught exception.
+
+`tests/test_image_snapshot_integrity.py` adds manually authored reader-only fixtures. Positive coverage uses non-empty supported diagnostic axes (`class`, `coordinate`, `component_occurrence`, `house`), preserves array dtypes/values, sample IDs and component offsets, and checks stored geometry/header agreement. Negative coverage includes missing/malformed geometry, shape/value disagreement, malformed geometry values, wrong axis dimensions/names, missing declared arrays, checksum corruption, invalid NPZ bytes with a matching checksum, and scalar sample/offset shapes. Discovery covers all-valid, mixed valid/invalid, and all-invalid runs. The Image Embeddings AppTest uses the exact missing-`geometry.box_low` failure fixture. No model, checkpoint, membership, margin, prediction, or geometry value is constructed or recomputed.
+
+### Retirement-manifest reconciliation
+
+The manifest retains accepted T2 `c6aad87a45ac75835f02670f32fdeca5167f18f7`, accepted historical implementation `2de9c5f29b436f727720e87132d0b4be25a40768`, all original 132 T2 failure IDs, and the established disposition arithmetic: **176 original IDs** (96 deleted, 77 replaced, 3 split; 68 deleted groups, 58 replaced groups, 3 split groups). Every original ID was checked against actual T2 collection output: 323 nodes collected, no missing or duplicate accounted IDs. From detached worktree `/tmp/town-model-t2-manifest-audit` at the exact accepted T2 SHA, the commands were `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest --collect-only -q` (323 collected) and `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q`. The full rerun produced **191 passed, 132 failed, 0 skipped, 9 warnings**; the 132 actual failure IDs exactly equal the manifest's preserved list.
+
+Replacement references were audited against actual current collection output, not guessed function names. Incorrect metadata-inspection and rejected-operation mappings now point to the read-only metadata, explicit unavailable/no-publication, and existing-run nonmutation tests that assert those guarantees. Point projections cite all four collected parameterized nodes (`[2]`, `[5]`, `[8]`, `[16]`). Snapshot-axis coverage points to the new hand-built reader fixtures and explicitly distinguishes stored-data assertions from retired model-generated geometry/activity/margin/relation assertions. Deleted entries carry no replacement references; all 58 replaced and 3 split groups identify current tests and describe partial preservation where applicable.
+
+`tests/test_t3_architecture.py` now performs a bounded `pytest --collect-only -q -p no:cacheprovider tests` subprocess. This collects node IDs only and does not execute tests. It verifies every replacement resolves to an exact collected node, rejects malformed/duplicate references within an entry, requires non-empty replacement lists for replaced/split dispositions, forbids replacement claims for deleted entries, preserves baseline failure coverage and ontology split checks, and compares the manifest's current-test count to actual collection. The independent command `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest --collect-only -q` reported **196 tests collected**. The manifest records the original submitted-T3 count (**180**) separately from remediation (**196**). Final reconciliation: 147 original IDs remain unchanged, 6 accounted IDs retain their names with retargeted/split assertions, and 43 current IDs are new relative to accepted T2 (`147 + 6 + 43 = 196`). All **121 replacement references across 40 distinct node IDs** resolve; no replaced/split entry is empty and no deleted entry claims coverage.
+
+### Verification and preserved boundaries
+
+- Full suite: `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q` — **196 passed, 0 failed, 0 skipped, 7 existing Streamlit/Pandas warnings**.
+- Focused integrity/architecture/metadata selection — **51 passed, 0 failed, 0 skipped, 7 existing warnings**:
+  ```bash
+  PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q \
+    tests/test_image_snapshot_integrity.py tests/test_dashboard_app.py \
+    tests/test_classifier_backend_unavailable.py tests/test_t3_architecture.py \
+    tests/test_phase3_models.py \
+    tests/test_phase3_relations.py::test_ontology_metadata_distinguishes_asserted_entailed_and_unknown_relations \
+    tests/test_phase3_runs.py::test_run_config_identity_and_original_subset_order_remain_metadata_only \
+    tests/test_phase3_config.py::test_historical_objective_metadata_and_run_identity_compatibility_are_stable \
+    tests/test_phase2_models_losses.py::test_all_unknown_instances_are_absent_from_reduction_and_have_zero_gradient \
+    tests/test_phase3_architecture.py::test_image_dashboard_is_metadata_only_and_has_no_model_execution_or_geometry
+  ```
+- `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m compileall -q src/town_model tests` — passed; staged `git diff --cached --check` — passed.
+- CLI commands were run with `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/town`: `--help`; `inspect examples/pizza-48 --json`; `validate examples/pizza-48 --no-write-report --json`; and `experiment image inspect <temporary-run>`. Inspection returned `pizza-dcc148789aecf8af86a3`, 48 samples, `current_pass`; validation returned valid/zero errors and the canonical `examples/pizza-48/reports/validation.json` SHA-256 remained `cd371bd190796552fdf831f084b365d48af42d363c448f9952fc5a2fafe07925`. `experiment image run --config <missing-config> --output <temporary-output>` and `experiment mapping --output <temporary-output>` both exited 2 with the unavailable message and created no output paths.
+- Dashboard startup command `town dashboard --headless --port 50621` returned `/_stcore/health=ok` and root HTTP 200; its process group was stopped. Dataset-page AppTests passed. A fresh process verified all eight removed implementation modules remain unimportable. Architecture/source tests still find no historical classifier definitions or checkpoint reconstruction.
+- No canonical datasets, research artifacts, accepted history refs, or historical algorithms were changed or restored. The initial T3 evidence above remains historical evidence for the original submission.
+
+### Remaining responsibilities, limitations, and handoff
+
+Issue #7 / T4 remains **blocked, unassigned, and unstarted**. T4 still owns final historical presentation policy for stored geometry/scores and must keep dataset pages usable without implying old mathematical interpretation. T5/independent teardown acceptance and author-owned classifier decisions are also not started or implied by this remediation. Discovery intentionally omits invalid snapshots rather than listing every rejected path; the page clearly reports that no snapshots passed integrity inspection. CPU-only checks do not claim CUDA behavior. These boundaries and the exact implementation diff require independent verification; this report does not self-accept the work.
