@@ -12,7 +12,7 @@ For every task, start here:
 8. Submit the exact implementation SHA, test evidence, acceptance-criteria mapping, limitations, and independent-review request.
 9. End with a reproducible issue-comment handoff. Only an independent reviewer may accept work; do not close unfinished issues.
 
-The accepted T0–T5 teardown leaves a classifier-free reconstruction foundation; historical Phase 1–3 classifier behavior is not operational. The canonical A1 source records 70 active author-approved decisions; its exact identity and active-ID provenance are indexed in `docs/reconstruction/A1_DECISION_COMPLETENESS_AUDIT.md`. R1 repository reconciliation is in progress, not independently reviewed or accepted. Treat the ledger as scientific authority and the readiness report as a derived dependency map; unresolved details remain author-controlled. Phase 4, detector development, and later scientific training remain on hold/unimplemented. Load only the scientific-spec sections a task needs.
+The accepted T0–T5 teardown leaves a classifier-free reconstruction foundation; historical Phase 1–3 classifier behavior is not operational. The canonical A1 source records 70 active author-approved decisions; its exact identity and active-ID provenance are indexed in `docs/reconstruction/A1_DECISION_COMPLETENESS_AUDIT.md`. R1 repository reconciliation has a fixed revision in independent review and is not yet accepted. Treat the ledger as scientific authority and the readiness report as a derived dependency map; unresolved details remain author-controlled. Phase 4, detector development, and later scientific training remain on hold/unimplemented. Load only the scientific-spec sections a task needs.
 
 ## Agent skills
 

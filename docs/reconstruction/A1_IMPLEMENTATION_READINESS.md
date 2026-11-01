@@ -1,14 +1,14 @@
 # A1 Implementation Readiness and Scientific Dependency Frontier
 
-**Status:** R1 documentation artifact, in progress and not independently accepted. This is a planning/readiness index derived from the [canonical author-approved A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md), not a second mathematical authority. Its proposed candidate scopes are not implementation authorization or `workflow:ready` tickets.
+**Status:** Fixed R1 documentation artifact submitted for independent review; not accepted. This is a planning/readiness index derived from the [canonical author-approved A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md), not a second mathematical authority. Its proposed candidate scopes are not implementation authorization or `workflow:ready` tickets.
 
 ## Three independent status dimensions
 
 | Dimension | Current status |
 |---|---|
 | **Scientific** | A1 source received and author-approved: 70 active F decisions. F3.6 is superseded by F3.6-R. Open gates and foundational audit remain unresolved; historical/context-only items are not approvals. |
-| **Implementation** | R1 repository documentation is **in progress** under [issue #10](https://github.com/midhunpradeep/town_model/issues/10). No reconstructed classifier, geometry, objective or optimizer is present in active source; detector and later scientific training remain unimplemented. |
-| **Independent review** | R1 repository changes are **not reviewed** and not accepted. R0 alone is independently accepted. An approved scientific decision does not imply implementation; implementation completion will not imply independent acceptance or scientific superiority. |
+| **Implementation** | The R1 documentation implementation is complete at the fixed revision in [issue #10](https://github.com/midhunpradeep/town_model/issues/10). No reconstructed classifier, geometry, objective or optimizer is present in active source; detector and later scientific training remain unimplemented. |
+| **Independent review** | R1 is **in review**; no verdict has been issued and it is not accepted. R0 alone is independently accepted. An approved scientific decision does not imply implementation; implementation completion will not imply independent acceptance or scientific superiority. |
 
 ## Approved comparison and semantic guardrails
 

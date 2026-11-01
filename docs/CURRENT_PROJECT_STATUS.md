@@ -1,6 +1,6 @@
 # Current project status
 
-**Updated:** 2026-11-01 — R1 A1 authority documentation in progress (not independently accepted)
+**Updated:** 2026-11-01 — R1 A1 authority documentation submitted for independent review (not accepted)
 
 **Repository:** `midhunpradeep/town_model`
 
@@ -21,8 +21,8 @@ The [canonical A1 Scientific Decision Ledger](reconstruction/A1_SCIENTIFIC_DECIS
 | Status dimension | Current state |
 |---|---|
 | **Scientific** | A1 source received and author-approved. F3.6 is superseded by F3.6-R. The ledger's P0/P1/P2 gates and foundational questions A–J remain unresolved where stated; historical context and mathematical consequences are not additional approvals. |
-| **Implementation** | R1 repository documentation is in progress under [issue #10](https://github.com/midhunpradeep/town_model/issues/10). No reconstructed classifier, geometry, objective, or optimizer is present in active source; no detector or later scientific training has been implemented. |
-| **Independent review** | R1 documentation is not yet reviewed or accepted. R0 is independently accepted; that does not accept R1 or implement any A1 decision. |
+| **Implementation** | The R1 documentation implementation is complete at the fixed revision in [issue #10](https://github.com/midhunpradeep/town_model/issues/10). No reconstructed classifier, geometry, objective, or optimizer is present in active source; no detector or later scientific training has been implemented. |
+| **Independent review** | R1 is in review; no verdict has been issued and it is not accepted. R0 is independently accepted; that does not accept R1 or implement any A1 decision. |
 
 The accepted T0–T5 teardown remains the current classifier-free operational baseline; historical Phase 1–3 classifier acceptance is not current execution authority. Issues [#2](https://github.com/midhunpradeep/town_model/issues/2) and [#3](https://github.com/midhunpradeep/town_model/issues/3) retain their planning and author-decision identities. #2 is being reconciled to A1; #3 has a proposed source-linked membership/set resolution pending explicit author confirmation and is not closed or finally resolved by an agent comment. Unresolved scientific details remain author-controlled.
 
