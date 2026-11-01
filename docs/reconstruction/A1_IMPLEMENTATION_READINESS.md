@@ -1,18 +1,22 @@
 # A1 Implementation Readiness and Scientific Dependency Frontier
 
-**Status:** Fixed R1 documentation artifact submitted for independent review; not accepted. This is a planning/readiness index derived from the [canonical author-approved A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md), not a second mathematical authority. Its proposed candidate scopes are not implementation authorization or `workflow:ready` tickets.
+**Role:** Derived planning frontier, not a scientific specification or implementation authorization. Scientific authority is split by version: the immutable [original A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is canonical for F0–F10; the separate [F11 addendum](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md) records twelve post-R1 approvals and becomes repository authority for F11 only after independent review and integration. Candidate scopes below are not `workflow:ready` tickets.
 
-## Three independent status dimensions
+## Authority, provenance and status dimensions
 
-| Dimension | Current status |
+The original A1 ledger contains 70 active approvals and remains byte-identical (SHA-256 `f552b60f10f96d9e76585331b99e8543d8b7a81535c261386a93aa697b0489b9`, 34,910 bytes). The author-reported mathematics-session handoff dated 2026-11-01 supplies twelve additional approved summaries, F11.1–F11.12. Together the current supplied-source scientific frontier is **70 + 12 = 82 active approvals**. This does not mean R1 independently reviewed all 82: R1 issue [#10](https://github.com/midhunpradeep/town_model/issues/10) was accepted and integrated at `100d04d4ecae4f58f525bbdac76b87bf28026d5c`, but its review did not cover F11. The F11 repository addendum is submitted separately under issue [#12](https://github.com/midhunpradeep/town_model/issues/12); its fixed repository revision awaits independent review/integration. The original [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) still audits only the original 70-decision source and is not rewritten.
+
+| Dimension | Current state |
 |---|---|
-| **Scientific** | A1 source received and author-approved: 70 active F decisions. F3.6 is superseded by F3.6-R. Open gates and foundational audit remain unresolved; historical/context-only items are not approvals. |
-| **Implementation** | The R1 documentation implementation is complete at the fixed revision in [issue #10](https://github.com/midhunpradeep/town_model/issues/10). No reconstructed classifier, geometry, objective or optimizer is present in active source; detector and later scientific training remain unimplemented. |
-| **Independent review** | R1 is **in review**; no verdict has been issued and it is not accepted. R0 alone is independently accepted. An approved scientific decision does not imply implementation; implementation completion will not imply independent acceptance or scientific superiority. |
+| **Scientific** | Author-reported approval: original 70 A1 decisions plus twelve F11 summaries. F3.6 remains superseded by F3.6-R; no original decision is superseded by F11. Audit A–J and other omitted formal/experimental details remain open where stated. |
+| **Implementation** | No reconstructed classifier, geometry, objective, optimizer, detector, or F11 evaluator has been implemented. Candidate mathematical slices below are planning only. The accepted T0–T5 classifier-free baseline remains operational. |
+| **Independent review** | R1 (#10) is accepted for its own bounded documentation scope; it did not review F11. This F11 repository addendum is not self-accepted and requires its own independent review. Scientific approval, implementation completion and independent acceptance are distinct. |
 
-## Approved comparison and semantic guardrails
+The handoff source contains concise approval summaries, not the original mathematics-session transcript or formal derivations. Do not fill missing definitions, theorem hypotheses, algorithms, or experimental protocols by inference.
 
-The primary comparison remains exactly these five configurations:
+## Primary comparison and semantic guardrails
+
+The five primary conditions remain exactly:
 
 1. Affine baseline + BCE-with-logits.
 2. Box + signed logistic.
@@ -20,82 +24,106 @@ The primary comparison remains exactly these five configurations:
 4. Town + signed logistic.
 5. Town + signed hinge.
 
-Primary geometry/classification objectives are unregularized. Do not add physical compactness penalties, ontology-axiom constraints, auxiliary point attraction, or reference losses to these primary configurations. ChebiBox and original-town-inspired reference losses are supplementary, separately named studies; the source-corrected town reference objective under F6.5 is not fully approved.
+Primary objectives remain unregularized. Do not add compactness penalties, auxiliary point attraction, ontology-axiom penalties, or supplementary reference losses to the primary comparison.
 
-The Boolean set semantics and numerical measurements remain different contracts:
+F3.6-R remains authoritative: a house is a closed frame minus the union of ambient open window interiors; a town is a union of houses. Exact Boolean membership determines geometric predictions. Signed coordinate clearance is a separate numerical training measurement, composed through the approved exact min/max rules without hidden normalization. Do not infer implementation mechanics from retired classifiers.
 
-- F3.6-R is active and F3.6 superseded. For a house, `H = F \ ⋃ int_{ℝ^d}(W)`: the frame is closed, strict ambient window interiors are excluded, and boundaries are retained unless removed by another window's interior. Independent windows outside the frame do not remove out-of-frame points. Town membership is the union of house membership. F3.11 preserves `W=0` and `H=1,W=0` box equivalence.
-- Hard Boolean membership is the prediction authority. Signed coordinate clearance is a separate measurement; a numerical threshold must not silently replace exact set membership or alter boundary semantics. Preserve `W=0` behavior.
-- F5.1/F5.6 require raw coordinate clearance in physical units without implicit width/dimension normalization. F5.3 fixes exact min/max composition; F5.5 uses documented framework AD subgradients at ties, with diagnostics rather than an invented custom tie rule.
+F11 reinforces, but does not fully operationalize, distinctions among OWL entailment, verified generator interpretations and finite-sample evidence; emergent geometry and explicit relation penalties; structural invariants and raw coordinates; relation classes; exact certificates and tolerance estimates; learning questions and feasibility levels; and held-out image, compositional and structural generalization. See the [F11 addendum and its source-linked A–J crosswalk](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md#L98).
 
-Keep these interpretations distinct: ontology entailment vs generator-derived supervised labels; unknown labels vs known negatives; observed-point classification vs global region relations; exact relation certificates vs sampled diagnostics; empty/vacuous formal relations vs nontrivial geometric evidence; representational realizability vs optimization success; historical engineering milestones vs future scientific training stages. Accurate point predictions do not establish global ontology discovery or OWL/ALC reasoning.
+## Implementation-critical
 
-## Candidate small scopes for separate future engineering contracts
+These decisions are required for the corresponding trainable modules to exhibit mathematically correct, numerically valid, or trainable behavior. They are **not** prerequisites for unrelated pure evaluators whose contracts explicitly take supplied physical endpoints/points and exclude trainable parameterization, optimization, and optimizer state.
 
-These are candidate scopes supported by cited approvals. They are not approved for implementation by R1, and each needs its own narrow issue, explicit inputs/outputs, preconditions, deterministic oracle and independent review. Resolve only the stated integration boundaries in that contract; do not expand into open P0/P1 work.
+### P0-A — Raw-to-physical transforms and numerical feasibility
 
-| Candidate scope | Approved basis | Remaining scope boundary to state explicitly |
+Still open: exact bounded/unbounded raw-to-physical parameterization/transforms and initialization; finite-precision reserves and validated operating range; geometry feasibility and `ε`/`δ` constraints/defaults; matched physical initialization. These block trainable parameterization/initialization and its numerical validation. They do not block physical-corner Boolean membership or other pure evaluators with explicit valid-input contracts.
+
+### P0-B — Transactional invalid optimizer-update rejection
+
+Still open: atomic rejection, rollback and recovery for invalid/nonfinite proposed updates, including model parameters, optimizer state (including AdamW moments), scheduler state and the recorded run/checkpoint disposition. F7.8 approves rejecting invalid updates but does not settle the transaction. This blocks corresponding training/update modules, not pure geometry or objective evaluators that perform no optimizer update.
+
+### P0-C — Training stages and optimizer policy
+
+Still open: training-stage transitions, optimizer-state policy at transitions, numerical optimizer defaults, and gradient-failure handling. This blocks the corresponding trainable-stage orchestration/configuration; it does not block unrelated deterministic mathematical evaluators.
+
+### Classifier-facing integration edges — separate unresolved boundary
+
+Do not merge these integration questions into P0-A/B/C or silently derive answers from retired classifiers:
+
+- ownership and ordering of class outputs/class IDs;
+- point-domain behavior, including `Δ=ℝ^d` integration;
+- empty-input behavior;
+- zero-window behavior at classifier/integration boundaries (while F3.11's mathematical `W=0` and single-box equivalence remain approved).
+
+A pure evaluator or a point-only affine slice may be planned only with these edges explicitly scoped out or supplied by an independently approved caller contract. This frontier does not implement or ready that integration work.
+
+## Evaluation-critical
+
+These items are required before defensible RQ1/RQ2 conclusions or comparison-quality generalization claims. An approved foundational principle does not mean the complete evaluation protocol is approved.
+
+- **Relations and references:** formal conditions and population for the F11.5 taxonomy; typed pair population; evidence mapping/provenance across OWL entailment, verified generator interpretations and finite samples; unknown handling; relation labels and aggregation. F11.6 preserves evidence distinctions but does not supply the protocol.
+- **Exact certificates:** sound algorithms and arithmetic assumptions for sets defined by finite stored physical endpoints; resource/unknown policy; separately labeled tolerance estimates. F11.8 does not choose the certificate algorithm or tolerance method.
+- **Statistical units and experiment populations:** independent image/recipe/asset and relation-pair units, predeclared denominators, seed handling, uncertainty, split/selection rules, and the populations used for each claim.
+- **Generalization protocols:** separately define held-out image, compositional and structural generalization populations, measurements and selection controls. F11.7 names the distinct questions but not their operational tests.
+- **RQ1/RQ2 comparison scope:** the primary five conditions remain fixed, but final dimensions/capacities, populations, analysis, relation references, metrics and claim thresholds are not supplied by this addendum. Do not decide final methodology here.
+- **Feasibility evidence:** F11.3/F11.11 require separate learning and simultaneous-feasibility questions; operational criteria and diagnostics remain to be specified before using them to explain outcomes.
+
+F11.12 authorizes optional affine structural diagnostics while preserving box–town as the main RQ2 comparison. Those diagnostics do not replace or preempt the remaining protocol.
+
+## Optional experiments — not primary prerequisites
+
+Keep these supplementary and separate from the five primary classifier conditions:
+
+- compactness studies;
+- auxiliary point organization;
+- fixed-point diagnostic benchmarks;
+- higher-order intersection and capacity benchmarks;
+- supplementary affine structural diagnostics;
+- additional reference losses and ablations.
+
+Approving a theorem, diagnostic category, or optional study does not make its experimental protocol complete or turn it into a primary prerequisite. In particular, the F11.9 higher-order intersection benchmark, F11.10 capacity witnesses, F11.12 affine diagnostics, F10.3 fixed-point benchmark, compactness work, and reference losses must not add hidden terms or conditions to the primary comparison.
+
+## Deferred theory
+
+Broad topology characterizations and general ontology satisfiability investigations may remain outside the immediate reconstruction path when they are not needed for the specified experiments. They remain in the scientific record (including the original A1 F10.5 and foundational audit A–J) and are not resolved, deleted, or converted into implementation prerequisites by this frontier.
+
+## Narrow mathematical slices suitable for separately scoped planning
+
+The following have sufficient scientific definitions for a future bounded task to be proposed, subject to its own contract, dependency check, and independent review. **They are planning candidates only; none is implemented, automatically authorized, or made `workflow:ready` here.** A pure-evaluator contract must explicitly exclude trainable transforms/parameterization, optimization, and optimizer state; do not block such an evaluator on P0-A/B/C if those items are outside its inputs and outputs.
+
+| Candidate slice | Scientific basis | Boundary that its own contract must state |
 |---|---|---|
-| Pure physical-corner Boolean box membership | F3.2, F3.4, F7.4 | Define the evaluator's physical-corner/input validity preconditions and how the declared domain `Δ` participates. Test exact closed faces; do not implement raw-to-physical transforms. |
-| House membership with open window interiors | F3.2, F3.5, F3.6-R | Use strict ambient interiors and exact set membership; distinguish contained and independent windows under the same set rule. State handling of supplied corners and domain validation without inventing transforms. |
-| Town union membership | F3.2, F3.5, F3.9, F3.11 | Specify the pure evaluator boundary for a fixed `H≥1`, `W≥0`; preserve zero-window and single-box equivalence. No adaptive capacity or trainable geometry. |
-| Deterministic boundary and degenerate-fixture tests | F3.2, F3.4, F3.6-R, F3.10 | Degenerate fixed-corner fixtures are mathematical evaluator tests only; they do not relax positive trainable primitive widths. Include retained/excluded boundary witnesses. |
-| Signed coordinate-clearance evaluation | F5.1, F5.6 | Implement the stated coordinate clearance as a numerical measurement in raw physical units, not a Boolean predictor or Euclidean distance. Keep its finite-precision input assumptions explicit. |
-| Exact min/max score composition and tie diagnostics | F5.3, F5.5 | Keep score composition separate from Boolean membership and objective penalties; document framework AD behavior and observe tie/branch frequencies. No soft replacement or custom tie gradient. |
-| Basic affine point-only classifier interface | F4.1–F4.4 | Keep it source-metadata independent, with ordered Boolean and baseline-logit outputs and fixed `DomainThing`. Defer unresolved `Δ=ℝ^d`, class-order integration, and empty-batch behavior to a separate explicit decision/task boundary; do not couple it to the image path. |
-| Fixed-point geometry diagnostic benchmark | F10.3, with F6.1–F6.3 | Use common immutable latent points to isolate representational geometry from encoder adaptation. A later contract must define the exact diagnostic fixture/configuration; it must not change primary training or imply final RQ2 evidence. |
+| Physical-corner box Boolean membership | F3.2, F3.4, F7.4 | Supplied physical endpoints and point-domain preconditions; exact closed faces; no raw-to-physical transform. |
+| House/window membership and town union | F3.2, F3.5, F3.6-R | Supplied physical corners; strict ambient open-window interiors; exact Boolean membership; no parameterization or optimization. |
+| Zero-window and single-box equivalence | F3.11 | `W=0` and `H=1,W=0` on pure supplied geometry; do not infer integration behavior for empty batches or classifier adapters. |
+| Signed coordinate-clearance evaluation | F5.1, F5.6 | Coordinate clearance in raw physical units, separate from membership and not Euclidean distance; explicit finite input assumptions. |
+| Exact min/max composition | F5.3, F5.5 | Approved composition and framework AD tie behavior/diagnostics only where gradients are in scope; no soft replacement or hidden normalization. |
+| Signed logistic and hinge penalty kernels | F6.1–F6.3 | Pure supplied signed-clearance/label inputs and explicit temperature/margin parameters; no implicit regularization, reducer, optimizer, or default selection. |
+| Flat point-only affine classifier behavior | F4.1–F4.4, F11.1 | Keep class-order ownership, point-domain behavior, empty inputs and `W=0` integration edges explicitly scoped; do not couple to image infrastructure or infer unresolved adapters. |
+| Deterministic boundary, degeneracy and fixed-point fixtures | F3.2, F3.4, F3.6-R, F3.10, F10.3 | Fixed physical-corner/point fixtures only; degenerate evaluator fixtures do not relax positive trainable widths or decide comparison-quality experiments. |
 
-No candidate permits implementing a raw transform, optimizer, training loop, source-inspired reference loss, global relation certificate, detector, or scientific experiment without its own authority and task contract.
+## Foundational audit A–J status
 
-## Blocked scientific dependencies: P0 and P1
+All ten original foundational topics remain in the scientific record. F11 addresses portions of them but does not make all ten resolved. For each topic, the linked [F11 crosswalk](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md#L98) records the approved principle, missing details, consequence, and whether a dependent scope is actually blocked.
 
-The entries below preserve the source's open gates (A1 ledger §4). Each missing item has an earliest affected proposed task, a premature-choice consequence, and a focused question for the parallel mathematics session. Questions are prompts only, not recommendations or implied answers. An engineering task may proceed only if its explicit boundary excludes the unresolved dependency.
-
-| Gate | Approved decisions it builds upon | Exact missing scientific decision | Earliest proposed task affected | Consequence of choosing prematurely | Focused mathematics-session question |
-|---|---|---|---|---|---|
-| **P0-1 — Raw-to-physical transforms and initialization** (source gate 1) | F3.4, F3.7, F3.9–F3.10; F7.1–F7.7 | Exact bounded/unbounded raw-to-center/half-width transform and inverse/initialization; feasibility for contained and independent windows; how matched physical starts are constructed. | Trainable geometry parameterization/initializer contract, before any trainable box/town model task. | Different transforms, feasibility rules or initialization produce different reachable sets, gradients and matched comparisons; historical transforms could be silently revived. | Which exact raw parameterization, inverse and initialization maps—and what contained/independent-window feasibility rules—are approved for each domain? |
-| **P0-2 — Numerical feasibility, operating ranges and reserves** (source gate 1) | F5.1, F5.6; F7.1–F7.7; F9.5 | Validated float32 operating range, finite-precision reserves and concrete `ε`/`δ` defaults/constraints, including bounded capacity reserve. The principles are approved; concrete constants and numerical policy are not. | Transform/evaluator feasibility validators and numerical boundary tests; must be settled before trainable geometry relies on them. | Convenient constants or tolerances can change represented sets, exclude valid boundary fixtures, admit invalid geometry, or make numerical outputs appear scientifically comparable when they are not. | What finite float32 range/reserve and per-run `ε`/`δ` policy should define valid geometry, and what validation evidence is required? |
-| **P0-3 — Invalid optimizer-step rollback and recovery** (source gate 2) | F7.8; F9.2, F9.4–F9.5; F8.4 | Transaction boundary and recovery of model parameters, optimizer state (including AdamW moments), scheduler and run state after invalid/nonfinite proposed updates; exact failed-step/run disposition. F7.8's reject principle does not specify the transaction mechanism. | Training-step engine/checkpoint state-machine task, before any trainable run implementation. | Partial rollback, optimizer reset or silently advanced scheduler changes the optimization path and can leave invalid state despite a rejected step. | What state is atomic per proposed update, what is restored on rejection, and how must failure be recorded/resumed? |
-| **P0-4 — Phase transitions and optimizer numerical defaults** (source gate 3) | F8.3–F8.5; F9.1–F9.5; F7.8 | Exact phase-transition optimizer/scheduler state and unfreezing behavior; numerical group learning-rate/decay baselines, clipping threshold and gradient-failure behavior. Constant-LR AdamW principle is approved; values and transition mechanics are not. | Scientific-stage orchestration and optimizer configuration task, before Stage 1/2/3 training. | Arbitrary LR, decay, clipping or state carry-over changes convergence and stage lineage, invalidating comparison and checkpoint interpretation. | What optimizer/scheduler state is retained or recreated at each transition, and which numeric group baselines/failure rules are approved? |
-| **P0-5 — Supplementary reference-objective conformance** (source gate 4) | F3.2, F3.5, F3.6-R; F5.3; F6.4–F6.5 | Source-verified box reference implementation; town source formula/reductions reconciled branch-by-branch with F3.6-R, hand-computable tests, and author review of material corrections. The final source-corrected town formula is explicitly not approved. | Separately named reference-loss implementation and conformance tests; not the five-way primary objective implementation. | A convenient port may invert targets/reductions or conflict with the approved open-interior semantics, creating an incorrectly labeled comparison. | Which original source branches/reductions survive F3.6-R, which need correction, and which corrected town formula (if any) is author-approved? |
-| **P0-6 — Classifier integration edge cases** (source gate 5) | F2.3, F3.11, F4.1–F4.4 | Exact integration behavior for points when `Δ=ℝ^d`, ordered typed class outputs/class-order ownership, empty batches, and `W=0` across the intended classifier boundary. Approved mathematical interfaces do not settle every retained-system integration edge. | Classifier-facing interface/adapter contract and its conformance tests; must precede integration with retained point/image infrastructure. | Defaults copied from retired adapters may smuggle in old behavior or make outputs ambiguous at empty/zero-window boundaries. | What are the exact input-domain, class-order and empty-input/zero-window contracts at the classifier integration boundary? |
-| **P1-1 — Global relation population, semantics and references** (source gate 6) | F0.1, F1.1, F3.1–F3.3; F10.1, F10.9–F10.12 | Declared universe/type scope; relation vocabulary and pair population; valid positive/negative reference evidence and provenance; direct vs transitive cases; unknown handling; final supervisor-approved aggregate protocol. F10 fixes important evidence rules, not the final protocol. | RQ2 reference/pair manifest and evaluation-protocol task, before any final global-relation claim. | Treating non-entailment as false, mixing typed populations, or choosing pairs/metrics after observing results creates leakage and a different research question. | Which typed ontology-pair population, relation vocabulary, reference sources and predeclared aggregate protocol answer the intended RQ2? |
-| **P1-2 — Sound certificates and numerical proof assumptions** (source gate 7) | F3.2, F3.6-R; F5.3, F7.3; F10.1, F10.6, F10.10 | Practical town-relation certificate algorithm; what “exact” means for float32 corners; soundness assumptions and resource/status rules for unknown; separately declared bounded/unbounded sampled reference measures. | Relation-certificate design/implementation and exact-vs-sampled diagnostics, before interpreting certificates. | Tolerance heuristics can misclassify touching boundaries; unsuccessful search can be mislabeled proof; sampled absence can be mislabeled satisfaction. | What sound arithmetic/certificate method and unknown/resource policy are acceptable for stored float32 geometry, and which sampling measures are diagnostic only? |
-| **P1-3 — Final comparison/experiment matrix and monitors** (source gate 8, experiment scope) | F2.7–F2.8; F3.7, F3.9; F5.6; F6.1–F6.4; F7.6–F7.7; F8.1–F8.5; F9.1–F9.5; F10.2–F10.4, F10.11–F10.12 | Final dimensions/capacities/window modes and controls; point-encoder controls, weighting variants, primary vs secondary matrix, selection/monitor rules, and which comparisons support which claims. | Comparison-quality configuration/experiment-plan contract, before experiment execution or result selection. | A post hoc or confounded matrix can change the primary question, leak validation/test information, or mistake exploratory diagnostics for comparison-quality evidence. | Which exact configurations and validation monitors are necessary for the five-way core, and which remain separate secondary studies? |
-| **P1-4 — Detector and ROI-matching integration policy** (source gate 8, detector/ROI details) | F2.5; F9.1–F9.2; F10.11–F10.12; retained historical engineering context in ledger §3 | Detector thresholds/filtering, matching algorithm and tie policy, class dependence, unmatched/missed detection treatment, selected-coordinate detach/matching behavior at implementation level, and stage-specific validation/checkpoint monitors. Historical proposals are context only; they do not approve these details. | Stage-1 detector specification and Stage-3 predicted-ROI/matching task; detector work remains on hold and must not start under R1. | A chosen matching/threshold policy alters supervision, ROI composition and detector/ontology gradients, and can misstate end-to-end metrics or resurrect historical draft assumptions. | Which detector filtering and one-to-one ROI-matching policy, unmatched-case treatment and phase-specific monitor are author-approved for the intended scientific stages? |
-| **P1-5 — Statistical units, independence and uncertainty** (source gate 9) | F1.1, F8.1–F8.2; F10.11–F10.12 | Independence/representativeness of generator assets and recipes; unit of analysis; validation/test selection boundaries; paired comparison and seed treatment; finite-sample uncertainty method and denominator. A seed count alone is not a statistical protocol. | Dataset split/analysis plan and comparison-statistics task, before comparison-quality runs or final metrics are selected. | Invalid independence assumptions or denominator choices yield misleading precision, leakage, and post hoc statistical claims. | What is the independent sampling unit and predeclared uncertainty/comparison method for image, relation-pair and seed-level outcomes? |
-
-## P2 optional studies — not primary blockers
-
-P2 gates 10–12 are optional and remain separate from the five-way primary reconstruction:
-
-- **Compactness:** F10.7 allows a separately identified physical region-size study; F10.14 names box sum-of-widths as the first optional box compactness experiment. Hyperparameters/controls need follow-up; a town compactness functional remains unresolved. These must not regularize primary objectives.
-- **Point organization:** F10.8/F10.16 separate identity-preserving visual-view consistency from later known-label-conditioned attraction. Augmentation/view design, anti-collapse mechanism and coefficients remain open. Neither enters primary losses or blocks the primary comparison.
-- **Additional studies:** extra reference losses, volume/overlap statistics, and broader capacity/scale/dimension ablations remain optional. Fixed-point diagnostic benchmarking (F10.3) is a distinct candidate small scope, not permission for co-adaptive training.
-
-## Foundational audit A–J — unresolved, not approved
-
-These ten questions are preserved from ledger §5. They are not implemented features or additional approvals, and they do **not** all block every engineering task. The affected scopes below identify the genuine dependency boundary.
-
-| Audit | Unresolved question (concise locator) | Genuine dependency; does not automatically block |
+| Topic | F11 contribution | Current status / actual dependency |
 |---|---|---|
-| **A** | Common ontology universe and entity typing: which pizza/component sorts and typed scopes define class relations, emptiness, universality and `DomainThing`? | Global relation universe, pair population and cross-type interpretation. Does not block local Boolean membership for explicitly typed points. |
-| **B** | What is being discovered when generator targets already contain ontology/recipe-derived superclass labels; how to prevent relation/test leakage? | RQ2 claim wording, reference provenance and evaluation design. Does not block geometry evaluator tests. |
-| **C** | Fixed-point representational realizability vs optimization/generalization failure; how learned encoders can conceal capacity differences? | Interpreting model comparisons and feasibility diagnostics. Does not block isolated pure geometry membership. |
-| **D** | Coordinate/gauge identifiability under translations, permutations, reflections and scaling; which cross-run quantities are comparable? | Cross-run parameter/score comparisons and scale-controlled studies. Does not block a single-run exact membership oracle. |
-| **E** | Formal relation vocabulary (`overlap`, exclusion, equivalence, satisfiability, proper subclass) and logical/reference provenance. | Final RQ2 pair labels and ontology relation protocol. Does not block membership or local score tests. |
-| **F** | Meaning and soundness of “exact” float32 geometric certificates, especially boundary touching. | Exact relation-certificate implementation and claims. Does not block exact Boolean evaluation over supplied physical corners. |
-| **G** | Which patterns are reachable with fixed `H,W`, positive widths and clearance; set-family expressivity vs trainable reachability? | Capacity/theorem interpretation and claims about particular trainable models. Does not block evaluating a supplied region. |
-| **H** | Physical scale/margin identifiability when points and regions co-adapt across dimensions, domains, temperatures and width floors. | Cross-setting loss/scale comparison and scale studies. Does not block raw coordinate-clearance evaluation. |
-| **I** | Independence/representativeness of assets/recipes, statistical units, uncertainty and predeclared denominators. | Comparison-quality experiments and generalization claims. Does not block deterministic mathematical fixtures. |
-| **J** | Whether visual composition reflects ontology relations or memorizes generator recipes without role/existential semantics. | Interpretation of pizza-level RQ2 and any ontology-discovery claim. Does not block component-level membership tests. |
+| A — Semantic universe and typing | F11.1 | Partly addressed; typed universe/relation scope remains open. Pure explicit-input evaluators are not blocked. |
+| B — Meaning of discovery | F11.2, F11.6 | Meaning/provenance principles approved; leakage and RQ2 evidence protocol remain open. |
+| C — Realizability versus optimization | F11.3, F11.11 | Questions separated; formal criteria remain open. Pure evaluators are not blocked. |
+| D — Coordinate identifiability | F11.4 | Structural-invariant priority approved; invariant set/alignment/scale protocol remains open. |
+| E — Relation vocabulary | F11.5, F11.6 | Taxonomy/provenance distinctions approved; formal conditions/population remain open. |
+| F — Certificate soundness | F11.8 | Endpoint/tolerance distinction approved; sound arithmetic/algorithms remain open. |
+| G — Geometry capacity | F11.9, F11.10 | Theorem/benchmark summaries approved; hypotheses, construction and reachability detail remain open. |
+| H — Scale/margin identifiability | F11.4 where applicable | Qualified structural comparison approved; scale protocol remains open. |
+| I — Generalization/statistics | F11.7 where applicable | Generalization categories separated; populations/statistical protocols remain open. |
+| J — Visual composition and ontology claims | F11.2, F11.7 where applicable | Emergence/generalization principles approved; ontology-role interpretation and claim evidence remain open. |
 
-New evidence may refine these questions only through an author-approved decision process. Do not answer them in an implementation contract by assuming a convenient interpretation.
+No row above is a new approval or an assertion that the foundational question is fully resolved.
 
-## Cross-cutting authority and hold boundaries
+## Source and hold boundaries
 
-- The [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) maps the 70 active IDs to exact lines in the immutable source. Consequences, history, gates, audit questions and recommendations remain separate source categories.
-- The [expanded v1.1 thesis specification](../../pizzaiolo_thesis_implementation_spec_v1_1_expanded.md) remains a historical review draft; it cannot override A1 or settle its open gates.
-- The accepted T0–T5 teardown remains the current classifier-free operational baseline. Historical Phase 1–3 acceptance does not restore those classifiers. Phase 4/detector work and later scientific training remain on hold/unimplemented.
-- Scientific approval, implementation completion and independent-review acceptance are different statuses. R1 source approval does not authorize classifier implementation; independent engineering acceptance does not establish scientific superiority or confirm a thesis hypothesis.
-- Track the live R1 state and exact review SHA in [issue #10](https://github.com/midhunpradeep/town_model/issues/10). Issue #2 remains the open Wayfinder map; issue #3 remains an author decision pending explicit confirmation.
+- The [original A1 ledger](A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is canonical for F0–F10; the separate [F11 addendum](A1_F11_SCIENTIFIC_ADDENDUM_2026-11-01.md) is the F11-only record, subject to its independent-review/integration condition. The [completeness audit](A1_DECISION_COMPLETENESS_AUDIT.md) audits only the immutable original source.
+- The expanded v1.1 specification remains a historical review draft and cannot settle F11 omissions or override A1.
+- The accepted T0–T5 teardown remains the classifier-free execution baseline. Phase 4, detector development, scientific training, and R2 remain on hold/unimplemented.
+- Issues [#2](https://github.com/midhunpradeep/town_model/issues/2) and [#3](https://github.com/midhunpradeep/town_model/issues/3) retain their separate planning/author-decision identities. Issue [#10](https://github.com/midhunpradeep/town_model/issues/10) is accepted R1. Issue [#11](https://github.com/midhunpradeep/town_model/issues/11) remains a separate post-R1 lifecycle-status task; issue [#12](https://github.com/midhunpradeep/town_model/issues/12) tracks this F11 reconciliation.
