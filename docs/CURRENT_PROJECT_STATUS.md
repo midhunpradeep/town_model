@@ -1,18 +1,28 @@
 # Current project status
 
-**Recorded:** 2026-10-31
+**Updated:** 2026-11-01 — R0 reconstruction-baseline reconciliation
 
 **Repository:** `midhunpradeep/town_model`
 
-**Scientific authority:** [`pizzaiolo_thesis_implementation_spec_v1_1_expanded.md`](../pizzaiolo_thesis_implementation_spec_v1_1_expanded.md), unchanged.
+**R0 verified starting `main`:** `3bd7252f2232d86e190f71c4e4a29de40dedb396` (also the fetched `origin/main` at claim). The accepted teardown implementation `19222424f5ad8347deddc6dfb2d7187bd85609c0` and final T5 review/report commit `2b9df576aac2fd95f093bbb3b046813620a822a5` are ancestors of that baseline. The [R0 report](reconstruction/R0_RECONCILIATION_REPORT.md) records the implementation branch and fresh verification; issue #9's final handoff comment identifies the exact review SHA. R0 is documentation/workflow/verification only and is not integrated into `main` by the implementer.
 
-**Accepted Phase 3 implementation:** `a098a0a3c66a30200bd85906212cb07ef8bd19eb`
+## Current operational baseline: classifier-free reconstruction foundation
 
-**Definitive Phase 3 review/report commit:** `2de9c5f29b436f727720e87132d0b4be25a40768`
+Phase 1 dataset preparation, Phase 2 synthetic classifiers, and Phase 3 pre-detector GT-ROI image-to-ontology classifiers were independently accepted for their historical scopes. The subsequent T0–T5 teardown is also accepted and supersedes their classifier behavior as the current operational baseline. The definitive [T5 teardown review](../reviews/classifier_teardown_t5_final_acceptance.md) accepts teardown implementation `19222424f5ad8347deddc6dfb2d7187bd85609c0`; its review record is report commit `2b9df576aac2fd95f093bbb3b046813620a822a5`. Historical acceptance reports remain unchanged and are evidence of their original milestones, not evidence that those classifiers still run.
 
-**Current cleanup branch:** `maintenance/accepted-phase3-cleanup`, created directly from the definitive review commit above.
+Retained, classifier-independent infrastructure includes dataset preparation/validation and ontology targets; known/unknown masks and stable class order; canonical preprocessing, MobileNetV3-Large/FPN visual features and ground-truth ROI/component identity; `VisionFeatureBatch`; point-only `ImagePointModel`/`ImagePointResult` and global, compositional, and hybrid pathways; generic known-mask reducers; visual-feature caches, run identity/storage; validated read-only historical snapshot/metadata inspection; and dataset CLI/dashboard surfaces. Protected tensor contracts remain component visual features `[B,K,260]`, global spatial features `[B,256,7,7]`, component points `[B,K,d]`, and final pizza points `[B,d]`.
 
-See the [acceptance index](ACCEPTANCE_INDEX.md) for accepted implementation/report pairs and the preserved review history. The cleanup branch adds documentation only; it does not replace, amend, or merge the accepted implementation.
+The historical affine/neural, box, and town classifier implementations, geometric membership calculations, classifier-specific objectives, and model-dependent execution paths have been removed. Classifier-dependent CLI/API/dashboard operations intentionally fail with `ClassifierBackendUnavailableError`; do not restore them or publish model outputs through rejected operations. The historical implementation inventory is descriptive evidence only.
+
+## Scientific authority and next-task boundary
+
+The author-approved mathematical handoff supplied for R0 reports **50 active A1 decisions**. R0 records that count and the authority boundary; it does not recreate, enumerate, or independently declare the full decision ledger. **R1 is responsible for durable reconciliation of the approved decisions and their exact sources.** The expanded v1.1 specification remains a historical review draft, not the current reconstruction authority. R1 must identify what is approved, superseded, or still open; unresolved scientific questions remain author-controlled. The provisional tracker comments on [initiative #2](https://github.com/midhunpradeep/town_model/issues/2) and [decision ticket #3](https://github.com/midhunpradeep/town_model/issues/3) do not finalize either issue or add author approval.
+
+The current repository contains no classifier reconstruction, trained detector, or later scientific training stages. R2 is a separate proposed interface-development task after R1 has reconciled the ledger and a coordinator has established its approved scope and blockers. Phase 4 and detector/scientific training work remain on hold/unimplemented; no historical Phase 1–3 acceptance authorizes them.
+
+## Historical Phase 1–3 status snapshot
+
+The material below preserves the 2026-10-31 Phase 1–3 milestone/status record. Its historical acceptance counts and scope descriptions remain useful, but statements there about then-current classifier implementation, the expanded draft as scientific authority, or branch structure are **not current operational or scientific authority**. The current T0–T5 boundary and A1/R1 status are stated above and in the linked T5 report. Historical reviews are not edited to make their original scope appear current.
 
 ## Status vocabulary
 
@@ -24,7 +34,7 @@ See the [acceptance index](ACCEPTANCE_INDEX.md) for accepted implementation/repo
 
 Acceptance of an implementation milestone is not scientific acceptance of a hypothesis.
 
-## Implementation milestone status
+## Phase 1–3 historical implementation milestone status
 
 | Milestone | Implementation status | Independent acceptance | Evidence and boundary |
 |---|---|---|---|
@@ -35,7 +45,7 @@ Acceptance of an implementation milestone is not scientific acceptance of a hypo
 
 Earlier **REQUEST CHANGES** verdicts are retained in their original review documents. The later final acceptance reviews supersede those earlier verdicts for Phases 1–3; see the [acceptance index](ACCEPTANCE_INDEX.md) for the sequence and review scope.
 
-## Implemented subsystems in the accepted baseline
+## Subsystems present in the accepted Phase 3 baseline (historical snapshot)
 
 ### Data and ontology preparation (Phase 1)
 
@@ -97,7 +107,7 @@ The expanded specification has two distinct kinds of “phase.” They must not 
 
 Historical results and artifacts remain unchanged; no new dataset or expensive experiment was created for this status update.
 
-## Accepted verification evidence
+## Historical accepted-verification evidence
 
 The final independent acceptance reports are authoritative for their respective reviewed revisions:
 
@@ -113,7 +123,7 @@ The cleanup branch test suite was run in `.venv` with Python 3.12 and the instal
 
 This is the observed test result for the cleanup checkout; it is separate from (and matches the count in) the historical definitive Phase 3 review.
 
-## Remaining engineering requirements from the expanded specification
+## Outstanding work listed by the historical expanded-spec review draft
 
 The following are **outstanding**, not implicitly satisfied by Phase 3 acceptance:
 
@@ -128,7 +138,7 @@ The following are **outstanding**, not implicitly satisfied by Phase 3 acceptanc
 
 Other explicitly deferred options in the expanded specification (for example cones, adaptive house/window gates, attention pooling, OWL/ALC reasoning, and automatic hyperparameter search) remain deferred and should not be treated as hidden Phase 3 deliverables.
 
-## Pending scientific/methodology decisions
+## Decisions listed as pending in the 2026-10-31 snapshot
 
 - The supervisor-approved RQ2 protocol remains pending: ontology-pair population, relation labels, aggregate metrics, handling of unknown relations, statistical comparison, and what evidence is sufficient for the thesis claim. Exact box and sampled town utilities are diagnostic foundations, not that final protocol.
 - The reference town-distance adaptation is not fully mathematically settled in the expanded specification. The specification explicitly requires source tracing and author review for material ambiguity; no code or documentation here resolves it.
@@ -136,7 +146,7 @@ Other explicitly deferred options in the expanded specification (for example con
 - Provisional defaults (including weighting cap/β, initialization distributions, and selected comparison settings) are configuration choices, not scientific optima. The author-led classifier consolidation is expected to decide which model definitions and comparisons remain appropriate; this status document does not decide them.
 - Baseline/box/town capacity differs, and the expanded specification names this as a confound to report rather than a solved fairness issue.
 
-## Git branch structure and provenance
+## Historical Git branch structure and provenance
 
 Before cleanup work, remote refs were checked with `git ls-remote`. The exact Phase 3 acceptance branch matched `2de9c5f29b436f727720e87132d0b4be25a40768`; accepted Phase 2 and Phase 1 review branches matched their records. The accepted implementation ancestry is:
 
@@ -165,6 +175,6 @@ Relevant remote branch heads at cleanup start:
 
 This cleanup branch is based directly on the last row's exact SHA. The old `implementation/phase-3-image-embeddings` tip (`241cac…`) is an earlier development revision, not the accepted implementation. The maintenance branch is a separate documentation-only descendant; it is not a merge into `main` and does not move or replace any acceptance ref.
 
-## Hold status
+## Historical hold status as of 2026-10-31
 
 Phase 4 authorization is recorded in the definitive Phase 3 review. **Phase 4 remains intentionally on hold pending the author's model-consolidation work.** This handoff documents the accepted baseline and makes classifier code inspectable; it does not start reconstruction, choose model structures, resolve scientific methodology, or modify implementation.

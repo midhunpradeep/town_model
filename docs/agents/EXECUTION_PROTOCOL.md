@@ -21,6 +21,12 @@ gh issue list --repo midhunpradeep/town_model --state open --label workflow:read
 
 `workflow:ready` is the only implementation-work frontier. A candidate with an assignee or an open blocker is not eligible. The `ready-for-agent` triage label is not a substitute for this check.
 
+## Reconstruction-specific sequencing
+
+The accepted T0–T5 teardown is the current classifier-free baseline; historical Phase 1–3 classifier behavior is not executable. The author-approved handoff supplied for R0 reports 50 active A1 decisions, while R1 remains responsible for reconciling the exact decisions and approval links into the durable repository ledger. Do not derive requirements from the historical classifier inventory or expanded review draft, and do not treat provisional #2/#3 status comments as final decision resolutions.
+
+Planning boundary only: a later R2 task may develop classifier-facing interfaces from the R1-reconciled authority while preserving retained dataset/ontology and point/tensor contracts. R2 is not authorization to implement classifier mathematics, objectives, optimizers, detector behavior, or scientific training. R1/R2 need their own approved issue scopes, blockers, and review lifecycle; this note does not create or ready either task.
+
 ## Issue lifecycle and state authority
 
 An implementation issue has exactly one `workflow:*` label at a time. That label is its authoritative lifecycle state; its assignee is its current owner. Do not encode state in multiple labels, free-text status fields, project boards, or a Markdown task list. GitHub open/closed status is a terminal projection: accepted tasks are closed; rejected tasks remain open unless explicitly superseded.

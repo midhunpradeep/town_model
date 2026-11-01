@@ -1,5 +1,7 @@
 # Classifier teardown dependency map (T0/T1)
 
+> **Historical planning artifact — not a current architecture or tracker-status source.** This map records the T0/T1-era dependency analysis written before T2–T5 and its original proposed dispositions. Statements below that old classifiers remain active, T2–T5 are pending, or old modules are present are historical. The accepted T0–T5 teardown removed historical classifier implementations and made model-dependent operations unavailable. Use [current project status](../CURRENT_PROJECT_STATUS.md), the [acceptance index](../ACCEPTANCE_INDEX.md), and the [definitive T5 review](../../reviews/classifier_teardown_t5_final_acceptance.md) for current state. The contents below are otherwise preserved as historical evidence.
+
 ## Scope and authority
 
 This map records the accepted implementation at baseline `95438f2356f8415506dba93a45cb2908ff5cf875` and the compatibility-preserving T1 extraction on `reconstruction/classifier-teardown`. The old models remain active for this pass. The map is dependency evidence, not a replacement-model specification. No classifier output meaning, geometry, parameterization, initialization, objective, score, membership rule, or scientific interpretation is approved here.

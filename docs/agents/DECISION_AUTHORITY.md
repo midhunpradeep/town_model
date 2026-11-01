@@ -16,11 +16,12 @@ Agents may decide internal code organization within approved boundaries, small i
 
 ## Current source-of-truth boundaries
 
-- [`CURRENT_PROJECT_STATUS.md`](../CURRENT_PROJECT_STATUS.md) is milestone-level state; [`ACCEPTANCE_INDEX.md`](../ACCEPTANCE_INDEX.md) and the linked independent reviews identify accepted implementation revisions and their scope.
-- [`CLASSIFIER_IMPLEMENTATION_INVENTORY.md`](../CLASSIFIER_IMPLEMENTATION_INVENTORY.md) describes the existing code as reference evidence. It is not an approved specification for reconstructed models.
-- [`pizzaiolo_thesis_implementation_spec_v1_1_expanded.md`](../../pizzaiolo_thesis_implementation_spec_v1_1_expanded.md) is an expanded review draft that explicitly says it is not implementation authorization and records unresolved choices. Its contents may inform discussion; they do not renew approval of historical choices.
-- Phase 1, Phase 2, and bounded pre-detector Phase 3 remain accepted for their recorded scopes. Acceptance of those implementations does not authorize redesign, reconstruction, or Phase 4. Phase 4 is on hold.
-- The `Classifier Reconstruction — Author-Led Mathematical Design` GitHub issue is a planning map. Its topic list is fog to resolve, not a requirements list.
+- [`CURRENT_PROJECT_STATUS.md`](../CURRENT_PROJECT_STATUS.md) states the current classifier-free operational baseline; [`ACCEPTANCE_INDEX.md`](../ACCEPTANCE_INDEX.md) and linked independent reviews distinguish historical Phase 1–3 implementation acceptance from accepted T0–T5 teardown.
+- [`CLASSIFIER_IMPLEMENTATION_INVENTORY.md`](../CLASSIFIER_IMPLEMENTATION_INVENTORY.md) is descriptive historical/reference evidence. It is not a specification for reconstructed models and does not imply its inventoried implementations remain active.
+- [`pizzaiolo_thesis_implementation_spec_v1_1_expanded.md`](../../pizzaiolo_thesis_implementation_spec_v1_1_expanded.md) is a historical expanded review draft. It is not the current reconstruction authority or implementation authorization; its former statements cannot supersede explicit later author decisions.
+- The author-approved mathematical handoff supplied for R0 reports **50 active A1 decisions**. The full decision ledger and exact approval-source links have not yet been durably reconciled in the repository. **R1 owns that formal reconciliation.** R0 records only the count and limited handoff context; agents must not infer the full ledger from historical code, the expanded draft, or a summary comment. Until R1 makes exact decisions traceable to author-approved sources, unresolved details remain author-controlled and dependent implementation work must not be marked READY.
+- Phase 1, Phase 2, and bounded pre-detector Phase 3 remain accepted for their historical scopes. The later T0–T5 teardown is the accepted operational boundary: historical classifier implementations and model-dependent execution were removed or made explicitly unavailable. Neither historical acceptance nor teardown authorizes reconstruction, detector work, or scientific training. Phase 4 remains on hold.
+- The `Classifier Reconstruction — Author-Led Mathematical Design` issue #2 remains a planning map. Issue #3 and its provisional status comment do not authorize implementation or finalize the decision record. R1 must reconcile the tracker with the approved A1 sources without converting agent summary into new author approval.
 
 If sources appear to conflict, stop and record the precise conflict for the author. Do not select whichever source is easiest to implement.
 

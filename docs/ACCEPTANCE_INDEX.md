@@ -2,7 +2,7 @@
 
 This index identifies the accepted implementation revisions and the independent review records that establish their status. Implementation SHAs and later report-only review commits are intentionally listed separately. Links to historical documents preserve their original wording and verdicts; those files have not been rewritten to make them look current.
 
-## Authoritative accepted revisions
+## Accepted historical Phase 1–3 implementation revisions
 
 | Milestone | Accepted implementation SHA | Independent acceptance record | Scope of acceptance |
 |---|---|---|---|
@@ -10,7 +10,15 @@ This index identifies the accepted implementation revisions and the independent 
 | Phase 2 | [`087b116c4d06cd08af65d775136986a413cc5eff`](https://github.com/midhunpradeep/town_model/commit/087b116c4d06cd08af65d775136986a413cc5eff) | Review commit [`fbe1063f2451270a89c9e0c110b988d6aafa4a27`](https://github.com/midhunpradeep/town_model/commit/fbe1063f2451270a89c9e0c110b988d6aafa4a27); [`reviews/phase_02_final_acceptance_review.md`](../reviews/phase_02_final_acceptance_review.md) | Synthetic neural-baseline, box and town classifiers, geometry/loss/reducer behavior, experiment persistence and Geometry Laboratory. |
 | Phase 3 | [`a098a0a3c66a30200bd85906212cb07ef8bd19eb`](https://github.com/midhunpradeep/town_model/commit/a098a0a3c66a30200bd85906212cb07ef8bd19eb) | Definitive review commit [`2de9c5f29b436f727720e87132d0b4be25a40768`](https://github.com/midhunpradeep/town_model/commit/2de9c5f29b436f727720e87132d0b4be25a40768); [`reviews/phase_03_definitive_acceptance_review.md`](../reviews/phase_03_definitive_acceptance_review.md) | **Pre-detector, GT-ROI image-to-ontology implementation milestone.** It is not detector-pretrained stage 2, end-to-end detection, or evidence for final scientific claims. The definitive review records 292 passing tests. |
 
-The current cleanup branch was created directly from the definitive Phase 3 review commit `2de9c5f29b436f727720e87132d0b4be25a40768`. In ancestry order, the direct Phase 3 sequence is `a098a0a` (accepted implementation) → `87a5215` (separate remediation report) → `2de9c5f` (definitive review record). Do not use `main` or the older `implementation/phase-3-image-embeddings` tip as the accepted Phase 3 baseline.
+The Phase 3 implementation/review pair above remains accepted for its historical pre-detector GT-ROI scope. It is not the current classifier-execution baseline. At R0 start, fetched `main` was `3bd7252f2232d86e190f71c4e4a29de40dedb396`; it contains both accepted teardown implementation `19222424f5ad8347deddc6dfb2d7187bd85609c0` and T5 final review/report commit `2b9df576aac2fd95f093bbb3b046813620a822a5` in its ancestry. The nine commits after the T5 report preserve earlier teardown review records; R0 found no intervening classifier implementation changes. See the [R0 report](reconstruction/R0_RECONCILIATION_REPORT.md) for exact ancestry and fresh checks.
+
+## Accepted T0–T5 classifier teardown — current execution boundary
+
+The staged teardown (issues #4–#8) is independently accepted. The definitive [T5 review](../reviews/classifier_teardown_t5_final_acceptance.md), report commit [`2b9df576aac2fd95f093bbb3b046813620a822a5`](https://github.com/midhunpradeep/town_model/commit/2b9df576aac2fd95f093bbb3b046813620a822a5), accepts the exact teardown implementation [`19222424f5ad8347deddc6dfb2d7187bd85609c0`](https://github.com/midhunpradeep/town_model/commit/19222424f5ad8347deddc6dfb2d7187bd85609c0). This acceptance supersedes classifier execution from Phases 2–3 without rewriting those historical records.
+
+The current foundation retains dataset/ontology/supervision contracts, canonical vision/FPN/ROI features, `VisionFeatureBatch`, point-only image projections/composition, generic known-mask reducers, feature caching and run/storage identity, validated read-only historical metadata/snapshot inspection, and dataset CLI/dashboard surfaces. Component visual features remain `[B,K,260]`; global spatial features `[B,256,7,7]`; component points `[B,K,d]`; final pizza points `[B,d]`.
+
+Historical neural/affine, box, and town classifiers; their membership/geometric algorithms and classifier-specific objectives; and model-dependent train/evaluate/resume/interpretation operations are removed or explicitly unavailable through `ClassifierBackendUnavailableError`. Rejected operations must not create or mutate model artifacts. The exact unavailable route matrix and retained-boundary evidence are in the T5 review and fresh R0 report.
 
 ## Historical implementation and remediation records
 
@@ -41,5 +49,5 @@ The current cleanup branch was created directly from the definitive Phase 3 revi
 ## Read this before relying on a result
 
 - **Accepted implementation does not mean scientifically evaluated.** The definitive Phase 3 review explicitly says acceptance is not evidence that towns outperform the baseline or box model. The accepted system has no implemented or trained image detector.
-- The unchanged scientific authority is [`pizzaiolo_thesis_implementation_spec_v1_1_expanded.md`](../pizzaiolo_thesis_implementation_spec_v1_1_expanded.md). Phase-specific scope documents record implementation sequencing/deferrals and do not replace that specification.
-- Current status and remaining work are summarized in [`docs/CURRENT_PROJECT_STATUS.md`](CURRENT_PROJECT_STATUS.md). Factual classifier details are in [`docs/CLASSIFIER_IMPLEMENTATION_INVENTORY.md`](CLASSIFIER_IMPLEMENTATION_INVENTORY.md).
+- The expanded v1.1 document is a historical review draft, not current scientific authority or implementation authorization. The author-approved mathematical handoff supplied to R0 reports 50 active A1 decisions; durable ledger reconciliation is pending R1. R0 does not reconstruct that ledger, and unresolved scientific questions remain author-controlled. See [current project status](CURRENT_PROJECT_STATUS.md), the R0 report, and live planning issues [#2](https://github.com/midhunpradeep/town_model/issues/2)/[#3](https://github.com/midhunpradeep/town_model/issues/3).
+- [`docs/CURRENT_PROJECT_STATUS.md`](CURRENT_PROJECT_STATUS.md) states the current operational boundary and separately labels its 2026-10-31 Phase 1–3 text as a historical snapshot. [`docs/CLASSIFIER_IMPLEMENTATION_INVENTORY.md`](CLASSIFIER_IMPLEMENTATION_INVENTORY.md) remains descriptive evidence only.
