@@ -8,7 +8,7 @@ This map records the accepted implementation at baseline `95438f2356f8415506dba9
 
 The author-led classifier map is issue [#2](https://github.com/midhunpradeep/town_model/issues/2); its membership/set-operation decision [#3](https://github.com/midhunpradeep/town_model/issues/3) remains pending and is not required for T0/T1. The infrastructure bootstrap review [#1](https://github.com/midhunpradeep/town_model/issues/1) was `workflow:in-review` when this work began; its independent acceptance is pending. This map does not represent the agent workflow as independently accepted.
 
-The accepted historical implementation remains at [`remediation/phase-3-last-two-findings`](https://github.com/midhunpradeep/town_model/tree/remediation/phase-3-last-two-findings), commit `2de9c5f29b436f727720e87132d0b4be25a40768`. `main` and that branch are unchanged.
+The historical `remediation/phase-3-last-two-findings` branch is no longer a live ref. Its definitive Phase 3 review/report is preserved at immutable [review commit `2de9c5f29b436f727720e87132d0b4be25a40768`](https://github.com/midhunpradeep/town_model/commit/2de9c5f29b436f727720e87132d0b4be25a40768). The [review document](../../reviews/phase_03_definitive_acceptance_review.md) accepts Phase 3 implementation `a098a0a3c66a30200bd85906212cb07ef8bd19eb`; the accepted implementation and later review/report commit are distinct revisions. `main` and these historical records are unchanged.
 
 ## Target boundary after T1
 
