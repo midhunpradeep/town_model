@@ -8,9 +8,20 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 ROOT = Path(__file__).parents[1]
 SOURCE = ROOT / "src" / "town_model"
 ACCEPTED_HISTORY = "2de9c5f29b436f727720e87132d0b4be25a40768"
+EXPECTED_NODE_DISPOSITIONS = {"deleted": 96, "replaced": 77, "split": 3}
+EXPECTED_GROUP_DISPOSITIONS = {"deleted": 68, "replaced": 58, "split": 3}
+FINAL_INTEGRITY_REGRESSION_NODES = {
+    "tests/test_image_snapshot_integrity.py::test_reader_rejects_decreasing_uint64_offsets_with_other_metadata_valid",
+    "tests/test_image_snapshot_integrity.py::test_reader_accepts_valid_uint64_offsets[increasing]",
+    "tests/test_image_snapshot_integrity.py::test_reader_accepts_valid_uint64_offsets[empty-component-range]",
+    "tests/test_image_snapshot_integrity.py::test_discovery_skips_decreasing_uint64_offsets_and_keeps_valid_snapshot",
+    "tests/test_t3_architecture.py::test_retirement_manifest_rejects_coordinated_disposition_count_mutation",
+}
 
 
 def _source_files() -> list[Path]:
@@ -97,6 +108,30 @@ assert not set(('NeuralBaseline', 'BoxClassifier', 'TownClassifier', 'PointClass
     subprocess.run([sys.executable, "-c", script], cwd=ROOT, env=env, check=True)
 
 
+def _disposition_counts(entries: list[dict[str, object]]) -> tuple[dict[str, int], dict[str, int]]:
+    node_counts = {disposition: 0 for disposition in EXPECTED_NODE_DISPOSITIONS}
+    group_counts = {disposition: 0 for disposition in EXPECTED_GROUP_DISPOSITIONS}
+    for entry in entries:
+        disposition = entry["disposition"]
+        assert isinstance(disposition, str) and disposition in node_counts
+        original_node_ids = entry["original_node_ids"]
+        assert isinstance(original_node_ids, list)
+        node_counts[disposition] += len(original_node_ids)
+        group_counts[disposition] += 1
+    return node_counts, group_counts
+
+
+def _assert_manifest_disposition_counts(manifest: dict[str, object]) -> tuple[dict[str, int], dict[str, int]]:
+    entries = manifest["entries"]
+    assert isinstance(entries, list)
+    node_counts, group_counts = _disposition_counts(entries)
+    assert node_counts == EXPECTED_NODE_DISPOSITIONS
+    assert group_counts == EXPECTED_GROUP_DISPOSITIONS
+    assert manifest["disposition_node_counts"] == EXPECTED_NODE_DISPOSITIONS
+    assert manifest["disposition_group_counts"] == EXPECTED_GROUP_DISPOSITIONS
+    return node_counts, group_counts
+
+
 def _collected_current_test_nodes() -> set[str]:
     """Collect node IDs only; this subprocess does not execute collected tests."""
     environment = os.environ.copy()
@@ -136,8 +171,6 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert current_nodes
 
     covered: set[str] = set()
-    node_dispositions = {"deleted": 0, "split": 0, "replaced": 0}
-    group_dispositions = {"deleted": 0, "split": 0, "replaced": 0}
     for entry in entries:
         for field in (
             "original_node_ids", "historical_behavior", "retirement_reason",
@@ -146,7 +179,7 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
             assert field in entry and entry[field] not in (None, "", []), (entry, field)
         assert "replacement_tests" in entry
         disposition = entry["disposition"]
-        assert disposition in node_dispositions
+        assert disposition in EXPECTED_NODE_DISPOSITIONS
         assert entry["accepted_historical_revision"] == ACCEPTED_HISTORY
         assert isinstance(entry["replacement_tests"], list)
         assert len(entry["replacement_tests"]) == len(set(entry["replacement_tests"])), entry
@@ -154,8 +187,6 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
             assert entry["replacement_tests"], f"{disposition} entry has no replacement: {entry}"
         else:
             assert not entry["replacement_tests"], f"deleted entry claims replacement coverage: {entry}"
-        node_dispositions[disposition] += len(entry["original_node_ids"])
-        group_dispositions[disposition] += 1
         for node_id in entry["original_node_ids"]:
             assert node_id not in covered, f"duplicate manifest node: {node_id}"
             assert node_id.startswith("tests/") and "::" in node_id
@@ -174,8 +205,7 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert not baseline_nodes & additional_nodes
     assert covered == baseline_nodes | additional_nodes
     assert baseline_nodes <= covered
-    assert node_dispositions == manifest["disposition_node_counts"]
-    assert group_dispositions == manifest["disposition_group_counts"]
+    node_dispositions, group_dispositions = _assert_manifest_disposition_counts(manifest)
     assert sum(node_dispositions.values()) == manifest["accounted_original_node_count"]
     assert len(covered) == manifest["accounted_original_node_count"]
     assert len(entries) == manifest["entry_count"]
@@ -186,13 +216,15 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert summary["starting_t2_collected_nodes"] == sum(baseline_suite.values())
     assert isinstance(summary["submitted_t3_collected_nodes_before_remediation"], int)
     assert summary["submitted_t3_collected_nodes_before_remediation"] < len(current_nodes)
-    assert summary["current_collected_nodes_at_remediation_checkpoint"] == len(current_nodes)
+    checkpoint_node_count = summary["current_collected_nodes_at_remediation_checkpoint"]
+    assert FINAL_INTEGRITY_REGRESSION_NODES <= current_nodes
+    assert checkpoint_node_count + len(FINAL_INTEGRITY_REGRESSION_NODES) == len(current_nodes)
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
         summary["unchanged_original_node_ids_retained"]
         + summary["same_node_id_retargeted_or_split"]
         + summary["new_node_ids_added"]
-        == len(current_nodes)
+        == checkpoint_node_count
     )
 
     snapshot_entry = next(
@@ -219,3 +251,25 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert d5a_entry["disposition"] == "split"
     assert "entailment" in d5a_entry["independent_assertions_retained"].lower()
     assert any("test_mushroom_vegetarian_ontology_entailment_is_independent_of_geometry" in node for node in d5a_entry["replacement_tests"])
+
+
+def test_retirement_manifest_rejects_coordinated_disposition_count_mutation() -> None:
+    path = ROOT / "docs" / "reconstruction" / "T3_TEST_RETIREMENT_MANIFEST.md"
+    text = path.read_text(encoding="utf-8")
+    start_marker = "<!-- T3_RETIREMENT_DATA_START -->"
+    end_marker = "<!-- T3_RETIREMENT_DATA_END -->"
+    payload = text.split(start_marker, 1)[1].split(end_marker, 1)[0].strip()
+    payload = payload.removeprefix("```json").removesuffix("```").strip()
+    original_manifest = json.loads(payload)
+    mutated_manifest = dict(original_manifest)
+    mutated_manifest["entries"] = [dict(entry) for entry in original_manifest["entries"]]
+    entry = next(item for item in mutated_manifest["entries"] if item["disposition"] == "replaced")
+    entry["disposition"] = "deleted"
+    mutated_nodes, mutated_groups = _disposition_counts(mutated_manifest["entries"])
+    mutated_manifest["disposition_node_counts"] = mutated_nodes
+    mutated_manifest["disposition_group_counts"] = mutated_groups
+
+    assert mutated_nodes == {"deleted": 97, "replaced": 76, "split": 3}
+    assert mutated_groups == {"deleted": 69, "replaced": 57, "split": 3}
+    with pytest.raises(AssertionError):
+        _assert_manifest_disposition_counts(mutated_manifest)

@@ -76,7 +76,7 @@ def load_image_snapshot(path: Path | str) -> ImageResearchSnapshot:
         raise _snapshot_integrity_error(
             root, "arrays.component_offsets", "must be a one-dimensional integer array matching sample_ids"
         )
-    if offsets[0] != 0 or np.any(offsets < 0) or np.any(np.diff(offsets) < 0):
+    if offsets[0] != 0 or np.any(offsets < 0) or np.any(offsets[1:] < offsets[:-1]):
         raise _snapshot_integrity_error(root, "arrays.component_offsets", "must start at zero and be non-decreasing")
     component_count = arrays.get("component_count_total")
     if (

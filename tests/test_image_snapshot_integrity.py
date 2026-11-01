@@ -203,6 +203,64 @@ def test_reader_normalizes_malformed_identity_and_offset_shapes(tmp_path: Path) 
         load_image_snapshot(offset_snapshot)
 
 
+def test_reader_rejects_decreasing_uint64_offsets_with_other_metadata_valid(tmp_path: Path) -> None:
+    arrays = _snapshot_values()
+    arrays["component_offsets"] = np.asarray([0, 5, 3], dtype=np.uint64)
+    arrays["component_count_total"] = np.asarray(3, dtype=np.uint64)
+    snapshot_path, stored_arrays = _write_snapshot(tmp_path / "decreasing-unsigned-offsets", arrays=arrays)
+    header = json.loads((snapshot_path / "header.json").read_text(encoding="utf-8"))
+    arrays_path = snapshot_path / "arrays.npz"
+
+    assert header["sample_ids"] == ["pizza-a", "pizza-b"]
+    assert stored_arrays["sample_ids"].shape == (2,)
+    offsets = stored_arrays["component_offsets"]
+    assert offsets.dtype == np.dtype(np.uint64)
+    assert offsets.shape == (len(header["sample_ids"]) + 1,)
+    assert offsets[0] == 0
+    assert offsets[-1] == stored_arrays["component_count_total"].item() == 3
+    assert stored_arrays["component_count_total"].shape == ()
+    assert header["arrays_sha256"] == hashlib.sha256(arrays_path.read_bytes()).hexdigest()
+    assert np.any(offsets[1:] < offsets[:-1])
+
+    with pytest.raises(ValueError, match=r"arrays\.component_offsets"):
+        load_image_snapshot(snapshot_path)
+
+
+@pytest.mark.parametrize(
+    "offset_values",
+    ([0, 2, 3], [0, 0, 3]),
+    ids=["increasing", "empty-component-range"],
+)
+def test_reader_accepts_valid_uint64_offsets(tmp_path: Path, offset_values: list[int]) -> None:
+    arrays = _snapshot_values()
+    arrays["component_offsets"] = np.asarray(offset_values, dtype=np.uint64)
+    arrays["component_count_total"] = np.asarray(3, dtype=np.uint64)
+    snapshot_path, _ = _write_snapshot(tmp_path / "valid-unsigned-offsets", arrays=arrays)
+
+    snapshot = load_image_snapshot(snapshot_path)
+
+    assert snapshot.arrays["component_offsets"].dtype == np.dtype(np.uint64)
+    assert snapshot.arrays["component_offsets"].tolist() == offset_values
+    assert snapshot.arrays["component_count_total"].dtype == np.dtype(np.uint64)
+    assert snapshot.arrays["component_count_total"].item() == 3
+
+
+def test_discovery_skips_decreasing_uint64_offsets_and_keeps_valid_snapshot(tmp_path: Path) -> None:
+    run = tmp_path / "run"
+    valid_arrays = _snapshot_values()
+    valid_arrays["component_offsets"] = np.asarray([0, 2, 3], dtype=np.uint64)
+    valid_arrays["component_count_total"] = np.asarray(3, dtype=np.uint64)
+    valid, _ = _write_snapshot(run / "snapshots" / "epoch-00001", arrays=valid_arrays)
+    invalid_arrays = _snapshot_values()
+    invalid_arrays["component_offsets"] = np.asarray([0, 5, 3], dtype=np.uint64)
+    invalid_arrays["component_count_total"] = np.asarray(3, dtype=np.uint64)
+    invalid, _ = _write_snapshot(run / "snapshots" / "epoch-00002", arrays=invalid_arrays)
+
+    with pytest.raises(ValueError, match=r"arrays\.component_offsets"):
+        load_image_snapshot(invalid)
+    assert discover_image_snapshots(run) == [valid]
+
+
 def test_discovery_returns_all_valid_snapshots(tmp_path: Path) -> None:
     run = tmp_path / "run"
     first, _ = _write_snapshot(run / "snapshots" / "epoch-00001")
