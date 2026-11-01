@@ -2,10 +2,14 @@
 
 **Verdict: ACCEPT R0**
 
-**Issue:** [#9 — R0: Reconcile reconstruction baseline and repository authority](https://github.com/midhunpradeep/town_model/issues/9)  
-**Previous reviewed implementation:** `6e03e01d42b35c4bf69846c1cd4b55940075c30f`  
-**New implementation:** `40f362b6cf7e3969b0ea61c9b2a52f968a32bce2`  
-**Prior review record:** `cb858d5bcba209c02157a981e7813fcaa9d05943`  
+**Issue:** [#9 — R0: Reconcile reconstruction baseline and repository authority](https://github.com/midhunpradeep/town_model/issues/9)
+
+**Previous reviewed implementation:** `6e03e01d42b35c4bf69846c1cd4b55940075c30f`
+
+**New implementation:** `40f362b6cf7e3969b0ea61c9b2a52f968a32bce2`
+
+**Prior review record:** `cb858d5bcba209c02157a981e7813fcaa9d05943`
+
 **Implementation branch:** `docs/r0-reconstruction-baseline-reconciliation`
 
 The new implementation is a direct child of the previously reviewed implementation. I inspected it in a clean isolated worktree at the exact new SHA. The two blocking documentation findings are resolved; the diff introduces no regression or out-of-scope work.
