@@ -112,3 +112,48 @@ def test_image_embeddings_displays_only_persisted_metadata_and_checksums(tmp_pat
     assert any(item.label == "Checksummed historical snapshot metadata" for item in app.selectbox)
     assert not app.button
     assert {path: path.read_bytes() for path in before} == before
+
+
+def test_image_embeddings_marks_corrupt_geometry_snapshot_unavailable(tmp_path: Path) -> None:
+    runs_root = tmp_path / "runs"
+    run = runs_root / "historical-run"
+    run.mkdir(parents=True)
+    identity_hash = "stored-run-identity"
+    (run / "manifest.json").write_text(json.dumps({
+        "schema_version": "image-run-manifest-v1",
+        "run_id": run.name,
+        "identity_hash": identity_hash,
+        "state": "completed",
+    }))
+    (run / "resolved-config.json").write_text(json.dumps({"identity_hash": identity_hash}))
+
+    snapshot_dir = run / "snapshots" / "epoch-00001"
+    snapshot_dir.mkdir(parents=True)
+    arrays_path = snapshot_dir / "arrays.npz"
+    np.savez_compressed(
+        arrays_path,
+        sample_ids=np.asarray(["sample-1"], dtype=np.str_),
+        component_offsets=np.asarray([0, 0], dtype=np.int64),
+        component_count_total=np.asarray(0, dtype=np.int64),
+        classifier_geometry_box_low=np.asarray([[0.1, 0.2]], dtype=np.float32),
+    )
+    (snapshot_dir / "header.json").write_text(json.dumps({
+        "schema_version": "image-research-snapshot-v2",
+        "sample_ids": ["sample-1"],
+        "diagnostic_axes_schema": {"classifier_geometry_box_low": ["class", "coordinate"]},
+        "arrays_sha256": hashlib.sha256(arrays_path.read_bytes()).hexdigest(),
+        "geometry": {},
+    }))
+
+    app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+    app.sidebar.radio[0].set_value("Image Embeddings")
+    app.sidebar.text_input[2].set_value(str(runs_root))
+    app.run()
+
+    assert not app.exception
+    assert any(
+        "No persisted image snapshots passed checksum-validated metadata inspection" in item.value
+        for item in app.info
+    )
+    assert not any(item.label == "Checksummed historical snapshot metadata" for item in app.selectbox)

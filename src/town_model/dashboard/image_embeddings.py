@@ -69,7 +69,7 @@ def render_image_embeddings(st, runs_root: Path, dataset_path: Path) -> None:
 
     snapshots = discover_snapshots(selected_run)
     if not snapshots:
-        st.info("No persisted image snapshots passed checksum-validated metadata inspection.")
+        st.info("No persisted image snapshots passed checksum-validated metadata inspection; invalid snapshots are unavailable.")
         return
     selected_snapshot = st.selectbox(
         "Checksummed historical snapshot metadata", snapshots, format_func=lambda path: path.name

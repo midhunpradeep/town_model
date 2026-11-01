@@ -10,7 +10,7 @@ This manifest records the exact original pytest node IDs or parameterized node g
 
 The current replacement tests do **not** validate a replacement classifier. They cover only supported independent boundaries: image-to-point projections, dataset/ontology targets and masks, caller-supplied value reducers, cache/integrity, historical metadata/snapshot reading, atomic generic storage, and explicit unavailable-operation behavior.
 
-Test collection reconciles as follows: baseline 323 nodes; current suite 180 nodes. **147 original node IDs remain unchanged**, **6 original IDs were retargeted/split under the same name**, and **27 new node IDs were added**. The 176 manifest entries account for every other original ID plus the six retargeted cases.
+Test collection reconciles as follows: accepted T2 collected 323 nodes; submitted T3 collected 180; the remediation suite collects 196 nodes. **147 original node IDs remain unchanged**, **6 accounted IDs retain their names with retargeted/split assertions**, and **43 current node IDs are new relative to T2**. The manifest preserves all 176 accounted original IDs (132 prior failures plus 44 additional nodes). The 147 unchanged IDs plus 6 retargeted IDs plus 43 new IDs reconcile to the current 196-node collection.
 
 Independent ontology assertions were preserved:
 
@@ -180,7 +180,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical score-to-penalty/objective behavior or tests generic mask/weight/aggregation behavior through the old objective module.",
       "retirement_reason": "Historical score conversion and objective formulas were removed; value-only masked reduction/aggregation is retained without approving an objective.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain tested.",
+      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain; no score conversion or classifier objective is covered.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_generic_weighted_reduction_and_effective_batch_aggregation_remain_independent"
       ],
@@ -193,9 +193,12 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "Partial: retired implementations are absent and representative model APIs/CLI reject explicitly. No classifier outputs, geometry, membership, or loss values survive.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_retired_model_modules_and_package_exports_are_absent"
+        "tests/test_classifier_backend_unavailable.py::test_retired_model_modules_and_package_exports_are_absent",
+        "tests/test_t3_architecture.py::test_retired_modules_and_historical_executable_definitions_are_absent",
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -206,10 +209,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
         "tests/test_classifier_backend_unavailable.py::test_direct_historical_image_penalty_rejects_every_loss_configuration_without_side_effects[box-signed_distance]"
       ],
       "historical_behavior": "Asserts historical behavior `test direct historical image penalty rejects every loss configuration without side effects`.",
-      "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
+      "retirement_reason": "The score/objective module and historical formulas were removed; no numerical behavior or direct penalty API is retained.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No numerical penalty, gradient, or loss assertion survives. The replacement proves historical executable definitions are absent; generic value reduction is separate.",
       "replacement_tests": [
+        "tests/test_classifier_backend_unavailable.py::test_retired_model_modules_and_package_exports_are_absent",
         "tests/test_t3_architecture.py::test_retired_modules_and_historical_executable_definitions_are_absent"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
@@ -218,11 +222,12 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_classifier_backend_unavailable.py::test_direct_image_objective_rejects_valid_supplied_scores_before_mutation_or_artifacts"
       ],
-      "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
-      "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
+      "historical_behavior": "Calls the historical image-objective function with valid scores/targets and checks rejection before mutation or artifact creation.",
+      "retirement_reason": "The model-specific objective module was removed rather than retained behind a guard; no score interpretation remains.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No score-to-penalty behavior survives. Removed objective definitions are absent; generic caller-supplied-value aggregation is tested separately.",
       "replacement_tests": [
+        "tests/test_classifier_backend_unavailable.py::test_retired_model_modules_and_package_exports_are_absent",
         "tests/test_t3_architecture.py::test_retired_modules_and_historical_executable_definitions_are_absent"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
@@ -234,9 +239,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "Fresh-process imports avoid removed implementations; both pages render without uncaught errors or model controls.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
+        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
+        "tests/test_phase3_architecture.py::test_image_dashboard_is_metadata_only_and_has_no_model_execution_or_geometry"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -244,12 +250,12 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_classifier_backend_unavailable.py::test_image_cli_metadata_inspection_remains_read_only"
       ],
-      "historical_behavior": "Asserts old Image Embeddings launch/preflight/worker/prediction/geometry controls or successful model execution.",
-      "retirement_reason": "Model-dependent controls and recomputation were removed; dataset dashboard pages and safe persisted metadata remain.",
+      "historical_behavior": "Inspects persisted image-run manifest and metrics through the read-only CLI path.",
+      "retirement_reason": "Metadata inspection remains a read-only JSON operation; only model-dependent execution was removed.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset pages remain tested; the model page verifies explicit unavailability and metadata-only reads.",
+      "independent_assertions_retained": "CLI image metadata inspection returns stored manifest/metrics and leaves the run tree byte-identical.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_image_and_synthetic_metadata_inspection_are_read_only"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -260,9 +266,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Direct API tests verify explicit rejection; source checks find no model/checkpoint reconstruction call. No successful execution is claimed.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_image_point_path_and_visual_only_feature_factory_remain_independent"
+        "tests/test_classifier_backend_unavailable.py::test_retired_model_modules_and_package_exports_are_absent",
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_t3_architecture.py::test_retired_modules_and_historical_executable_definitions_are_absent"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -273,7 +281,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test image point path and visual only feature extractor remain independent`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Point shapes/identity/validity, lack of classifier outputs, and the visual-only feature factory are directly asserted.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_image_point_path_and_visual_only_feature_factory_remain_independent"
       ],
@@ -286,9 +294,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "API and CLI preflight tests assert rejection before construction, config reads, or output publication.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects"
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -310,9 +319,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "CLI rejections cover fixed/mapping, image preflight/run/matrix/resume/evaluate/relation/stop, and synthetic evaluate/resume/export; API and no-mutation coverage is separate.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -323,10 +334,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test read only run inspection and checksums remain available`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Read-only metadata leaves files unchanged; the checksum reader returns values unchanged. New non-empty-axis coverage is the reader-only fixture.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_image_and_synthetic_metadata_inspection_are_read_only",
-        "tests/test_classifier_backend_unavailable.py::test_checksum_validated_snapshot_values_remain_readable_without_model"
+        "tests/test_classifier_backend_unavailable.py::test_checksum_validated_snapshot_values_remain_readable_without_model_import",
+        "tests/test_image_snapshot_integrity.py::test_reader_roundtrips_nonempty_diagnostic_axes_and_stored_values_without_reconstruction"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -334,12 +346,14 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_create_runs_workers_checkpoints_or_exports"
       ],
-      "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
+      "historical_behavior": "Calls rejected image/synthetic run, launch, matrix, cache, and export operations and checks no run/worker/checkpoint/cache/export paths are created.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Direct API rejection/no-output and existing-run nonmutation are asserted; no checkpoint is loaded or created.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_image_point_path_and_visual_only_feature_factory_remain_independent"
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts",
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -350,8 +364,9 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Existing image/synthetic run trees remain byte-identical after rejected resume/stop calls; direct APIs report explicit errors.",
       "replacement_tests": [
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts",
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
@@ -363,9 +378,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Synthetic CLI rejection, representative API rejection, and retired module absence remain tested; no synthetic model/checkpoint behavior survives.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects"
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_t3_architecture.py::test_retired_modules_and_historical_executable_definitions_are_absent"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -376,9 +393,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts hard box/town membership, signed-margin, region-relation, or old relation CLI behavior.",
       "retirement_reason": "Those geometric algorithms and duplicate NumPy/Torch membership implementations were removed, not retained behind guards.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Generic no-clobber JSON publication and ontology metadata assertions remain tested separately.",
+      "independent_assertions_retained": "Worker/snapshot/relation APIs reject without output; CLI relation rejection and reader-only snapshot behavior are separate.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects"
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
+        "tests/test_image_snapshot_integrity.py::test_reader_roundtrips_nonempty_diagnostic_axes_and_stored_values_without_reconstruction"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -389,7 +408,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Checks the image-to-point projection shapes/values while also constructing the old image classifier adapter or asserting old classifier outputs.",
       "retirement_reason": "The compatibility adapter and classifier outputs were removed; the independent point pathway remains.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Point shapes, bounds, sample/component IDs, validity masks, composition mode, and absence of classifier outputs remain tested.",
+      "independent_assertions_retained": "Point values/shapes, occurrence identity, validity masks, mode, and absence of classifier outputs remain tested without an adapter.",
       "replacement_tests": [
         "tests/test_classifier_teardown_boundary.py::test_image_point_model_preserves_points_and_identity_without_classifier_outputs"
       ],
@@ -402,7 +421,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Checks that importing dataset/config/CLI/dashboard/snapshot/point layers does not eagerly import concrete classifier or geometry implementations.",
       "retirement_reason": "The old import-isolation assertion was expanded from deferred imports to the T3 requirement that historical implementation modules are absent; the original node was replaced with an absence-aware boundary test.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset, configuration, CLI, dashboard, snapshot, and image-point imports remain isolated from model execution.",
+      "independent_assertions_retained": "Fresh-process dataset/config/CLI/dashboard/snapshot/point imports remain isolated from removed modules and exports.",
       "replacement_tests": [
         "tests/test_classifier_teardown_boundary.py::test_dataset_and_point_imports_do_not_load_or_expose_retired_implementations"
       ],
@@ -415,10 +434,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts old Image Embeddings launch/preflight/worker/prediction/geometry controls or successful model execution.",
       "retirement_reason": "Model-dependent controls and recomputation were removed; dataset dashboard pages and safe persisted metadata remain.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset pages remain tested; the model page verifies explicit unavailability and metadata-only reads.",
+      "independent_assertions_retained": "AppTest renders persisted run/snapshot metadata with a read-only caption and no buttons; import isolation is checked separately.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
-        "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums"
+        "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums",
+        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -429,10 +448,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts old Image Embeddings launch/preflight/worker/prediction/geometry controls or successful model execution.",
       "retirement_reason": "Model-dependent controls and recomputation were removed; dataset dashboard pages and safe persisted metadata remain.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset pages remain tested; the model page verifies explicit unavailability and metadata-only reads.",
+      "independent_assertions_retained": "AppTest checks metadata-only values/no buttons; fresh-process page coverage checks both model pages.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
-        "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums"
+        "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums",
+        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -443,7 +462,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts old Image Embeddings launch/preflight/worker/prediction/geometry controls or successful model execution.",
       "retirement_reason": "Model-dependent controls and recomputation were removed; dataset dashboard pages and safe persisted metadata remain.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset pages remain tested; the model page verifies explicit unavailability and metadata-only reads.",
+      "independent_assertions_retained": "Partial only: page startup and metadata-only/no-model-control state remain; worker failure/log rendering is retired and not claimed.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
         "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums"
@@ -457,7 +476,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts old Image Embeddings launch/preflight/worker/prediction/geometry controls or successful model execution.",
       "retirement_reason": "Model-dependent controls and recomputation were removed; dataset dashboard pages and safe persisted metadata remain.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset pages remain tested; the model page verifies explicit unavailability and metadata-only reads.",
+      "independent_assertions_retained": "The page has no launch/model buttons; persisted metadata is tested separately. Worker launch is retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
         "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums"
@@ -471,10 +490,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts old Image Embeddings launch/preflight/worker/prediction/geometry controls or successful model execution.",
       "retirement_reason": "Model-dependent controls and recomputation were removed; dataset dashboard pages and safe persisted metadata remain.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dataset pages remain tested; the model page verifies explicit unavailability and metadata-only reads.",
+      "independent_assertions_retained": "No dashboard preflight controls remain; CLI rejection checks no config read/output. Invalid-draft UI diagnostics are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
-        "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums"
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -485,7 +504,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -496,7 +515,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -507,7 +526,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -518,7 +537,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -529,7 +548,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -540,7 +559,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "CLI mapping invocation rejects explicitly and creates no output; no synthetic runs are retained.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
       ],
@@ -553,9 +572,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "Fixed training/export reject without publication; synthetic JSON metadata-only inspection is separate. No model results/geometry are replaced.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts",
+        "tests/test_classifier_backend_unavailable.py::test_image_and_synthetic_metadata_inspection_are_read_only"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -566,7 +587,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test high dimensional view uses actual sample anchor and explicit slice`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Only unavailable/no-model-controls page behavior is tested. Sample anchoring, slicing, and geometry plots are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
@@ -579,9 +600,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test historical snapshot without optional activity remains readable`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Reader fixtures without optional activity load checksum-validated stored sample/offset/value arrays unchanged.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
+        "tests/test_classifier_backend_unavailable.py::test_checksum_validated_snapshot_values_remain_readable_without_model_import",
+        "tests/test_image_snapshot_integrity.py::test_geometry_metadata_is_optional_when_no_geometry_arrays_are_stored"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -592,7 +614,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test invalid or missing runs are reported without crashing`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Only safe disabled-page startup remains tested; synthetic geometry-run discovery/error presentation are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
@@ -605,7 +627,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test saved run discovery selection region metrics and comparison`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Only unavailable Geometry Laboratory behavior is checked; saved geometry selection, region metrics, and comparison are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
@@ -615,12 +637,14 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_phase2_dashboard_geometry.py::test_snapshot_activity_tracks_initial_intermediate_and_final_geometry"
       ],
-      "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
+      "historical_behavior": "Generates/displays initial, intermediate, and final model-dependent geometry activity snapshots.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "Partial: hand-built stored activity values/axes and header agreement round-trip unchanged; model-generated activity/trajectory assertions are retired.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
+        "tests/test_image_snapshot_integrity.py::test_reader_roundtrips_nonempty_diagnostic_axes_and_stored_values_without_reconstruction",
+        "tests/test_image_snapshot_integrity.py::test_reader_rejects_invalid_diagnostic_axis_declarations[wrong-axis-count]",
+        "tests/test_image_snapshot_integrity.py::test_reader_reports_controlled_geometry_integrity_errors[value-mismatch]"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -628,10 +652,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_phase2_dashboard_geometry.py::test_streamlit_geometry_laboratory_loads_saved_runs_without_retraining"
       ],
-      "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
+      "historical_behavior": "Loads persisted classifier runs in the former Geometry Laboratory without retraining.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "AppTest verifies the unavailable Geometry Laboratory loads without exception or model controls; saved-run visualization is retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
@@ -642,10 +666,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
         "tests/test_phase2_dashboard_geometry.py::test_town_plot_keeps_overlap_reinclusion_and_window_boundaries_faithful[2-axes0]",
         "tests/test_phase2_dashboard_geometry.py::test_town_plot_keeps_overlap_reinclusion_and_window_boundaries_faithful[3-axes1]"
       ],
-      "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
+      "historical_behavior": "Plots historical town overlap/reinclusion and window-boundary geometry for parameterized dimensions.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "Only disabled geometry-page behavior is tested. No town boundaries, overlap, reinclusion, or plot mathematics survive.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
@@ -658,7 +682,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -669,7 +693,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -680,7 +704,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -691,7 +715,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test missing snapshot or unknown split fails clearly`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -702,7 +726,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -713,7 +737,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -724,7 +748,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -735,7 +759,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -746,7 +770,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test dimension aware initialization is seeded and diverse`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -757,7 +781,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test empty batches chunked equivalence and validation`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -768,7 +792,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test extreme float32 raw parameters remain valid and seeded`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -779,7 +803,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -790,7 +814,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test minimum width feasibility and float32 physical invariants`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -801,7 +825,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test multiple windows and classes follow literal boolean set operations`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -812,7 +836,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -825,7 +849,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test target volume initialization materially improves high dimensional window activity`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -836,7 +860,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test window boundary exclusion and other house reinclusion`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -847,7 +871,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -858,7 +882,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test positive inside window activates window branch and negative inside house activates frame`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -869,7 +893,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -880,7 +904,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -891,7 +915,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -902,7 +926,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -913,7 +937,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -924,7 +948,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test invalid min width values are rejected by config and constructors`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -932,10 +956,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_phase2_models_losses.py::test_all_unknown_instances_are_absent_from_objective_and_have_zero_gradient"
       ],
-      "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
+      "historical_behavior": "Checks all-unknown rows are excluded from the old objective and have zero gradient.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "Value-only reduction still excludes all-unknown rows and yields zero gradients without a classifier objective.",
       "replacement_tests": [
         "tests/test_phase2_models_losses.py::test_all_unknown_instances_are_absent_from_reduction_and_have_zero_gradient"
       ],
@@ -948,7 +972,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test baseline zero logit threshold is inclusive and bce is unreduced`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -961,7 +985,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -972,7 +996,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -983,7 +1007,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -994,7 +1018,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1005,7 +1029,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1016,7 +1040,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1027,7 +1051,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1038,7 +1062,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1049,7 +1073,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1060,9 +1084,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts the old dashboard experiment controls delegated to a detached worker service.",
       "retirement_reason": "The model-dependent controls and worker launch UI were removed; the page is metadata-only.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Dashboard startup and read-only persisted run/snapshot metadata remain tested.",
+      "independent_assertions_retained": "Source checks confirm no training/geometry path; AppTest verifies unavailable metadata-only pages with no controls.",
       "replacement_tests": [
-        "tests/test_phase3_architecture.py::test_image_dashboard_is_metadata_only_and_has_no_model_execution_or_geometry"
+        "tests/test_phase3_architecture.py::test_image_dashboard_is_metadata_only_and_has_no_model_execution_or_geometry",
+        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1073,7 +1098,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Compares cached and uncached historical classifier training trajectories.",
       "retirement_reason": "No active classifier training trajectory exists after T3; cache identity, integrity, locking, and visual feature retrieval remain independent.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Strict feature-cache identity and integrity tests remain active.",
+      "independent_assertions_retained": "Only feature-cache identity and deterministic train/validation panel assertions survive; no training trajectory parity is claimed.",
       "replacement_tests": [
         "tests/test_phase3_cache.py::test_frozen_cache_has_strict_identity_and_only_deterministic_train_validation_panel"
       ],
@@ -1086,9 +1111,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Expects `town experiment image run` to train a historical model, publish a run/checkpoint/snapshot, and then inspect that model-dependent run.",
       "retirement_reason": "The image training and snapshot-producing operations were removed; metadata-only inspection remains supported but the old command sequence cannot execute.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Persisted run inspection and checksummed snapshot reading are tested from caller-created historical metadata fixtures; dataset CLI behavior remains independently tested.",
+      "independent_assertions_retained": "Run rejection/no-publication, read-only JSON inspection, and hand-built checksum-validated arrays remain; training results are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
+        "tests/test_classifier_backend_unavailable.py::test_image_and_synthetic_metadata_inspection_are_read_only",
+        "tests/test_classifier_backend_unavailable.py::test_checksum_validated_snapshot_values_remain_readable_without_model_import",
         "tests/test_dashboard_app.py::test_image_embeddings_displays_only_persisted_metadata_and_checksums"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
@@ -1100,7 +1127,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test default and selectable image objective identities and scientific hashes`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Archived objective identity/hash stability is metadata-only; formulas are not evaluated or approved.",
       "replacement_tests": [
         "tests/test_phase3_config.py::test_historical_objective_metadata_and_run_identity_compatibility_are_stable"
       ],
@@ -1113,7 +1140,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Combines an OWL entailment with a geometric region-violation query.",
       "retirement_reason": "The geometric query executed removed classifier-region semantics; the ontology entailment is independent.",
       "disposition": "split",
-      "independent_assertions_retained": "The MushroomTopping → VegetarianTopping entailment is retained without any region query.",
+      "independent_assertions_retained": "MushroomTopping → VegetarianTopping entailment remains asserted without a geometry query.",
       "replacement_tests": [
         "tests/test_phase3_d5a_ontology_entailments.py::test_mushroom_vegetarian_ontology_entailment_is_independent_of_geometry"
       ],
@@ -1126,7 +1153,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "Partial: early CLI rejection/no-artifact and generic atomic JSON publication are checked separately; old post-publication relation handling is retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
         "tests/test_phase3_d5b_relation_publication.py::test_single_writer_publishes_complete_json_and_cleans_temporary_file"
@@ -1148,7 +1175,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test all nine image model configurations forward and backpropagate`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1159,7 +1186,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical score-to-penalty/objective behavior or tests generic mask/weight/aggregation behavior through the old objective module.",
       "retirement_reason": "Historical score conversion and objective formulas were removed; value-only masked reduction/aggregation is retained without approving an objective.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain tested.",
+      "independent_assertions_retained": "Generic known-mask weighted reduction, unit-weight equivalence, eligibility, aggregation, and gradients survive without score conversion.",
       "replacement_tests": [
         "tests/test_phase3_models.py::test_weighted_instance_reduction_masks_unknown_values_and_gradients",
         "tests/test_phase3_models.py::test_weighted_effective_batch_accumulation_matches_full_batch_gradients",
@@ -1175,7 +1202,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1186,7 +1213,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1197,7 +1224,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test default family objective penalties and signed distance hinge are numerically exact`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1208,7 +1235,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical score-to-penalty/objective behavior or tests generic mask/weight/aggregation behavior through the old objective module.",
       "retirement_reason": "Historical score conversion and objective formulas were removed; value-only masked reduction/aggregation is retained without approving an objective.",
       "disposition": "split",
-      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain tested.",
+      "independent_assertions_retained": "Partial: mask, supplied weights, occurrence/image reduction, eligibility, gradients, and aggregation remain; score/objective conversion is retired.",
       "replacement_tests": [
         "tests/test_phase3_models.py::test_known_mask_values_reduce_per_instance_then_per_image_without_score_conversion"
       ],
@@ -1221,7 +1248,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test hybrid pizza supervision alone reaches deepsets and component projection`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1232,7 +1259,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1246,9 +1273,12 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Checks the image-to-point projection shapes/values while also constructing the old image classifier adapter or asserting old classifier outputs.",
       "retirement_reason": "The compatibility adapter and classifier outputs were removed; the independent point pathway remains.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Point shapes, bounds, sample/component IDs, validity masks, composition mode, and absence of classifier outputs remain tested.",
+      "independent_assertions_retained": "All four exact parameterized nodes preserve point shapes/bounds, sample/component identity, validity, and absence of classifier outputs.",
       "replacement_tests": [
-        "tests/test_phase3_models.py::test_model_projection_shapes_and_bounded_point_contract"
+        "tests/test_phase3_models.py::test_model_projection_shapes_and_bounded_point_contract[2]",
+        "tests/test_phase3_models.py::test_model_projection_shapes_and_bounded_point_contract[5]",
+        "tests/test_phase3_models.py::test_model_projection_shapes_and_bounded_point_contract[8]",
+        "tests/test_phase3_models.py::test_model_projection_shapes_and_bounded_point_contract[16]"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1259,11 +1289,8 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical score-to-penalty/objective behavior or tests generic mask/weight/aggregation behavior through the old objective module.",
       "retirement_reason": "Historical score conversion and objective formulas were removed; value-only masked reduction/aggregation is retained without approving an objective.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain tested.",
+      "independent_assertions_retained": "Generic caller-supplied aggregation still raises undefined-support for an all-ineligible batch; no scoring is used.",
       "replacement_tests": [
-        "tests/test_phase3_models.py::test_weighted_instance_reduction_masks_unknown_values_and_gradients",
-        "tests/test_phase3_models.py::test_weighted_effective_batch_accumulation_matches_full_batch_gradients",
-        "tests/test_phase3_models.py::test_unit_weights_reproduce_unweighted_known_value_mean",
         "tests/test_phase3_models.py::test_undefined_effective_batch_is_reported_without_fabricated_zero_objective"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
@@ -1275,7 +1302,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Exercises old model-dependent snapshot generation, stored geometry/margins, or the legacy snapshot schema error.",
       "retirement_reason": "Snapshot generation reconstructed historical outputs/geometry and was removed; only checksum-validated read-only snapshot loading remains.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Safe schema/checksum/offset validation and stored-value reading remain tested with hand-authored metadata fixtures.",
+      "independent_assertions_retained": "Only unsupported schema-version rejection is preserved with a hand-built reader fixture; model-generated snapshot assertions are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_snapshot_reader_rejects_unsupported_schema_without_model_reconstruction"
       ],
@@ -1296,7 +1323,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1305,10 +1332,19 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
         "tests/test_phase3_models.py::test_snapshot_diagnostic_axes_roundtrip_preserve_class_geometry_and_instance_activity"
       ],
       "historical_behavior": "Exercises old model-dependent snapshot generation, stored geometry/margins, or the legacy snapshot schema error.",
-      "retirement_reason": "Snapshot generation reconstructed historical outputs/geometry and was removed; only checksum-validated read-only snapshot loading remains.",
+      "retirement_reason": "Model-generated snapshot/math assertions were removed; hand-built reader fixtures preserve the independent stored-array, axis, and header-agreement contract.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Safe schema/checksum/offset validation and stored-value reading remain tested with hand-authored metadata fixtures.",
-      "replacement_tests": [],
+      "independent_assertions_retained": "Partial: non-empty axes are dimension-checked; stored IDs, offsets, dtypes, values, and geometry/header agreement round-trip. Model-generated values/margins/relations/plots are retired.",
+      "replacement_tests": [
+        "tests/test_image_snapshot_integrity.py::test_reader_roundtrips_nonempty_diagnostic_axes_and_stored_values_without_reconstruction",
+        "tests/test_image_snapshot_integrity.py::test_geometry_metadata_is_optional_when_no_geometry_arrays_are_stored",
+        "tests/test_image_snapshot_integrity.py::test_reader_reports_controlled_geometry_integrity_errors[missing-field]",
+        "tests/test_image_snapshot_integrity.py::test_reader_reports_controlled_geometry_integrity_errors[shape-mismatch]",
+        "tests/test_image_snapshot_integrity.py::test_reader_reports_controlled_geometry_integrity_errors[value-mismatch]",
+        "tests/test_image_snapshot_integrity.py::test_reader_rejects_invalid_diagnostic_axis_declarations[wrong-axis-count]",
+        "tests/test_image_snapshot_integrity.py::test_reader_rejects_invalid_diagnostic_axis_declarations[missing-array]",
+        "tests/test_image_snapshot_integrity.py::test_reader_rejects_checksum_corruption_before_returning_arrays"
+      ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
     {
@@ -1318,12 +1354,9 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical score-to-penalty/objective behavior or tests generic mask/weight/aggregation behavior through the old objective module.",
       "retirement_reason": "Historical score conversion and objective formulas were removed; value-only masked reduction/aggregation is retained without approving an objective.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain tested.",
+      "independent_assertions_retained": "Caller-supplied weighted values preserve full/split-batch result and gradient equivalence with unknown values masked.",
       "replacement_tests": [
-        "tests/test_phase3_models.py::test_weighted_instance_reduction_masks_unknown_values_and_gradients",
-        "tests/test_phase3_models.py::test_weighted_effective_batch_accumulation_matches_full_batch_gradients",
-        "tests/test_phase3_models.py::test_unit_weights_reproduce_unweighted_known_value_mean",
-        "tests/test_phase3_models.py::test_undefined_effective_batch_is_reported_without_fabricated_zero_objective"
+        "tests/test_phase3_models.py::test_weighted_effective_batch_accumulation_matches_full_batch_gradients"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1334,12 +1367,9 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical score-to-penalty/objective behavior or tests generic mask/weight/aggregation behavior through the old objective module.",
       "retirement_reason": "Historical score conversion and objective formulas were removed; value-only masked reduction/aggregation is retained without approving an objective.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Caller-supplied value reduction, known-mask exclusion, gradients, per-image eligibility, and effective-batch aggregation remain tested.",
+      "independent_assertions_retained": "Weighted reduction, unknown-mask exclusion, and gradients are tested with values, not classifier scores.",
       "replacement_tests": [
-        "tests/test_phase3_models.py::test_weighted_instance_reduction_masks_unknown_values_and_gradients",
-        "tests/test_phase3_models.py::test_weighted_effective_batch_accumulation_matches_full_batch_gradients",
-        "tests/test_phase3_models.py::test_unit_weights_reproduce_unweighted_known_value_mean",
-        "tests/test_phase3_models.py::test_undefined_effective_batch_is_reported_without_fabricated_zero_objective"
+        "tests/test_phase3_models.py::test_weighted_instance_reduction_masks_unknown_values_and_gradients"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1350,7 +1380,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Checks the image-to-point projection shapes/values while also constructing the old image classifier adapter or asserting old classifier outputs.",
       "retirement_reason": "The compatibility adapter and classifier outputs were removed; the independent point pathway remains.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Point shapes, bounds, sample/component IDs, validity masks, composition mode, and absence of classifier outputs remain tested.",
+      "independent_assertions_retained": "Empty component points and classifier-free composition remain tested; no classifier output is fabricated.",
       "replacement_tests": [
         "tests/test_phase3_models.py::test_zero_roi_image_points_produce_the_empty_deepsets_point"
       ],
@@ -1363,7 +1393,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts hard box/town membership, signed-margin, region-relation, or old relation CLI behavior.",
       "retirement_reason": "Those geometric algorithms and duplicate NumPy/Torch membership implementations were removed, not retained behind guards.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Generic no-clobber JSON publication and ontology metadata assertions remain tested separately.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1374,7 +1404,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Combines authoritative asserted/entailed/unknown ontology metadata checks with a later old-geometry relation query.",
       "retirement_reason": "The geometry relation computation and geometry-backed publication path were removed; ontology metadata itself is independent and retained.",
       "disposition": "split",
-      "independent_assertions_retained": "Ontology metadata assertions and canonical snapshot-ID validation remain executable.",
+      "independent_assertions_retained": "Ontology status metadata and canonical snapshot class mapping remain; geometry is not computed.",
       "replacement_tests": [
         "tests/test_phase3_relations.py::test_ontology_metadata_distinguishes_asserted_entailed_and_unknown_relations"
       ],
@@ -1387,7 +1417,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts hard box/town membership, signed-margin, region-relation, or old relation CLI behavior.",
       "retirement_reason": "Those geometric algorithms and duplicate NumPy/Torch membership implementations were removed, not retained behind guards.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Generic no-clobber JSON publication and ontology metadata assertions remain tested separately.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1398,7 +1428,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts hard box/town membership, signed-margin, region-relation, or old relation CLI behavior.",
       "retirement_reason": "Those geometric algorithms and duplicate NumPy/Torch membership implementations were removed, not retained behind guards.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Generic no-clobber JSON publication and ontology metadata assertions remain tested separately.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1409,7 +1439,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts hard box/town membership, signed-margin, region-relation, or old relation CLI behavior.",
       "retirement_reason": "Those geometric algorithms and duplicate NumPy/Torch membership implementations were removed, not retained behind guards.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Generic no-clobber JSON publication and ontology metadata assertions remain tested separately.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1420,10 +1450,11 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Only explicit rejection/no-output and existing-run immutability remain; checkpoint compatibility is not claimed.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication",
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1434,10 +1465,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "Direct launch rejection/no-output and dashboard no-launch-control behavior remain; worker process behavior is retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1448,10 +1479,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Only rejected stop/resume and existing-run nonmutation remain; worker lifecycle/checkpoint behavior is not reproduced.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1462,7 +1493,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "Direct API/CLI tests assert matrix unavailability and no output; comparison-configuration semantics are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
@@ -1476,10 +1507,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Only rejected worker/run calls and existing-file nonmutation remain; status reconciliation/checkpoint recovery are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1490,7 +1521,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Expected metadata inspection to mutate a stale running manifest based on process/lock state.",
       "retirement_reason": "T2 deliberately made inspection read-only; lifecycle reconciliation is not part of inspection.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Read-only manifest/snapshot integrity is tested; generic lock ownership tests remain.",
+      "independent_assertions_retained": "Read-only metadata inspection leaves files unchanged; generic writer-lock tests are separate.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_image_and_synthetic_metadata_inspection_are_read_only"
       ],
@@ -1503,7 +1534,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test invalid configuration fails before any run directory is created`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "Preflight rejects before config reads or run/output creation; model-specific validation is not claimed.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
@@ -1516,12 +1547,12 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
         "tests/test_phase3_runs.py::test_invalid_dashboard_launch_fails_preflight_without_creating_output[invalid_config1-positive integer counts]",
         "tests/test_phase3_runs.py::test_invalid_dashboard_launch_fails_preflight_without_creating_output[invalid_config2-integer feature indices]"
       ],
-      "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
+      "historical_behavior": "Submits parameterized invalid model drafts through dashboard preflight and checks no output run is created.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "No dashboard preflight/model controls remain; CLI rejection has no config read/output. Invalid-draft diagnostics are retired.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
+        "tests/test_classifier_backend_unavailable.py::test_fresh_import_graph_and_model_pages_do_not_load_removed_implementations",
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
@@ -1530,10 +1561,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "original_node_ids": [
         "tests/test_phase3_runs.py::test_invalid_model_and_vision_preflight_has_no_run_cache_or_cli_side_effects"
       ],
-      "historical_behavior": "Compares cached and uncached historical classifier training trajectories.",
+      "historical_behavior": "Checks invalid model/vision preflight creates no run, feature cache, or CLI artifacts.",
       "retirement_reason": "No active classifier training trajectory exists after T3; cache identity, integrity, locking, and visual feature retrieval remain independent.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Strict feature-cache identity and integrity tests remain active.",
+      "independent_assertions_retained": "Preflight/API rejection verifies no run, configured feature-cache directory, or CLI output is created; model/vision validation diagnostics are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
         "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
@@ -1547,7 +1578,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model preflight/run resolution, run identity, and original split selection.",
       "retirement_reason": "Model-dependent preflight cannot return an executable run; pure dataset subset ordering and config identity remain independent.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Original train/validation split selection and stable config identity remain tested without model construction.",
+      "independent_assertions_retained": "Metadata-only subset ordering/disjointness and stable identity under presentation-only changes remain tested.",
       "replacement_tests": [
         "tests/test_phase3_runs.py::test_run_config_identity_and_original_subset_order_remain_metadata_only",
         "tests/test_phase3_config.py::test_historical_objective_metadata_and_run_identity_compatibility_are_stable"
@@ -1561,10 +1592,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "replaced",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "Only explicit run/resume rejection and existing-artifact preservation remain; training/lifecycle/generated snapshots/geometry are retired.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1575,10 +1606,10 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "API rejection and existing-run hashes confirm no stop request or other artifact is written.",
       "replacement_tests": [
         "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1589,10 +1620,9 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts successful model-dependent CLI, worker, launch, stop, preflight, or matrix execution.",
       "retirement_reason": "Supported operations now fail with the centralized unavailable-backend error before side effects.",
       "disposition": "replaced",
-      "independent_assertions_retained": "New CLI/API rejection tests verify the explicit error and artifact non-publication.",
+      "independent_assertions_retained": "Only direct worker rejection/no-artifact behavior survives; subprocess status/log persistence is not claimed.",
       "replacement_tests": [
-        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects",
-        "tests/test_classifier_backend_unavailable.py::test_classifier_dependent_cli_routes_reject_before_reads_or_publication"
+        "tests/test_classifier_backend_unavailable.py::test_supported_model_operations_fail_explicitly_without_side_effects"
       ],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1603,7 +1633,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1614,7 +1644,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1625,7 +1655,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1636,7 +1666,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1647,7 +1677,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1658,7 +1688,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Loads, reconstructs, evaluates, resumes, or plots a historical classifier checkpoint.",
       "retirement_reason": "Model-specific checkpoint deserialization/reconstruction is no longer an active operation; no checkpoint fallback is permitted.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Checksummed read-only JSON/NPZ snapshot and metadata readers remain covered by separate tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1677,7 +1707,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test nine real image training smokes update save reload and evaluate`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1688,7 +1718,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test one real image optimizer update saves resumable training state`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1699,7 +1729,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1710,7 +1740,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical behavior `test snapshot capture does not change training trajectory`.",
       "retirement_reason": "The behavior depends on a removed classifier implementation or its model-dependent execution path.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent dataset, vision, point, reducer, identity, metadata, and storage assertions are retained in the referenced infrastructure tests.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1721,7 +1751,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts historical classifier family construction, parameterization, membership, margin, output, loss, or model-specific gradients.",
       "retirement_reason": "T3 removes the historical mathematical implementation itself; recreating these assertions would select old model semantics.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Independent point projection/composition, target/mask contracts, generic reducers, and vision infrastructure remain covered elsewhere.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1732,7 +1762,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1743,7 +1773,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1754,7 +1784,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Generates or trains the historical synthetic classifier fixtures/experiments.",
       "retirement_reason": "The synthetic fixture/training module is not the authoritative Pizzaïolo pipeline and was removed with model-dependent execution.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Real dataset/ontology generation, validation, and inspection tests remain active.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1765,7 +1795,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1776,7 +1806,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     },
@@ -1787,7 +1817,7 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
       "historical_behavior": "Asserts a historical positive-class weighting policy/formula or its checkpoint semantics.",
       "retirement_reason": "The former weighting-resolution policy is archived configuration metadata, not an approved executable objective; no replacement weighting formula was selected.",
       "disposition": "deleted",
-      "independent_assertions_retained": "Caller-supplied positive weights remain accepted by generic reducer tests; their derivation is not asserted.",
+      "independent_assertions_retained": "No assertion from this original node is represented as replacement coverage; the historical/model-dependent test is fully retired and replacement_tests is intentionally empty.",
       "replacement_tests": [],
       "accepted_historical_revision": "2de9c5f29b436f727720e87132d0b4be25a40768"
     }
@@ -1799,12 +1829,59 @@ The manifest accounts for **176 original node IDs** across **129 test groups**. 
   },
   "test_collection_change_summary": {
     "starting_t2_collected_nodes": 323,
-    "current_collected_nodes_at_manifest_checkpoint": 180,
     "unchanged_original_node_ids_retained": 147,
     "same_node_id_retargeted_or_split": 6,
-    "new_node_ids_added": 27,
-    "original_node_ids_accounted_in_entries": 176
-  }
+    "new_node_ids_added": 43,
+    "original_node_ids_accounted_in_entries": 176,
+    "submitted_t3_collected_nodes_before_remediation": 180,
+    "current_collected_nodes_at_remediation_checkpoint": 196
+  },
+  "additional_accounted_node_ids": [
+    "tests/test_classifier_backend_unavailable.py::test_caller_supplied_objective_terms_still_aggregate_without_scoring",
+    "tests/test_classifier_backend_unavailable.py::test_classifier_construction_inference_geometry_and_losses_are_unavailable",
+    "tests/test_classifier_backend_unavailable.py::test_direct_historical_image_penalty_rejects_every_loss_configuration_without_side_effects[baseline-signed_bce]",
+    "tests/test_classifier_backend_unavailable.py::test_direct_historical_image_penalty_rejects_every_loss_configuration_without_side_effects[box-signed_bce]",
+    "tests/test_classifier_backend_unavailable.py::test_direct_historical_image_penalty_rejects_every_loss_configuration_without_side_effects[box-signed_distance]",
+    "tests/test_classifier_backend_unavailable.py::test_direct_image_objective_rejects_valid_supplied_scores_before_mutation_or_artifacts",
+    "tests/test_classifier_backend_unavailable.py::test_fresh_process_imports_and_dashboard_model_pages_do_not_reach_classifiers",
+    "tests/test_classifier_backend_unavailable.py::test_image_cli_metadata_inspection_remains_read_only",
+    "tests/test_classifier_backend_unavailable.py::test_image_execution_and_checkpoint_entrypoints_fail_before_model_construction",
+    "tests/test_classifier_backend_unavailable.py::test_image_point_path_and_visual_only_feature_extractor_remain_independent",
+    "tests/test_classifier_backend_unavailable.py::test_image_preflight_validates_without_constructing_or_claiming_a_backend",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments0-synthetic classifier training]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments1-synthetic classifier training]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments10-synthetic classifier training resume]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments11-synthetic classifier geometry export]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments2-image classifier experiment preflight]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments3-image-to-ontology classifier training]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments4-automatic image classifier matrix execution]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments5-image-to-ontology classifier training resume]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments6-historical image classifier checkpoint evaluation]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments7-historical ontology-region relation diagnosis]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments8-control a historical image classifier worker]",
+    "tests/test_classifier_backend_unavailable.py::test_model_dependent_cli_commands_fail_nonzero_before_artifacts[arguments9-synthetic classifier evaluation]",
+    "tests/test_classifier_backend_unavailable.py::test_read_only_run_inspection_and_checksums_remain_available",
+    "tests/test_classifier_backend_unavailable.py::test_rejected_operations_do_not_create_runs_workers_checkpoints_or_exports",
+    "tests/test_classifier_backend_unavailable.py::test_rejected_resume_and_stop_leave_existing_lifecycle_and_artifacts_unchanged",
+    "tests/test_classifier_backend_unavailable.py::test_synthetic_training_loading_evaluation_resume_and_geometry_are_unavailable",
+    "tests/test_classifier_backend_unavailable.py::test_worker_snapshot_and_relation_execution_are_unavailable_before_side_effects",
+    "tests/test_classifier_teardown_boundary.py::test_dataset_and_point_imports_do_not_load_concrete_classifiers",
+    "tests/test_phase2_experiments.py::test_fixed_nonconvex_fixture_has_closed_window_exclusion_and_multiple_regions",
+    "tests/test_phase2_experiments.py::test_fixture_splits_and_masks_are_deterministic_and_shared",
+    "tests/test_phase2_models_losses.py::test_all_unknown_instances_are_absent_from_objective_and_have_zero_gradient",
+    "tests/test_phase3_architecture.py::test_image_dashboard_delegates_training_to_detached_execution_service",
+    "tests/test_phase3_config.py::test_default_and_selectable_image_objective_identities_and_scientific_hashes",
+    "tests/test_phase3_models.py::test_all_unit_image_weights_reproduce_unweighted_known_label_mean",
+    "tests/test_phase3_models.py::test_objective_undefined_for_entire_effective_batch_is_actionable",
+    "tests/test_phase3_models.py::test_weighted_effective_batch_accumulation_matches_full_batch_gradients",
+    "tests/test_phase3_models.py::test_weighted_instance_reduction_uses_sum_of_known_class_weights_and_masks_unknown_gradients",
+    "tests/test_phase3_training.py::test_experimental_inverse_frequency_is_explicit_and_capped",
+    "tests/test_phase3_training.py::test_positive_weights_ignore_negative_and_unknown_support_counts",
+    "tests/test_phase3_training.py::test_weight_normalization_is_stable_against_the_selected_class_subset",
+    "tests/test_phase3_weighting.py::test_cap_zero_support_none_and_explicit_experimental_alternative",
+    "tests/test_phase3_weighting.py::test_effective_number_formula_is_hand_computable_for_two_betas",
+    "tests/test_phase3_weighting.py::test_inverse_sqrt_uses_known_positive_count_ratio_and_common_unit_scale"
+  ]
 }
 ```
 <!-- T3_RETIREMENT_DATA_END -->

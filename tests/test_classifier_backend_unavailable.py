@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 import importlib
 import json
@@ -134,7 +135,14 @@ def test_supported_model_operations_fail_explicitly_without_side_effects(tmp_pat
         lambda: resolve_image_experiment(config, repository_root=ROOT),
         "image classifier experiment preflight",
     )
+    cache_directory = tmp_path / "feature-cache"
+    cache_config = replace(
+        config,
+        execution=replace(config.execution, feature_cache_directory=str(cache_directory)),
+    )
+    _expect_unavailable(lambda: run_image_experiment(cache_config, output), "training or resume")
     assert not output.exists()
+    assert not cache_directory.exists()
 
 
 def test_rejected_operations_do_not_mutate_existing_runs_or_create_cli_artifacts(tmp_path: Path, capsys) -> None:
@@ -166,8 +174,14 @@ def test_classifier_dependent_cli_routes_reject_before_reads_or_publication(tmp_
     missing = tmp_path / "missing.json"
     run = tmp_path / "missing-run"
     commands = (
+        (["experiment", "fixed", "--output", str(output)], "synthetic classifier training"),
+        (["experiment", "mapping", "--output", str(output)], "synthetic classifier training"),
         (["experiment", "image", "preflight", "--config", str(missing)], "image classifier experiment preflight"),
         (["experiment", "image", "run", "--config", str(missing), "--output", str(output)], "image-to-ontology classifier training"),
+        (["experiment", "image", "matrix", "--config", str(missing), "--output", str(output)], "automatic image classifier matrix execution"),
+        (["experiment", "image", "resume", str(run)], "image-to-ontology classifier training resume"),
+        (["experiment", "image", "evaluate", str(run)], "historical image classifier checkpoint evaluation"),
+        (["experiment", "image", "stop", str(run)], "control a historical image classifier worker"),
         (["experiment", "image", "relations", str(missing), "--source-class-id", "1", "--target-class-id", "2", "--relation", "containment", "--output", str(output)], "historical ontology-region relation diagnosis"),
         (["evaluate", str(run)], "synthetic classifier evaluation"),
         (["resume", str(run), "--additional-steps", "1"], "synthetic classifier training resume"),
