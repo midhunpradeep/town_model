@@ -169,3 +169,35 @@ Replacement references were audited against actual current collection output, no
 ### Remaining responsibilities, limitations, and handoff
 
 Issue #7 / T4 remains **blocked, unassigned, and unstarted**. T4 still owns final historical presentation policy for stored geometry/scores and must keep dataset pages usable without implying old mathematical interpretation. T5/independent teardown acceptance and author-owned classifier decisions are also not started or implied by this remediation. Discovery intentionally omits invalid snapshots rather than listing every rejected path; the page clearly reports that no snapshots passed integrity inspection. CPU-only checks do not claim CUDA behavior. These boundaries and the exact implementation diff require independent verification; this report does not self-accept the work.
+
+## 12. T3 final snapshot-offset and retirement-count remediation (2026-11-01)
+
+### Review finding and bounded correction
+
+The second independent review at [`bea097b3ee87138a691413a366c1a609bd74a1b4`](https://github.com/midhunpradeep/town_model/blob/bea097b3ee87138a691413a366c1a609bd74a1b4/reviews/classifier_teardown_t3_remediation_independent_review.md) returned **REQUEST CHANGES** on remediation HEAD `5dc3f0937504abfdb61f8d35e669717324bb6d06`. It confirmed the preceding snapshot-geometry and manifest-reference remediation, but identified (1) unsigned-integer underflow in component-offset monotonicity validation and (2) disposition counts that were only compared with totals in the same manifest. This correction is limited to those findings; no classifier teardown was repeated or reopened.
+
+**Branch:** `reconstruction/t3-final-integrity-remediation`, created in a clean isolated worktree directly from exact starting HEAD `5dc3f0937504abfdb61f8d35e669717324bb6d06`. **Source/test implementation commit:** `589e4e0850e657b72cf81267310595a1e669bc77` (`fix: validate T3 unsigned offsets and disposition counts`).
+
+### Unsigned component-offset validation
+
+The prior `np.diff(offsets) < 0` check can wrap a decreasing unsigned difference into a large positive value. I reproduced the reviewer's correctly checksummed v2 snapshot with two sample IDs, `uint64` offsets `[0, 5, 3]`, and scalar `uint64(3)` total: before the fix the reader accepted it and discovery returned it beside a valid snapshot. The regression verifies checksum, identity count, offset dimensionality/length/dtype, initial zero, final total, and the decreasing adjacent pair, so rejection is specifically for non-monotonic offsets.
+
+`src/town_model/inspection/image_snapshots.py` now uses the dtype-safe adjacent comparison `np.any(offsets[1:] < offsets[:-1])`. It performs no subtraction or numerical cast, and does not sort, repair, normalize, or truncate stored data. Existing one-dimensional integer, sample-count length, initial-zero, nonnegative, order, valid scalar-total, and final-total validations remain. The malformed fixture raises a controlled `ValueError` identifying `arrays.component_offsets`; discovery excludes it while preserving a valid sibling. Positive tests confirm `uint64` `[0, 2, 3]` and repeated offsets `[0, 0, 3]` (an empty component interval) load unchanged. Existing signed-integer and zero-component tests remain intact.
+
+### Independent retirement-count invariants
+
+`tests/test_t3_architecture.py` now anchors the accepted disposition values directly in the test: node counts `{deleted: 96, replaced: 77, split: 3}` and group counts `{deleted: 68, replaced: 58, split: 3}`. Both the entry-derived counts and the manifest's two recorded count objects must equal these independent constants; no expected value is derived from the manifest.
+
+A mutation-oriented test copies the manifest in memory, changes a one-node `replaced` entry to `deleted`, and updates both count objects to remain internally consistent. The resulting counts are 97/76/3 nodes and 69/57/3 groups; the independent invariant rejects them. The manifest file was not modified. Its current collection reconciliation remains explicit: its historical checkpoint is 196 nodes and the five new integrity regression nodes are separately identified, giving 201 currently collected nodes.
+
+### Verification and preserved boundaries
+
+- Required focused command: `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q tests/test_image_snapshot_integrity.py tests/test_t3_architecture.py` — **23 passed, 0 failed, 0 skipped**.
+- Dashboard/snapshot selection: `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q tests/test_dashboard_app.py tests/test_phase3_dashboard_data.py tests/test_phase3_architecture.py tests/test_image_snapshot_integrity.py` — **30 passed, 0 failed, 0 skipped**, 5 existing Pandas/Streamlit warnings. This includes the corrupt-geometry dashboard regression.
+- Dataset, classifier-unavailability, point/model, vision/FPN/ROI, ontology and generic-preservation selection: `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q tests/test_classifier_backend_unavailable.py tests/test_phase3_models.py tests/test_phase3_vision.py tests/test_dataset.py tests/test_generator.py tests/test_ontology.py tests/test_labels.py` — **91 passed, 0 failed, 0 skipped**, 2 existing warnings.
+- Full suite: `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m pytest -q` — **201 passed, 0 failed, 0 skipped**, 7 existing Streamlit/Pandas warnings (53.05 seconds).
+- `PYTHONPATH=src /home/midhun/Projects/ovgu/sem8/thesis/town_model/.venv/bin/python -m compileall -q src/town_model tests` and `git diff --check` — passed.
+- Architecture/import tests and the full suite confirm historical implementation modules remain absent; supported model-dependent operations still raise `ClassifierBackendUnavailableError`. Dataset generation help remains available; `town inspect examples/pizza-48 --json` returned dataset `pizza-dcc148789aecf8af86a3` (48 samples), and `town validate examples/pizza-48 --no-write-report --json` returned valid with 0 errors. Point projections, visual feature/FPN/ROI infrastructure, generic reducers, model-free snapshot reading, and metadata-only dashboard inspection remain covered and unchanged.
+- The retirement manifest remains accurate and unchanged: all **176 original node IDs** and all **132 accepted-T2 failure IDs** are accounted for; disposition totals remain **96/77/3 nodes** and **68/58/3 groups**. All **121 replacement references across 40 distinct current test nodes** resolve. Existing stored-geometry/axis integrity and dashboard fixes remain green. No classifier mathematics, scientific semantics, model behavior, canonical research artifact, accepted-history reference, or T4 implementation was changed.
+
+T0/T1 (#4) and T2 (#5) remain CLOSED `workflow:accepted`. Issue #6 remains open for independent review; #7 remains unclaimed and natively blocked by #6. This report records implementation evidence only and does not self-accept T3.
