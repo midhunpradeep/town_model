@@ -1,6 +1,6 @@
 # Current project status
 
-**Updated:** 2026-11-01 — R0 reconstruction-baseline reconciliation
+**Updated:** 2026-11-01 — R1 A1 authority documentation in progress (not independently accepted)
 
 **Repository:** `midhunpradeep/town_model`
 
@@ -14,11 +14,19 @@ Retained, classifier-independent infrastructure includes dataset preparation/val
 
 The historical affine/neural, box, and town classifier implementations, geometric membership calculations, classifier-specific objectives, and model-dependent execution paths have been removed. Classifier-dependent CLI/API/dashboard operations intentionally fail with `ClassifierBackendUnavailableError`; do not restore them or publish model outputs through rejected operations. The historical implementation inventory is descriptive evidence only.
 
-## Scientific authority and next-task boundary
+## Scientific authority and R1 documentation state
 
-The author-approved mathematical handoff supplied for R0 reports **50 active A1 decisions**. R0 records that count and the authority boundary; it does not recreate, enumerate, or independently declare the full decision ledger. **R1 is responsible for durable reconciliation of the approved decisions and their exact sources.** The expanded v1.1 specification remains a historical review draft, not the current reconstruction authority. R1 must identify what is approved, superseded, or still open; unresolved scientific questions remain author-controlled. The provisional tracker comments on [initiative #2](https://github.com/midhunpradeep/town_model/issues/2) and [decision ticket #3](https://github.com/midhunpradeep/town_model/issues/3) do not finalize either issue or add author approval.
+The [canonical A1 Scientific Decision Ledger](reconstruction/A1_SCIENTIFIC_DECISION_LEDGER_2026-11-01.md) is the single mathematical authority for 70 active author-approved F decisions. Its exact SHA-256, byte size, family counts, active-ID locations, F3.6 → F3.6-R supersession, and status-category audit are recorded in the [completeness audit](reconstruction/A1_DECISION_COMPLETENESS_AUDIT.md). The [implementation-readiness frontier](reconstruction/A1_IMPLEMENTATION_READINESS.md) is a derived index, not a competing scientific specification. The expanded v1.1 specification remains a historical review draft and cannot override A1.
 
-The current repository contains no classifier reconstruction. No detector has been implemented or trained, and no later scientific training stage has been completed. The [definitive Phase 3 acceptance review](../reviews/phase_03_definitive_acceptance_review.md) historically authorized Implementation Phase 4; the later [T5 teardown acceptance](../reviews/classifier_teardown_t5_final_acceptance.md) does not approve Phase 4 implementation. Current author direction keeps Phase 4 on hold. Historical Phase 4 authorization does not mean detector implementation, detector training, or a later scientific training stage is currently ready to execute or independently accepted. Resumption requires a separate, properly scoped task consistent with current author decisions. R2 is a separate proposed interface-development task after R1 has reconciled the ledger and a coordinator has established its approved scope and blockers.
+| Status dimension | Current state |
+|---|---|
+| **Scientific** | A1 source received and author-approved. F3.6 is superseded by F3.6-R. The ledger's P0/P1/P2 gates and foundational questions A–J remain unresolved where stated; historical context and mathematical consequences are not additional approvals. |
+| **Implementation** | R1 repository documentation is in progress under [issue #10](https://github.com/midhunpradeep/town_model/issues/10). No reconstructed classifier, geometry, objective, or optimizer is present in active source; no detector or later scientific training has been implemented. |
+| **Independent review** | R1 documentation is not yet reviewed or accepted. R0 is independently accepted; that does not accept R1 or implement any A1 decision. |
+
+The accepted T0–T5 teardown remains the current classifier-free operational baseline; historical Phase 1–3 classifier acceptance is not current execution authority. Issues [#2](https://github.com/midhunpradeep/town_model/issues/2) and [#3](https://github.com/midhunpradeep/town_model/issues/3) retain their planning and author-decision identities. #2 is being reconciled to A1; #3 has a proposed source-linked membership/set resolution pending explicit author confirmation and is not closed or finally resolved by an agent comment. Unresolved scientific details remain author-controlled.
+
+The current repository contains no classifier reconstruction. No detector has been implemented or trained, and no later scientific training stage has been completed. The [definitive Phase 3 acceptance review](../reviews/phase_03_definitive_acceptance_review.md) historically authorized Implementation Phase 4; the later [T5 teardown acceptance](../reviews/classifier_teardown_t5_final_acceptance.md) does not approve Phase 4 implementation. Current author direction keeps Phase 4 on hold. Historical Phase 4 authorization does not mean detector implementation, detector training, or a later scientific training stage is currently ready to execute or independently accepted. Resumption requires a separate, properly scoped task consistent with current author decisions. No R2 task has been started; any later classifier-facing interface task requires separately established scope after independent R1 review.
 
 ## Historical Phase 1–3 status snapshot
 
