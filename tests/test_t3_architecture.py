@@ -22,6 +22,9 @@ FINAL_INTEGRITY_REGRESSION_NODES = {
     "tests/test_image_snapshot_integrity.py::test_discovery_skips_decreasing_uint64_offsets_and_keeps_valid_snapshot",
     "tests/test_t3_architecture.py::test_retirement_manifest_rejects_coordinated_disposition_count_mutation",
 }
+T4_PRESENTATION_REGRESSION_NODES = {
+    "tests/test_image_snapshot_integrity.py::test_v2_snapshot_requires_explicit_diagnostic_axis_schema",
+}
 
 
 def _source_files() -> list[Path]:
@@ -218,7 +221,13 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert summary["submitted_t3_collected_nodes_before_remediation"] < len(current_nodes)
     checkpoint_node_count = summary["current_collected_nodes_at_remediation_checkpoint"]
     assert FINAL_INTEGRITY_REGRESSION_NODES <= current_nodes
-    assert checkpoint_node_count + len(FINAL_INTEGRITY_REGRESSION_NODES) == len(current_nodes)
+    assert T4_PRESENTATION_REGRESSION_NODES <= current_nodes
+    assert (
+        checkpoint_node_count
+        + len(FINAL_INTEGRITY_REGRESSION_NODES)
+        + len(T4_PRESENTATION_REGRESSION_NODES)
+        == len(current_nodes)
+    )
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
         summary["unchanged_original_node_ids_retained"]

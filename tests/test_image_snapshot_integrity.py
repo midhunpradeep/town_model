@@ -90,6 +90,17 @@ def test_reader_roundtrips_nonempty_diagnostic_axes_and_stored_values_without_re
     )
 
 
+def test_v2_snapshot_requires_explicit_diagnostic_axis_schema(tmp_path: Path) -> None:
+    snapshot_path, _ = _write_snapshot(tmp_path / "snapshot")
+    header_path = snapshot_path / "header.json"
+    header = json.loads(header_path.read_text(encoding="utf-8"))
+    del header["diagnostic_axes_schema"]
+    header_path.write_text(json.dumps(header), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"header\.diagnostic_axes_schema"):
+        load_image_snapshot(snapshot_path)
+
+
 def test_geometry_metadata_is_optional_when_no_geometry_arrays_are_stored(tmp_path: Path) -> None:
     arrays = {
         "sample_ids": np.asarray(["pizza-a"], dtype=np.str_),

@@ -208,11 +208,16 @@ def test_image_and_synthetic_metadata_inspection_are_read_only(tmp_path: Path, c
     image_run.mkdir()
     (image_run / "manifest.json").write_text(json.dumps({"schema_version": "image-run-manifest-v1", "state": "completed", "identity_hash": "persisted"}))
     (image_run / "metrics.json").write_text('{"stored": 0.25}')
-    image_before = _tree_hash(image_run)
+    worker_status = tmp_path / ".image-workers" / f"{image_run.name}.json"
+    worker_status.parent.mkdir()
+    worker_status.write_text(json.dumps({"state": "running", "marker": "must-remain-archived"}))
+    image_before = _tree_hash(tmp_path)
     assert inspect_run(image_run)["identity_hash"] == "persisted"
     assert main(["experiment", "image", "inspect", str(image_run)]) == 0
-    assert _tree_hash(image_run) == image_before
-    assert json.loads(capsys.readouterr().out)["metrics"] == {"stored": 0.25}
+    image_cli = json.loads(capsys.readouterr().out)
+    assert image_cli["evidence_status"] == "historical_stored_metadata"
+    assert image_cli["metrics"] == {"stored": 0.25}
+    assert _tree_hash(tmp_path) == image_before
 
     synthetic_run = tmp_path / "synthetic-run"
     synthetic_run.mkdir()
@@ -221,6 +226,12 @@ def test_image_and_synthetic_metadata_inspection_are_read_only(tmp_path: Path, c
     synthetic_before = _tree_hash(synthetic_run)
     result = inspect_saved_run(synthetic_run)
     assert result["metrics"] == {"stored": 1}
+    assert _tree_hash(synthetic_run) == synthetic_before
+    assert main(["inspect-run", str(synthetic_run)]) == 0
+    synthetic_cli = json.loads(capsys.readouterr().out)
+    assert synthetic_cli["evidence_status"] == "historical_stored_metadata"
+    assert synthetic_cli["config"] == {"family": "town"}
+    assert synthetic_cli["metrics"] == {"stored": 1}
     assert _tree_hash(synthetic_run) == synthetic_before
 
 

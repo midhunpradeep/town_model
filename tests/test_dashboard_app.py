@@ -71,6 +71,9 @@ def test_image_embeddings_displays_only_persisted_metadata_and_checksums(tmp_pat
     }))
     (run / "resolved-config.json").write_text(json.dumps({"identity_hash": identity_hash, "stored": True}))
     (run / "metrics.json").write_text(json.dumps({"historical_metric": 0.25}))
+    worker_status = runs_root / ".image-workers" / f"{run.name}.json"
+    worker_status.parent.mkdir()
+    worker_status.write_text(json.dumps({"state": "running", "marker": "must-remain-archived"}))
 
     snapshot_dir = run / "snapshots" / "epoch-00001"
     snapshot_dir.mkdir(parents=True)
@@ -101,7 +104,7 @@ def test_image_embeddings_displays_only_persisted_metadata_and_checksums(tmp_pat
         "geometry": {},
     }))
 
-    before = {path: path.read_bytes() for path in run.rglob("*") if path.is_file()}
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
     app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
     app = AppTest.from_file(str(app_path), default_timeout=30).run()
     app.sidebar.radio[0].set_value("Image Embeddings")
@@ -111,7 +114,7 @@ def test_image_embeddings_displays_only_persisted_metadata_and_checksums(tmp_pat
     assert any("historical values only" in item.value.lower() or "persisted values only" in item.value.lower() for item in app.caption)
     assert any(item.label == "Checksummed historical snapshot metadata" for item in app.selectbox)
     assert not app.button
-    assert {path: path.read_bytes() for path in before} == before
+    assert {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
 
 
 def test_image_embeddings_marks_corrupt_geometry_snapshot_unavailable(tmp_path: Path) -> None:

@@ -90,7 +90,11 @@ def load_image_snapshot(path: Path | str) -> ImageResearchSnapshot:
             root, "arrays.component_count_total", "does not match the final component offset"
         )
 
-    axis_schema = header.get("diagnostic_axes_schema", {})
+    if "diagnostic_axes_schema" not in header:
+        raise _snapshot_integrity_error(
+            root, "header.diagnostic_axes_schema", "is required by the snapshot schema"
+        )
+    axis_schema = header["diagnostic_axes_schema"]
     if not isinstance(axis_schema, dict):
         raise _snapshot_integrity_error(root, "header.diagnostic_axes_schema", "must be a JSON object")
     for key, axes in axis_schema.items():

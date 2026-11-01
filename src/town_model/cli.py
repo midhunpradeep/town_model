@@ -190,7 +190,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     manifest = inspect_run(args.run)
                     metrics_path = args.run.expanduser().resolve() / "metrics.json"
                     metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.is_file() else None
-                    print(json.dumps({"manifest": manifest, "metrics": metrics}, indent=2, sort_keys=True))
+                    print(json.dumps({
+                        "evidence_status": "historical_stored_metadata",
+                        "manifest": manifest,
+                        "metrics": metrics,
+                    }, indent=2, sort_keys=True))
                     return 0
                 operations = {
                     "preflight": "image classifier experiment preflight",
@@ -209,7 +213,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "inspect-run":
             from .inspection.synthetic_metadata import inspect_saved_run
 
-            print(json.dumps(inspect_saved_run(args.run), indent=2, sort_keys=True))
+            metadata = inspect_saved_run(args.run)
+            metadata["evidence_status"] = "historical_stored_metadata"
+            print(json.dumps(metadata, indent=2, sort_keys=True))
             return 0
         if args.command == "export-geometry":
             raise_classifier_backend_unavailable("synthetic classifier geometry export")
