@@ -5,7 +5,54 @@ import json
 from pathlib import Path
 
 import numpy as np
+import torch
 from streamlit.testing.v1 import AppTest
+
+from town_model.dashboard import app as dashboard_app
+from town_model.models.bounded_box_fixture import BOUNDED_BOX_INSPECTION_FIXTURE
+
+
+def test_mathematical_inspector_table_uses_cpu_evaluator_and_literal_fixture(monkeypatch) -> None:
+    calls: list[tuple[torch.device, torch.device, torch.device]] = []
+
+    def evaluator(points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
+        calls.append((points.device, lower.device, upper.device))
+        return torch.tensor([False, True, True, True, False, False], dtype=torch.bool)
+
+    monkeypatch.setattr(dashboard_app, "bounded_box_contains", evaluator)
+    frame, mismatch_count = dashboard_app._bounded_box_inspection_table()
+
+    assert calls == [(torch.device("cpu"), torch.device("cpu"), torch.device("cpu"))]
+    assert frame["Point"].tolist() == ["A", "B", "C", "D", "E", "F"]
+    assert frame["Coordinates"].tolist() == list(BOUNDED_BOX_INSPECTION_FIXTURE.points)
+    assert frame["Expected membership"].tolist() == [True, True, True, True, False, False]
+    assert frame["Actual membership"].tolist() == [False, True, True, True, False, False]
+    assert frame["Agreement"].tolist() == [False, True, True, True, True, True]
+    assert mismatch_count == 1
+
+
+def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
+    app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
+    artifacts = app_path.parents[3] / "artifacts"
+    before_exists = artifacts.exists()
+    before = {path: path.read_bytes() for path in artifacts.rglob("*") if path.is_file()} if before_exists else {}
+
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+    assert not app.exception
+    app.sidebar.radio[0].set_value("Mathematical Inspector")
+    app.run()
+
+    assert not app.exception
+    assert any(item.value == "Mathematical Inspector" for item in app.subheader)
+    assert any("mismatches: 0" in item.value for item in app.success)
+    assert not app.info
+    assert len(app.dataframe) == 1
+    assert not app.sidebar.text_input
+    assert not app.button
+    after_exists = artifacts.exists()
+    after = {path: path.read_bytes() for path in artifacts.rglob("*") if path.is_file()} if after_exists else {}
+    assert after_exists == before_exists
+    assert after == before
 
 
 def test_dashboard_explorer_loads_shared_dataset_and_renders_annotations(prepared_dataset: Path) -> None:

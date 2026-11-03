@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import torch
 from PIL import Image, ImageDraw
 
 from town_model.classifier_backend import ClassifierBackendUnavailableError
@@ -21,6 +22,8 @@ from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
 from town_model.dashboard.runtime import submit_generation
+from town_model.models.bounded_box import bounded_box_contains
+from town_model.models.bounded_box_fixture import BOUNDED_BOX_INSPECTION_FIXTURE
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_CONFIG = REPOSITORY_ROOT / "dataset.toml"
@@ -366,6 +369,78 @@ def _render_generation_monitor(st) -> None:
         st.error(failed)
 
 
+def _bounded_box_inspection_table() -> tuple[pd.DataFrame, int]:
+    fixture = BOUNDED_BOX_INSPECTION_FIXTURE
+    points = torch.tensor(fixture.points, dtype=torch.float32, device="cpu")
+    lower = torch.tensor(fixture.lower, dtype=torch.float32, device="cpu")
+    upper = torch.tensor(fixture.upper, dtype=torch.float32, device="cpu")
+    actual = bounded_box_contains(points, lower, upper).tolist()
+    rows = [
+        {
+            "Point": label,
+            "Coordinates": coordinates,
+            "Expected membership": expected,
+            "Actual membership": bool(actual_value),
+            "Agreement": expected == bool(actual_value),
+        }
+        for label, coordinates, expected, actual_value in zip(
+            fixture.labels, fixture.points, fixture.expected_contains, actual, strict=True
+        )
+    ]
+    frame = pd.DataFrame(rows)
+    mismatch_count = sum(not row["Agreement"] for row in rows)
+    return frame, mismatch_count
+
+
+def _render_mathematical_inspector(st) -> None:
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+
+    fixture = BOUNDED_BOX_INSPECTION_FIXTURE
+    frame, mismatch_count = _bounded_box_inspection_table()
+
+    figure, axis = plt.subplots(figsize=(6, 6))
+    domain_patch = Rectangle(
+        (-1.0, -1.0), 2.0, 2.0, fill=False, linestyle="--", edgecolor="black", linewidth=1.5
+    )
+    box_patch = Rectangle(
+        fixture.lower,
+        fixture.upper[0] - fixture.lower[0],
+        fixture.upper[1] - fixture.lower[1],
+        fill=False,
+        edgecolor="tab:orange",
+        linewidth=2,
+    )
+    axis.add_patch(domain_patch)
+    axis.add_patch(box_patch)
+    axis.scatter(
+        [point[0] for point in fixture.points],
+        [point[1] for point in fixture.points],
+        color="tab:blue",
+        zorder=3,
+    )
+    label_offsets = {
+        "A": (5, 5), "B": (5, 5), "C": (5, -9),
+        "D": (5, 5), "E": (5, 5), "F": (5, 5),
+    }
+    for label, (x, y) in zip(fixture.labels, fixture.points, strict=True):
+        axis.annotate(label, (x, y), xytext=label_offsets[label], textcoords="offset points")
+    axis.set_xlim(-1.4, 1.15)
+    axis.set_ylim(-1.15, 1.15)
+    axis.set_aspect("equal", adjustable="box")
+    axis.set_xlabel("x₁")
+    axis.set_ylabel("x₂")
+    axis.legend(handles=[domain_patch, box_patch], labels=["Bounded domain Δ", "Physical box"])
+    st.subheader("Mathematical Inspector")
+    st.pyplot(figure, clear_figure=True)
+    plt.close(figure)
+    st.dataframe(frame, hide_index=True, width="stretch")
+    if mismatch_count:
+        st.error(f"Fixture mismatches: {mismatch_count} of {len(fixture.labels)}")
+    else:
+        st.success(f"Fixture agreement: {len(fixture.labels)}/{len(fixture.labels)} · mismatches: 0")
+
+
 def _render_geometry_laboratory(st, runs_root: Path) -> None:
     del runs_root
     st.subheader("Geometry Laboratory")
@@ -378,7 +453,11 @@ def main() -> None:
     st.set_page_config(page_title="Town Embeddings Research", layout="wide")
     st.title("Representing Ontologies Using Town Embeddings")
     st.caption(f"Dataset explorer remains available. Historical classifier execution, geometry interpretation, and image embedding operations are disconnected during classifier reconstruction · dataset wire schema {SCHEMA_VERSION}")
-    page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset", "Geometry Laboratory", "Image Embeddings"))
+    page = st.sidebar.radio("Research workspace", ("Dataset overview", "Image explorer", "Generate dataset", "Geometry Laboratory", "Image Embeddings", "Mathematical Inspector"))
+    if page == "Mathematical Inspector":
+        _render_mathematical_inspector(st)
+        return
+
     default_path = DEFAULT_EXAMPLE_DATASET if DEFAULT_EXAMPLE_DATASET.is_dir() else REPOSITORY_ROOT / "artifacts" / "datasets" / "pizza-48"
     dataset_path = Path(st.sidebar.text_input("Prepared dataset path", value=str(default_path))).expanduser()
     st.sidebar.caption("Generation is explicit. Opening or refreshing this dashboard never creates data.")
