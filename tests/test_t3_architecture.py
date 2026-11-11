@@ -34,6 +34,12 @@ BOX02_DASHBOARD_REGRESSION_NODES = {
     "tests/test_dashboard_app.py::test_mathematical_inspector_reports_clearance_mismatches_separately",
 }
 BOX02_MATHEMATICAL_TEST_NODE_COUNT = 24
+TOWN01_INSPECTOR_REGRESSION_NODES = {
+    "tests/test_town_math_inspector.py::test_inspector_table_uses_cpu_evaluator_and_independent_literal_fixture",
+    "tests/test_town_math_inspector.py::test_standalone_inspector_renders_fixed_fixture_and_is_read_only",
+    "tests/test_town_math_inspector.py::test_wrong_evaluator_injection_shows_point_specific_mismatches",
+}
+TOWN01_MATHEMATICAL_TEST_NODE_COUNT = 44
 
 
 def _source_files() -> list[Path]:
@@ -245,15 +251,24 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert len(box02_mathematical_nodes) == BOX02_MATHEMATICAL_TEST_NODE_COUNT
     box01_nodes = box01_mathematical_nodes | BOX01_DASHBOARD_REGRESSION_NODES
     box02_nodes = box02_mathematical_nodes | BOX02_DASHBOARD_REGRESSION_NODES
+    town01_mathematical_nodes = {
+        node for node in current_nodes if node.startswith("tests/test_town_geometry.py::")
+    }
+    assert len(town01_mathematical_nodes) == TOWN01_MATHEMATICAL_TEST_NODE_COUNT
+    assert TOWN01_INSPECTOR_REGRESSION_NODES <= current_nodes
+    town01_nodes = town01_mathematical_nodes | TOWN01_INSPECTOR_REGRESSION_NODES
     box_nodes = box01_nodes | box02_nodes
-    legacy_nodes = current_nodes - box_nodes
+    accounted_feature_nodes = box_nodes | town01_nodes
+    legacy_nodes = current_nodes - accounted_feature_nodes
     assert (
         checkpoint_node_count
         + len(FINAL_INTEGRITY_REGRESSION_NODES)
         + len(T4_PRESENTATION_REGRESSION_NODES)
         == len(legacy_nodes)
     )
-    assert len(current_nodes) == len(legacy_nodes) + len(box01_nodes) + len(box02_nodes)
+    assert len(current_nodes) == (
+        len(legacy_nodes) + len(box01_nodes) + len(box02_nodes) + len(town01_nodes)
+    )
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
         summary["unchanged_original_node_ids_retained"]
