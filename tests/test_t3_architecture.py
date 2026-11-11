@@ -34,6 +34,11 @@ BOX02_DASHBOARD_REGRESSION_NODES = {
     "tests/test_dashboard_app.py::test_mathematical_inspector_reports_clearance_mismatches_separately",
 }
 BOX02_MATHEMATICAL_TEST_NODE_COUNT = 24
+BOX03_DASHBOARD_REGRESSION_NODES = {
+    "tests/test_dashboard_app.py::test_multi_box_inspector_matrices_use_cpu_evaluators_and_literal_fixture",
+    "tests/test_dashboard_app.py::test_multi_box_inspector_reports_cell_specific_mismatches_separately",
+}
+BOX03_MATHEMATICAL_TEST_NODE_COUNT = 58
 
 
 def _source_files() -> list[Path]:
@@ -245,7 +250,13 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert len(box02_mathematical_nodes) == BOX02_MATHEMATICAL_TEST_NODE_COUNT
     box01_nodes = box01_mathematical_nodes | BOX01_DASHBOARD_REGRESSION_NODES
     box02_nodes = box02_mathematical_nodes | BOX02_DASHBOARD_REGRESSION_NODES
-    box_nodes = box01_nodes | box02_nodes
+    multi_box_mathematical_nodes = {
+        node for node in current_nodes if node.startswith("tests/test_bounded_multi_box.py::")
+    }
+    assert len(multi_box_mathematical_nodes) == BOX03_MATHEMATICAL_TEST_NODE_COUNT
+    assert BOX03_DASHBOARD_REGRESSION_NODES <= current_nodes
+    box03_nodes = multi_box_mathematical_nodes | BOX03_DASHBOARD_REGRESSION_NODES
+    box_nodes = box01_nodes | box02_nodes | box03_nodes
     legacy_nodes = current_nodes - box_nodes
     assert (
         checkpoint_node_count
@@ -253,7 +264,9 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
         + len(T4_PRESENTATION_REGRESSION_NODES)
         == len(legacy_nodes)
     )
-    assert len(current_nodes) == len(legacy_nodes) + len(box01_nodes) + len(box02_nodes)
+    assert len(current_nodes) == (
+        len(legacy_nodes) + len(box01_nodes) + len(box02_nodes) + len(box03_nodes)
+    )
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
         summary["unchanged_original_node_ids_retained"]
