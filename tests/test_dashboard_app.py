@@ -13,22 +13,82 @@ from town_model.models.bounded_box_fixture import BOUNDED_BOX_INSPECTION_FIXTURE
 
 
 def test_mathematical_inspector_table_uses_cpu_evaluator_and_literal_fixture(monkeypatch) -> None:
-    calls: list[tuple[torch.device, torch.device, torch.device]] = []
+    membership_calls: list[tuple[torch.device, torch.device, torch.device]] = []
+    clearance_calls: list[tuple[torch.device, torch.device, torch.device]] = []
 
-    def evaluator(points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
-        calls.append((points.device, lower.device, upper.device))
+    def membership_evaluator(
+        points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor
+    ) -> torch.Tensor:
+        membership_calls.append((points.device, lower.device, upper.device))
         return torch.tensor([False, True, True, True, False, False], dtype=torch.bool)
 
-    monkeypatch.setattr(dashboard_app, "bounded_box_contains", evaluator)
-    frame, mismatch_count = dashboard_app._bounded_box_inspection_table()
+    def clearance_evaluator(
+        points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor
+    ) -> torch.Tensor:
+        clearance_calls.append((points.device, lower.device, upper.device))
+        return torch.tensor([0.5, 0.125, 0.0, 0.0, -0.25, -0.25], dtype=torch.float32)
 
-    assert calls == [(torch.device("cpu"), torch.device("cpu"), torch.device("cpu"))]
+    monkeypatch.setattr(dashboard_app, "bounded_box_contains", membership_evaluator)
+    monkeypatch.setattr(dashboard_app, "box_signed_clearance", clearance_evaluator)
+    frame, membership_mismatch_count, clearance_mismatches = (
+        dashboard_app._bounded_box_inspection_table()
+    )
+
+    cpu_devices = [(torch.device("cpu"), torch.device("cpu"), torch.device("cpu"))]
+    assert membership_calls == cpu_devices
+    assert clearance_calls == cpu_devices
+    assert frame.columns.tolist() == [
+        "Point",
+        "Coordinates",
+        "Expected membership",
+        "Actual membership",
+        "Agreement",
+        "Signed clearance",
+    ]
     assert frame["Point"].tolist() == ["A", "B", "C", "D", "E", "F"]
     assert frame["Coordinates"].tolist() == list(BOUNDED_BOX_INSPECTION_FIXTURE.points)
     assert frame["Expected membership"].tolist() == [True, True, True, True, False, False]
     assert frame["Actual membership"].tolist() == [False, True, True, True, False, False]
     assert frame["Agreement"].tolist() == [False, True, True, True, True, True]
-    assert mismatch_count == 1
+    assert frame["Signed clearance"].tolist() == [0.5, 0.125, 0.0, 0.0, -0.25, -0.25]
+    assert membership_mismatch_count == 1
+    assert clearance_mismatches == (("B", 0.0, 0.125),)
+
+
+def test_mathematical_inspector_reports_clearance_mismatches_separately(monkeypatch) -> None:
+    class InspectorSink:
+        def __init__(self) -> None:
+            self.errors: list[str] = []
+            self.successes: list[str] = []
+
+        def subheader(self, value: str) -> None:
+            pass
+
+        def pyplot(self, figure, **kwargs) -> None:
+            pass
+
+        def dataframe(self, frame, **kwargs) -> None:
+            pass
+
+        def error(self, message: str) -> None:
+            self.errors.append(message)
+
+        def success(self, message: str) -> None:
+            self.successes.append(message)
+
+    monkeypatch.setattr(
+        dashboard_app,
+        "_bounded_box_inspection_table",
+        lambda: (None, 1, (("B", 0.0, 0.125),)),
+    )
+    inspector = InspectorSink()
+
+    dashboard_app._render_mathematical_inspector(inspector)
+
+    assert inspector.errors == [
+        "Membership mismatches: 1 of 6",
+        "Signed-clearance mismatches: 1 of 6 (B: expected +0, actual +0.125)",
+    ]
 
 
 def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
@@ -44,9 +104,20 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
 
     assert not app.exception
     assert any(item.value == "Mathematical Inspector" for item in app.subheader)
-    assert any("mismatches: 0" in item.value for item in app.success)
+    assert any("membership mismatches: 0" in item.value for item in app.success)
+    assert any("clearance mismatches: 0" in item.value for item in app.success)
     assert not app.info
     assert len(app.dataframe) == 1
+    table = app.dataframe[0].value
+    assert table.columns.tolist() == [
+        "Point",
+        "Coordinates",
+        "Expected membership",
+        "Actual membership",
+        "Agreement",
+        "Signed clearance",
+    ]
+    assert table["Signed clearance"].tolist() == [0.5, 0.0, 0.0, 0.0, -0.25, -0.25]
     assert not app.sidebar.text_input
     assert not app.button
     after_exists = artifacts.exists()

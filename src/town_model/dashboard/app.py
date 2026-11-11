@@ -22,7 +22,7 @@ from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
 from town_model.dashboard.runtime import submit_generation
-from town_model.models.bounded_box import bounded_box_contains
+from town_model.models.bounded_box import bounded_box_contains, box_signed_clearance
 from town_model.models.bounded_box_fixture import BOUNDED_BOX_INSPECTION_FIXTURE
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -369,27 +369,49 @@ def _render_generation_monitor(st) -> None:
         st.error(failed)
 
 
-def _bounded_box_inspection_table() -> tuple[pd.DataFrame, int]:
+def _bounded_box_inspection_table() -> tuple[
+    pd.DataFrame, int, tuple[tuple[str, float, float], ...]
+]:
     fixture = BOUNDED_BOX_INSPECTION_FIXTURE
     points = torch.tensor(fixture.points, dtype=torch.float32, device="cpu")
     lower = torch.tensor(fixture.lower, dtype=torch.float32, device="cpu")
     upper = torch.tensor(fixture.upper, dtype=torch.float32, device="cpu")
-    actual = bounded_box_contains(points, lower, upper).tolist()
+    actual_membership = bounded_box_contains(points, lower, upper).tolist()
+    actual_clearances = box_signed_clearance(points, lower, upper).tolist()
     rows = [
         {
             "Point": label,
             "Coordinates": coordinates,
-            "Expected membership": expected,
-            "Actual membership": bool(actual_value),
-            "Agreement": expected == bool(actual_value),
+            "Expected membership": expected_membership,
+            "Actual membership": bool(actual_membership_value),
+            "Agreement": expected_membership == bool(actual_membership_value),
+            "Signed clearance": float(actual_clearance_value),
         }
-        for label, coordinates, expected, actual_value in zip(
-            fixture.labels, fixture.points, fixture.expected_contains, actual, strict=True
+        for (
+            label,
+            coordinates,
+            expected_membership,
+            actual_membership_value,
+            actual_clearance_value,
+        ) in zip(
+            fixture.labels,
+            fixture.points,
+            fixture.expected_contains,
+            actual_membership,
+            actual_clearances,
+            strict=True,
         )
     ]
     frame = pd.DataFrame(rows)
-    mismatch_count = sum(not row["Agreement"] for row in rows)
-    return frame, mismatch_count
+    membership_mismatch_count = sum(not row["Agreement"] for row in rows)
+    clearance_mismatches = tuple(
+        (label, float(expected), float(actual))
+        for label, expected, actual in zip(
+            fixture.labels, fixture.expected_clearances, actual_clearances, strict=True
+        )
+        if float(actual) != expected
+    )
+    return frame, membership_mismatch_count, clearance_mismatches
 
 
 def _render_mathematical_inspector(st) -> None:
@@ -397,7 +419,7 @@ def _render_mathematical_inspector(st) -> None:
     from matplotlib.patches import Rectangle
 
     fixture = BOUNDED_BOX_INSPECTION_FIXTURE
-    frame, mismatch_count = _bounded_box_inspection_table()
+    frame, membership_mismatch_count, clearance_mismatches = _bounded_box_inspection_table()
 
     figure, axis = plt.subplots(figsize=(6, 6))
     domain_patch = Rectangle(
@@ -435,10 +457,29 @@ def _render_mathematical_inspector(st) -> None:
     st.pyplot(figure, clear_figure=True)
     plt.close(figure)
     st.dataframe(frame, hide_index=True, width="stretch")
-    if mismatch_count:
-        st.error(f"Fixture mismatches: {mismatch_count} of {len(fixture.labels)}")
+    if membership_mismatch_count:
+        st.error(
+            f"Membership mismatches: {membership_mismatch_count} of {len(fixture.labels)}"
+        )
     else:
-        st.success(f"Fixture agreement: {len(fixture.labels)}/{len(fixture.labels)} · mismatches: 0")
+        st.success(
+            f"Membership fixture agreement: {len(fixture.labels)}/{len(fixture.labels)}"
+            " · membership mismatches: 0"
+        )
+    if clearance_mismatches:
+        details = "; ".join(
+            f"{label}: expected {expected:+.9g}, actual {actual:+.9g}"
+            for label, expected, actual in clearance_mismatches
+        )
+        st.error(
+            f"Signed-clearance mismatches: {len(clearance_mismatches)} of "
+            f"{len(fixture.labels)} ({details})"
+        )
+    else:
+        st.success(
+            f"Signed-clearance fixture agreement: {len(fixture.labels)}/{len(fixture.labels)}"
+            " · clearance mismatches: 0"
+        )
 
 
 def _render_geometry_laboratory(st, runs_root: Path) -> None:

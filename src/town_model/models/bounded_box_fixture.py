@@ -1,4 +1,4 @@
-"""The single literal point fixture shared by BOX-01 tests and inspection."""
+"""The single literal point fixture shared by bounded-box tests and inspection."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ class BoundedBoxInspectionFixture:
     labels: tuple[str, ...]
     points: tuple[tuple[float, float], ...]
     expected_contains: tuple[bool, ...]
+    expected_clearances: tuple[float, ...]
 
 
 BOUNDED_BOX_INSPECTION_FIXTURE = BoundedBoxInspectionFixture(
@@ -27,4 +28,5 @@ BOUNDED_BOX_INSPECTION_FIXTURE = BoundedBoxInspectionFixture(
         (-1.25, 0.0),
     ),
     expected_contains=(True, True, True, True, False, False),
+    expected_clearances=(0.50, 0.00, 0.00, 0.00, -0.25, -0.25),
 )

@@ -30,6 +30,10 @@ BOX01_DASHBOARD_REGRESSION_NODES = {
     "tests/test_dashboard_app.py::test_mathematical_inspector_navigation_is_read_only_and_minimal",
 }
 BOX01_MATHEMATICAL_TEST_NODE_COUNT = 47
+BOX02_DASHBOARD_REGRESSION_NODES = {
+    "tests/test_dashboard_app.py::test_mathematical_inspector_reports_clearance_mismatches_separately",
+}
+BOX02_MATHEMATICAL_TEST_NODE_COUNT = 24
 
 
 def _source_files() -> list[Path]:
@@ -228,19 +232,28 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert FINAL_INTEGRITY_REGRESSION_NODES <= current_nodes
     assert T4_PRESENTATION_REGRESSION_NODES <= current_nodes
     assert BOX01_DASHBOARD_REGRESSION_NODES <= current_nodes
-    box01_mathematical_nodes = {
+    assert BOX02_DASHBOARD_REGRESSION_NODES <= current_nodes
+    bounded_box_mathematical_nodes = {
         node for node in current_nodes if node.startswith("tests/test_bounded_box.py::")
     }
+    box02_mathematical_nodes = {
+        node for node in bounded_box_mathematical_nodes
+        if "::test_box02_" in node
+    }
+    box01_mathematical_nodes = bounded_box_mathematical_nodes - box02_mathematical_nodes
     assert len(box01_mathematical_nodes) == BOX01_MATHEMATICAL_TEST_NODE_COUNT
+    assert len(box02_mathematical_nodes) == BOX02_MATHEMATICAL_TEST_NODE_COUNT
     box01_nodes = box01_mathematical_nodes | BOX01_DASHBOARD_REGRESSION_NODES
-    legacy_nodes = current_nodes - box01_nodes
+    box02_nodes = box02_mathematical_nodes | BOX02_DASHBOARD_REGRESSION_NODES
+    box_nodes = box01_nodes | box02_nodes
+    legacy_nodes = current_nodes - box_nodes
     assert (
         checkpoint_node_count
         + len(FINAL_INTEGRITY_REGRESSION_NODES)
         + len(T4_PRESENTATION_REGRESSION_NODES)
         == len(legacy_nodes)
     )
-    assert len(current_nodes) == len(legacy_nodes) + len(box01_nodes)
+    assert len(current_nodes) == len(legacy_nodes) + len(box01_nodes) + len(box02_nodes)
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
         summary["unchanged_original_node_ids_retained"]

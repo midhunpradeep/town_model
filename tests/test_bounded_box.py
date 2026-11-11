@@ -5,7 +5,7 @@ from itertools import product
 import pytest
 import torch
 
-from town_model.models.bounded_box import bounded_box_contains
+from town_model.models.bounded_box import bounded_box_contains, box_signed_clearance
 from town_model.models.bounded_box_fixture import BOUNDED_BOX_INSPECTION_FIXTURE
 
 
@@ -37,6 +37,7 @@ def test_shared_inspection_fixture_has_independent_literal_oracle() -> None:
         (-1.25, 0.0),
     )
     assert fixture.expected_contains == (True, True, True, True, False, False)
+    assert fixture.expected_clearances == (0.50, 0.00, 0.00, 0.00, -0.25, -0.25)
 
 
 def test_fixed_fixture_membership_matches_literal_expected_values() -> None:
@@ -438,3 +439,432 @@ def test_G04_project_cuda_runtime_and_actual_device_are_available() -> None:
     value = torch.tensor([2.0], dtype=torch.float32, device=device)
     assert (value.square() == 4.0).item()
     torch.cuda.synchronize(device)
+
+
+def _device_for_box02(device_name: str) -> torch.device:
+    if device_name == "cuda":
+        return _cuda_device()
+    return torch.device("cpu")
+
+
+def _ordered_float32_bits(value: float) -> int:
+    import struct
+
+    bits = int.from_bytes(struct.pack(">f", value), byteorder="big")
+    if bits & 0x80000000:
+        return 0x80000000 - (bits & 0x7FFFFFFF)
+    return bits | 0x80000000
+
+
+def _max_float32_ulp_distance(left: torch.Tensor, right: torch.Tensor) -> int:
+    left_values = left.detach().cpu().reshape(-1).tolist()
+    right_values = right.detach().cpu().reshape(-1).tolist()
+    assert len(left_values) == len(right_values)
+    return max(
+        (abs(_ordered_float32_bits(a) - _ordered_float32_bits(b)) for a, b in zip(left_values, right_values, strict=True)),
+        default=0,
+    )
+
+
+def _assert_box02_forward_budget(cpu: torch.Tensor, cuda: torch.Tensor) -> None:
+    cuda_cpu = cuda.detach().cpu()
+    assert torch.equal(cpu == 0, cuda_cpu == 0)
+    nonzero = cpu != 0
+    assert torch.equal(torch.signbit(cpu[nonzero]), torch.signbit(cuda_cpu[nonzero]))
+    assert _max_float32_ulp_distance(cpu, cuda_cpu) <= 1
+
+
+def test_box02_C01_formula_constructs_all_faces_and_uses_one_amin(monkeypatch) -> None:
+    original_amin = torch.amin
+    calls: list[tuple[tuple[int, ...], int | None]] = []
+
+    def recording_amin(input: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+        dimension = kwargs.get("dim", args[0] if args else None)
+        calls.append((tuple(input.shape), dimension))
+        return original_amin(input, *args, **kwargs)
+
+    monkeypatch.setattr(torch, "amin", recording_amin)
+    points = torch.tensor([[0.0, 0.0], [0.75, -0.75]], dtype=torch.float32)
+    lower = torch.tensor([-1.0, -0.5], dtype=torch.float32)
+    upper = torch.tensor([0.5, 1.0], dtype=torch.float32)
+
+    actual = box_signed_clearance(points, lower, upper)
+
+    assert actual.tolist() == [0.5, -0.25]
+    assert calls == [((2, 4), 1)]
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_C02_N01_fixture_clearances_are_exact_on_cpu_and_cuda(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    points, lower, upper = _fixture_tensors()
+    expected = torch.tensor(
+        BOUNDED_BOX_INSPECTION_FIXTURE.expected_clearances,
+        dtype=torch.float32,
+        device=device,
+    )
+
+    actual = box_signed_clearance(points.to(device), lower.to(device), upper.to(device))
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+    assert actual.dtype is torch.float32
+    assert actual.shape == (6,)
+    assert actual.device == device
+    assert torch.equal(actual, expected)
+    assert actual.tolist() == [0.5, 0.0, 0.0, 0.0, -0.25, -0.25]
+
+
+def test_box02_C03_interior_faces_exterior_multiple_violations_and_domain_queries() -> None:
+    points = torch.tensor(
+        [
+            [0.0, 0.0],
+            [-1.0, 0.0],
+            [0.5, 0.0],
+            [0.75, -0.75],
+            [2.0, 0.0],
+            [-2.0, 2.0],
+        ],
+        dtype=torch.float32,
+    )
+    lower = torch.tensor([-1.0, -0.5], dtype=torch.float32)
+    upper = torch.tensor([0.5, 1.0], dtype=torch.float32)
+
+    actual = box_signed_clearance(points, lower, upper)
+
+    assert actual.tolist() == [0.5, 0.0, 0.0, -0.25, -1.5, -1.0]
+
+
+def test_box02_C04_degenerate_and_positive_width_narrow_boxes() -> None:
+    fixed = torch.tensor([0.25, -0.5], dtype=torch.float32)
+    fixed_points = torch.tensor([[0.25, -0.5], [0.25, -0.25]], dtype=torch.float32)
+    fixed_clearances = box_signed_clearance(fixed_points, fixed, fixed)
+
+    narrow_lower = torch.tensor([0.0], dtype=torch.float32)
+    narrow_upper = torch.tensor([2.0**-20], dtype=torch.float32)
+    narrow_midpoint = torch.tensor([[2.0**-21]], dtype=torch.float32)
+    narrow_clearance = box_signed_clearance(narrow_midpoint, narrow_lower, narrow_upper)
+
+    assert fixed_clearances.tolist() == [0.0, -0.25]
+    assert narrow_clearance.tolist() == [2.0**-21]
+
+
+@pytest.mark.parametrize("dimensions", (1, 2, 4))
+def test_box02_C05_dimensions_empty_batches_and_input_order(dimensions: int) -> None:
+    lower = torch.full((dimensions,), -0.25, dtype=torch.float32)
+    upper = torch.full((dimensions,), 0.25, dtype=torch.float32)
+    points = torch.stack(
+        (
+            torch.full((dimensions,), 0.125),
+            torch.zeros(dimensions),
+            torch.full((dimensions,), 0.5),
+            torch.full((dimensions,), -0.5),
+        )
+    )
+
+    actual = box_signed_clearance(points, lower, upper)
+    empty = box_signed_clearance(torch.empty((0, dimensions)), lower, upper)
+
+    assert actual.shape == (4,)
+    assert actual.dtype is torch.float32
+    assert actual.tolist() == [0.125, 0.25, -0.25, -0.25]
+    assert empty.shape == (0,)
+    assert empty.dtype is torch.float32
+    assert empty.device == points.device
+
+
+def test_box02_V01_V02_boolean_membership_and_shared_validation_contract() -> None:
+    points = torch.tensor([[0.0, 0.0], [0.75, 0.0]], dtype=torch.float32)
+    lower = torch.tensor([-1.0, -0.5], dtype=torch.float32)
+    upper = torch.tensor([0.5, 1.0], dtype=torch.float32)
+    expected_membership = torch.tensor([True, False])
+    expected_clearance = torch.tensor([0.5, -0.25], dtype=torch.float32)
+
+    assert torch.equal(bounded_box_contains(points, lower, upper), expected_membership)
+    assert torch.equal(box_signed_clearance(points, lower, upper), expected_clearance)
+
+    invalid_cases = (
+        (
+            torch.zeros((1, 2), dtype=torch.float64),
+            lower,
+            upper,
+            TypeError,
+            "dtype",
+        ),
+        (
+            torch.zeros((1, 2), dtype=torch.float32),
+            lower,
+            torch.tensor([0.5, 1.01], dtype=torch.float32),
+            ValueError,
+            "domain",
+        ),
+        (
+            torch.tensor([[float("nan"), 0.0]], dtype=torch.float32),
+            lower,
+            upper,
+            ValueError,
+            "finite",
+        ),
+    )
+    for invalid_points, invalid_lower, invalid_upper, error_type, message in invalid_cases:
+        for evaluator in (bounded_box_contains, box_signed_clearance):
+            with pytest.raises(error_type, match=message):
+                evaluator(invalid_points, invalid_lower, invalid_upper)
+
+
+def test_box02_V03_signed_validation_does_not_mutate_inputs() -> None:
+    points, lower, upper = _fixture_tensors()
+    originals = (points.clone(), lower.clone(), upper.clone())
+
+    result = box_signed_clearance(points, lower, upper)
+    assert result.tolist() == list(BOUNDED_BOX_INSPECTION_FIXTURE.expected_clearances)
+    assert torch.equal(points, originals[0])
+    assert torch.equal(lower, originals[1])
+    assert torch.equal(upper, originals[2])
+
+    invalid_upper = upper.clone()
+    invalid_upper[0] = 2.0
+    invalid_original = invalid_upper.clone()
+    with pytest.raises(ValueError, match="domain"):
+        box_signed_clearance(points, lower, invalid_upper)
+    assert torch.equal(points, originals[0])
+    assert torch.equal(lower, originals[1])
+    assert torch.equal(invalid_upper, invalid_original)
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_G01_unique_upper_face_gradients(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    points = torch.tensor([[0.25]], dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5], dtype=torch.float32, device=device, requires_grad=True)
+
+    clearance = box_signed_clearance(points, lower, upper)
+    grad_points, grad_lower, grad_upper = torch.autograd.grad(clearance.sum(), (points, lower, upper))
+
+    assert clearance.item() == 0.25
+    assert grad_points.tolist() == [[-1.0]]
+    assert grad_lower.tolist() == [0.0]
+    assert grad_upper.tolist() == [1.0]
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_G02_unique_lower_face_gradients(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    points = torch.tensor([[-0.25]], dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5], dtype=torch.float32, device=device, requires_grad=True)
+
+    clearance = box_signed_clearance(points, lower, upper)
+    grad_points, grad_lower, grad_upper = torch.autograd.grad(clearance.sum(), (points, lower, upper))
+
+    assert clearance.item() == 0.25
+    assert grad_points.tolist() == [[1.0]]
+    assert grad_lower.tolist() == [-1.0]
+    assert grad_upper.tolist() == [0.0]
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_G03_exterior_point_gradients(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    points = torch.tensor([[0.75]], dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5], dtype=torch.float32, device=device, requires_grad=True)
+
+    clearance = box_signed_clearance(points, lower, upper)
+    grad_points, grad_lower, grad_upper = torch.autograd.grad(clearance.sum(), (points, lower, upper))
+
+    assert clearance.item() == -0.25
+    assert grad_points.tolist() == [[-1.0]]
+    assert grad_lower.tolist() == [0.0]
+    assert grad_upper.tolist() == [1.0]
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_G04_one_dimensional_tie_uses_amin_subgradient(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    points = torch.tensor([[0.0]], dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5], dtype=torch.float32, device=device, requires_grad=True)
+
+    clearance = box_signed_clearance(points, lower, upper)
+    grad_points, grad_lower, grad_upper = torch.autograd.grad(clearance.sum(), (points, lower, upper))
+
+    assert clearance.item() == 0.5
+    assert grad_points.tolist() == [[0.0]]
+    assert grad_lower.tolist() == [-0.5]
+    assert grad_upper.tolist() == [0.5]
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_G05_multidimensional_fixture_tie_uses_amin_subgradient(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    points = torch.tensor([[0.0, 0.0]], dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-1.0, -0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5, 1.0], dtype=torch.float32, device=device, requires_grad=True)
+
+    clearance = box_signed_clearance(points, lower, upper)
+    grad_points, grad_lower, grad_upper = torch.autograd.grad(clearance.sum(), (points, lower, upper))
+
+    assert clearance.item() == 0.5
+    assert grad_points.tolist() == [[-0.5, 0.5]]
+    assert grad_lower.tolist() == [0.0, -0.5]
+    assert grad_upper.tolist() == [0.5, 0.0]
+
+
+@pytest.mark.parametrize("device_name", ("cpu", "cuda"))
+def test_box02_G06_degenerate_and_empty_gradients_are_finite(device_name: str) -> None:
+    device = _device_for_box02(device_name)
+    fixed_points = torch.tensor([[0.25, -0.5]], dtype=torch.float32, device=device, requires_grad=True)
+    fixed_lower = torch.tensor([0.25, -0.5], dtype=torch.float32, device=device, requires_grad=True)
+    fixed_upper = torch.tensor([0.25, -0.5], dtype=torch.float32, device=device, requires_grad=True)
+
+    fixed_clearance = box_signed_clearance(fixed_points, fixed_lower, fixed_upper)
+    fixed_gradients = torch.autograd.grad(
+        fixed_clearance.sum(), (fixed_points, fixed_lower, fixed_upper)
+    )
+    assert fixed_clearance.tolist() == [0.0]
+    assert all(torch.isfinite(gradient).all() for gradient in fixed_gradients)
+    assert fixed_gradients[0].tolist() == [[0.0, 0.0]]
+    assert fixed_gradients[1].tolist() == [-0.25, -0.25]
+    assert fixed_gradients[2].tolist() == [0.25, 0.25]
+
+    empty_points = torch.empty((0, 2), dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-1.0, -0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5, 1.0], dtype=torch.float32, device=device, requires_grad=True)
+    empty_clearance = box_signed_clearance(empty_points, lower, upper)
+    empty_gradients = torch.autograd.grad(empty_clearance.sum(), (empty_points, lower, upper))
+
+    assert empty_clearance.shape == (0,)
+    assert all(torch.isfinite(gradient).all() for gradient in empty_gradients)
+    assert empty_gradients[0].shape == (0, 2)
+    assert empty_gradients[1].tolist() == [0.0, 0.0]
+    assert empty_gradients[2].tolist() == [0.0, 0.0]
+
+
+def test_box02_N02_cuda_forward_gradient_and_invalid_input_checks() -> None:
+    device = _cuda_device()
+    points = torch.tensor([[0.25]], dtype=torch.float32, device=device, requires_grad=True)
+    lower = torch.tensor([-0.5], dtype=torch.float32, device=device, requires_grad=True)
+    upper = torch.tensor([0.5], dtype=torch.float32, device=device, requires_grad=True)
+    clearance = box_signed_clearance(points, lower, upper)
+    gradients = torch.autograd.grad(clearance.sum(), (points, lower, upper))
+    torch.cuda.synchronize(device)
+
+    assert clearance.device == device and clearance.item() == 0.25
+    assert [gradient.item() for gradient in gradients] == [-1.0, 0.0, 1.0]
+    with pytest.raises(ValueError, match="finite"):
+        box_signed_clearance(
+            torch.tensor([[float("nan")]], dtype=torch.float32, device=device),
+            lower.detach(),
+            upper.detach(),
+        )
+    with pytest.raises(ValueError, match="domain"):
+        box_signed_clearance(
+            torch.tensor([[0.0]], dtype=torch.float32, device=device),
+            lower.detach(),
+            torch.tensor([1.01], dtype=torch.float32, device=device),
+        )
+
+
+def test_box02_N03_nextafter_faces_small_large_extreme_degenerate_and_empty() -> None:
+    device = _cuda_device()
+    negative_infinity = torch.tensor(float("-inf"), dtype=torch.float32)
+    positive_infinity = torch.tensor(float("inf"), dtype=torch.float32)
+    lower_x = torch.tensor(-1.0, dtype=torch.float32)
+    upper_x = torch.tensor(0.5, dtype=torch.float32)
+    lower_y = torch.tensor(-0.5, dtype=torch.float32)
+    upper_y = torch.tensor(1.0, dtype=torch.float32)
+    boundary_points = torch.stack(
+        (
+            torch.stack((torch.nextafter(lower_x, negative_infinity), torch.tensor(0.0))),
+            torch.stack((torch.nextafter(lower_x, positive_infinity), torch.tensor(0.0))),
+            torch.stack((torch.nextafter(upper_x, negative_infinity), torch.tensor(0.0))),
+            torch.stack((torch.nextafter(upper_x, positive_infinity), torch.tensor(0.0))),
+            torch.stack((torch.tensor(0.0), torch.nextafter(lower_y, negative_infinity))),
+            torch.stack((torch.tensor(0.0), torch.nextafter(lower_y, positive_infinity))),
+            torch.stack((torch.tensor(0.0), torch.nextafter(upper_y, negative_infinity))),
+            torch.stack((torch.tensor(0.0), torch.nextafter(upper_y, positive_infinity))),
+        )
+    )
+    lower = torch.tensor([-1.0, -0.5], dtype=torch.float32)
+    upper = torch.tensor([0.5, 1.0], dtype=torch.float32)
+    expected_boundary = torch.tensor(
+        [
+            -1.1920928955078125e-7,
+            5.960464477539063e-8,
+            2.9802322387695312e-8,
+            -5.960464477539063e-8,
+            -5.960464477539063e-8,
+            2.9802322387695312e-8,
+            5.960464477539063e-8,
+            -1.1920928955078125e-7,
+        ],
+        dtype=torch.float32,
+    )
+    cpu_boundary = box_signed_clearance(boundary_points, lower, upper)
+    cuda_boundary = box_signed_clearance(
+        boundary_points.to(device), lower.to(device), upper.to(device)
+    )
+    torch.cuda.synchronize(device)
+    assert torch.equal(cpu_boundary, expected_boundary)
+    assert torch.equal(cuda_boundary.cpu(), expected_boundary)
+    _assert_box02_forward_budget(cpu_boundary, cuda_boundary)
+
+    smallest_positive = torch.nextafter(torch.tensor(0.0), torch.tensor(1.0))
+    largest_finite = torch.tensor(torch.finfo(torch.float32).max, dtype=torch.float32)
+    extreme_points = torch.stack(
+        (
+            torch.stack((smallest_positive, torch.tensor(0.0))),
+            torch.stack((-smallest_positive, torch.tensor(0.0))),
+            torch.tensor([-2.0, 0.0]),
+            torch.tensor([2.0, 0.0]),
+            torch.stack((largest_finite, torch.tensor(0.0))),
+            torch.stack((-largest_finite, torch.tensor(0.0))),
+        )
+    )
+    expected_extremes = torch.tensor(
+        [0.5, 0.5, -1.0, -1.5, -torch.finfo(torch.float32).max, -torch.finfo(torch.float32).max],
+        dtype=torch.float32,
+    )
+    cpu_extremes = box_signed_clearance(extreme_points, lower, upper)
+    cuda_extremes = box_signed_clearance(
+        extreme_points.to(device), lower.to(device), upper.to(device)
+    )
+    torch.cuda.synchronize(device)
+    assert torch.isfinite(cpu_extremes).all()
+    assert torch.isfinite(cuda_extremes).all()
+    assert torch.equal(cpu_extremes, expected_extremes)
+    assert torch.equal(cuda_extremes.cpu(), expected_extremes)
+    _assert_box02_forward_budget(cpu_extremes, cuda_extremes)
+
+    tiny = torch.nextafter(torch.tensor(0.0), torch.tensor(1.0))
+    tiny_box_lower = torch.tensor([0.0], dtype=torch.float32)
+    tiny_box_upper = torch.tensor([2.0 * tiny], dtype=torch.float32)
+    tiny_midpoint = torch.tensor([[tiny]], dtype=torch.float32)
+    tiny_expected = torch.tensor([tiny], dtype=torch.float32)
+    cpu_tiny = box_signed_clearance(tiny_midpoint, tiny_box_lower, tiny_box_upper)
+    cuda_tiny = box_signed_clearance(
+        tiny_midpoint.to(device), tiny_box_lower.to(device), tiny_box_upper.to(device)
+    )
+    torch.cuda.synchronize(device)
+    assert torch.equal(cpu_tiny, tiny_expected)
+    assert torch.equal(cuda_tiny.cpu(), tiny_expected)
+    _assert_box02_forward_budget(cpu_tiny, cuda_tiny)
+
+    fixed = torch.tensor([0.25, -0.5], dtype=torch.float32)
+    fixed_points = torch.tensor([[0.25, -0.5], [0.25, 0.0]], dtype=torch.float32)
+    cpu_fixed = box_signed_clearance(fixed_points, fixed, fixed)
+    cuda_fixed = box_signed_clearance(
+        fixed_points.to(device), fixed.to(device), fixed.to(device)
+    )
+    empty = box_signed_clearance(
+        torch.empty((0, 2), dtype=torch.float32, device=device),
+        lower.to(device),
+        upper.to(device),
+    )
+    torch.cuda.synchronize(device)
+    assert cpu_fixed.tolist() == [0.0, -0.5]
+    assert cuda_fixed.cpu().tolist() == [0.0, -0.5]
+    _assert_box02_forward_budget(cpu_fixed, cuda_fixed)
+    assert empty.dtype is torch.float32 and empty.shape == (0,) and empty.device == device
