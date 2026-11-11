@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 from streamlit.testing.v1 import AppTest
 
@@ -64,6 +65,9 @@ def test_mathematical_inspector_reports_clearance_mismatches_separately(monkeypa
         def subheader(self, value: str) -> None:
             pass
 
+        def markdown(self, value: str) -> None:
+            pass
+
         def pyplot(self, figure, **kwargs) -> None:
             pass
 
@@ -91,6 +95,104 @@ def test_mathematical_inspector_reports_clearance_mismatches_separately(monkeypa
     ]
 
 
+def test_multi_box_inspector_matrices_use_cpu_evaluators_and_literal_fixture(monkeypatch) -> None:
+    membership_calls: list[tuple[torch.device, torch.device, torch.device]] = []
+    clearance_calls: list[tuple[torch.device, torch.device, torch.device]] = []
+    real_membership = dashboard_app.bounded_multi_box_contains
+    real_clearance = dashboard_app.multi_box_signed_clearance
+
+    def membership_evaluator(points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
+        membership_calls.append((points.device, lower.device, upper.device))
+        return real_membership(points, lower, upper)
+
+    def clearance_evaluator(points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
+        clearance_calls.append((points.device, lower.device, upper.device))
+        return real_clearance(points, lower, upper)
+
+    monkeypatch.setattr(dashboard_app, "bounded_multi_box_contains", membership_evaluator)
+    monkeypatch.setattr(dashboard_app, "multi_box_signed_clearance", clearance_evaluator)
+    membership, clearance, membership_mismatches, clearance_mismatches = (
+        dashboard_app._bounded_multi_box_inspection_matrices()
+    )
+
+    cpu_devices = [(torch.device("cpu"), torch.device("cpu"), torch.device("cpu"))]
+    assert membership_calls == cpu_devices
+    assert clearance_calls == cpu_devices
+    assert membership.index.tolist() == ["A", "B", "C", "D", "E", "F"]
+    assert membership.columns.tolist() == ["Box 0", "Box 1"]
+    assert membership.values.tolist() == [
+        [True, True], [True, False], [False, True],
+        [False, False], [True, True], [False, False],
+    ]
+    assert clearance.index.tolist() == ["A", "B", "C", "D", "E", "F"]
+    assert clearance.columns.tolist() == ["Box 0", "Box 1"]
+    assert clearance.values.tolist() == [
+        [0.5, 0.25], [0.25, -0.5], [-0.25, 0.25],
+        [-0.25, -0.5], [0.0, 0.0], [-0.25, -1.0],
+    ]
+    assert membership_mismatches == ()
+    assert clearance_mismatches == ()
+
+
+def test_multi_box_inspector_reports_cell_specific_mismatches_separately(monkeypatch) -> None:
+    real_membership = dashboard_app.bounded_multi_box_contains
+    real_clearance = dashboard_app.multi_box_signed_clearance
+    calls: list[tuple[str, torch.device, torch.device, torch.device]] = []
+
+    def mismatched_membership(points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
+        calls.append(("membership", points.device, lower.device, upper.device))
+        result = real_membership(points, lower, upper)
+        result[0, 0] = False
+        return result
+
+    def mismatched_clearance(points: torch.Tensor, lower: torch.Tensor, upper: torch.Tensor) -> torch.Tensor:
+        calls.append(("clearance", points.device, lower.device, upper.device))
+        result = real_clearance(points, lower, upper)
+        result[1, 1] = 0.125
+        return result
+
+    monkeypatch.setattr(dashboard_app, "bounded_multi_box_contains", mismatched_membership)
+    monkeypatch.setattr(dashboard_app, "multi_box_signed_clearance", mismatched_clearance)
+
+    class InspectorSink:
+        def __init__(self) -> None:
+            self.markdown_values: list[str] = []
+            self.tables: list[pd.DataFrame] = []
+            self.errors: list[str] = []
+            self.successes: list[str] = []
+
+        def markdown(self, value: str) -> None:
+            self.markdown_values.append(value)
+
+        def dataframe(self, frame: pd.DataFrame, **kwargs) -> None:
+            self.tables.append(frame)
+
+        def error(self, message: str) -> None:
+            self.errors.append(message)
+
+        def success(self, message: str) -> None:
+            self.successes.append(message)
+
+    inspector = InspectorSink()
+    dashboard_app._render_multi_box_inspection(inspector)
+
+    assert calls == [
+        ("membership", torch.device("cpu"), torch.device("cpu"), torch.device("cpu")),
+        ("clearance", torch.device("cpu"), torch.device("cpu"), torch.device("cpu")),
+    ]
+    assert inspector.markdown_values == [
+        "#### Multi-box inference",
+        "Membership matrix",
+        "Signed-clearance matrix",
+    ]
+    assert len(inspector.tables) == 2
+    assert inspector.errors == [
+        "Multi-box membership mismatches: 1 of 12 (point A, box index 0: expected True, actual False)",
+        "Multi-box clearance mismatches: 1 of 12 (point B, box index 1: expected -0.5, actual +0.125)",
+    ]
+    assert not inspector.successes
+
+
 def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
     app_path = Path(__file__).parents[1] / "src" / "town_model" / "dashboard" / "app.py"
     artifacts = app_path.parents[3] / "artifacts"
@@ -107,7 +209,7 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
     assert any("membership mismatches: 0" in item.value for item in app.success)
     assert any("clearance mismatches: 0" in item.value for item in app.success)
     assert not app.info
-    assert len(app.dataframe) == 1
+    assert len(app.dataframe) == 3
     table = app.dataframe[0].value
     assert table.columns.tolist() == [
         "Point",
@@ -118,6 +220,22 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
         "Signed clearance",
     ]
     assert table["Signed clearance"].tolist() == [0.5, 0.0, 0.0, 0.0, -0.25, -0.25]
+    membership_matrix = app.dataframe[1].value
+    clearance_matrix = app.dataframe[2].value
+    assert membership_matrix.index.tolist() == ["A", "B", "C", "D", "E", "F"]
+    assert membership_matrix.columns.tolist() == ["Box 0", "Box 1"]
+    assert membership_matrix.values.tolist() == [
+        [True, True], [True, False], [False, True],
+        [False, False], [True, True], [False, False],
+    ]
+    assert clearance_matrix.index.tolist() == ["A", "B", "C", "D", "E", "F"]
+    assert clearance_matrix.columns.tolist() == ["Box 0", "Box 1"]
+    assert clearance_matrix.values.tolist() == [
+        [0.5, 0.25], [0.25, -0.5], [-0.25, 0.25],
+        [-0.25, -0.5], [0.0, 0.0], [-0.25, -1.0],
+    ]
+    assert any("Multi-box membership mismatches: 0 of 12" in item.value for item in app.success)
+    assert any("Multi-box clearance mismatches: 0 of 12" in item.value for item in app.success)
     assert not app.sidebar.text_input
     assert not app.button
     after_exists = artifacts.exists()

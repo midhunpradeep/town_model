@@ -24,6 +24,11 @@ from town_model.dashboard.data import class_names_for_targets, find_sample, load
 from town_model.dashboard.runtime import submit_generation
 from town_model.models.bounded_box import bounded_box_contains, box_signed_clearance
 from town_model.models.bounded_box_fixture import BOUNDED_BOX_INSPECTION_FIXTURE
+from town_model.models.bounded_multi_box import (
+    bounded_multi_box_contains,
+    multi_box_signed_clearance,
+)
+from town_model.models.bounded_multi_box_fixture import BOUNDED_MULTI_BOX_INSPECTION_FIXTURE
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_CONFIG = REPOSITORY_ROOT / "dataset.toml"
@@ -480,6 +485,87 @@ def _render_mathematical_inspector(st) -> None:
             f"Signed-clearance fixture agreement: {len(fixture.labels)}/{len(fixture.labels)}"
             " · clearance mismatches: 0"
         )
+    _render_multi_box_inspection(st)
+
+
+def _bounded_multi_box_inspection_matrices() -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    tuple[tuple[str, int, bool, bool], ...],
+    tuple[tuple[str, int, float, float], ...],
+]:
+    fixture = BOUNDED_MULTI_BOX_INSPECTION_FIXTURE
+    points = torch.tensor(fixture.points, dtype=torch.float32, device="cpu")
+    lower = torch.tensor(fixture.lower, dtype=torch.float32, device="cpu")
+    upper = torch.tensor(fixture.upper, dtype=torch.float32, device="cpu")
+    actual_membership = bounded_multi_box_contains(points, lower, upper).tolist()
+    actual_clearances = multi_box_signed_clearance(points, lower, upper).tolist()
+
+    membership_matrix = pd.DataFrame(
+        actual_membership, index=fixture.labels, columns=fixture.box_labels
+    )
+    clearance_matrix = pd.DataFrame(
+        actual_clearances, index=fixture.labels, columns=fixture.box_labels
+    )
+    membership_mismatches = tuple(
+        (fixture.labels[row], box_index, expected, bool(actual_membership[row][box_index]))
+        for row, expected_row in enumerate(fixture.expected_membership)
+        for box_index, expected in enumerate(expected_row)
+        if bool(actual_membership[row][box_index]) != expected
+    )
+    clearance_mismatches = tuple(
+        (
+            fixture.labels[row],
+            box_index,
+            expected,
+            float(actual_clearances[row][box_index]),
+        )
+        for row, expected_row in enumerate(fixture.expected_clearances)
+        for box_index, expected in enumerate(expected_row)
+        if float(actual_clearances[row][box_index]) != expected
+    )
+    return membership_matrix, clearance_matrix, membership_mismatches, clearance_mismatches
+
+
+def _render_multi_box_inspection(st) -> None:
+    fixture = BOUNDED_MULTI_BOX_INSPECTION_FIXTURE
+    (
+        membership_matrix,
+        clearance_matrix,
+        membership_mismatches,
+        clearance_mismatches,
+    ) = _bounded_multi_box_inspection_matrices()
+    total_cells = len(fixture.labels) * len(fixture.box_labels)
+
+    st.markdown("#### Multi-box inference")
+    st.markdown("Membership matrix")
+    st.dataframe(membership_matrix, width="stretch")
+    st.markdown("Signed-clearance matrix")
+    st.dataframe(clearance_matrix, width="stretch")
+
+    if membership_mismatches:
+        details = "; ".join(
+            f"point {point}, box index {box_index}: expected {expected}, actual {actual}"
+            for point, box_index, expected, actual in membership_mismatches
+        )
+        st.error(
+            f"Multi-box membership mismatches: {len(membership_mismatches)} of "
+            f"{total_cells} ({details})"
+        )
+    else:
+        st.success(f"Multi-box membership mismatches: 0 of {total_cells}")
+
+    if clearance_mismatches:
+        details = "; ".join(
+            f"point {point}, box index {box_index}: expected {expected:+.9g}, actual {actual:+.9g}"
+            for point, box_index, expected, actual in clearance_mismatches
+        )
+        st.error(
+            f"Multi-box clearance mismatches: {len(clearance_mismatches)} of "
+            f"{total_cells} ({details})"
+        )
+    else:
+        st.success(f"Multi-box clearance mismatches: 0 of {total_cells}")
 
 
 def _render_geometry_laboratory(st, runs_root: Path) -> None:
