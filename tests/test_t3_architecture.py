@@ -40,6 +40,11 @@ TOWN01_INSPECTOR_REGRESSION_NODES = {
     "tests/test_town_math_inspector.py::test_wrong_evaluator_injection_shows_point_specific_mismatches",
 }
 TOWN01_MATHEMATICAL_TEST_NODE_COUNT = 44
+BOX04_DASHBOARD_REGRESSION_NODES = {
+    "tests/test_dashboard_app.py::test_bound_box_inspector_uses_verified_synthetic_identity_and_direct_row_binding",
+    "tests/test_dashboard_app.py::test_bound_box_inspector_reports_each_output_mismatch_with_identity",
+}
+BOX04_MATHEMATICAL_TEST_NODE_COUNT = 80
 BOX03_DASHBOARD_REGRESSION_NODES = {
     "tests/test_dashboard_app.py::test_multi_box_inspector_matrices_use_cpu_evaluators_and_literal_fixture",
     "tests/test_dashboard_app.py::test_multi_box_inspector_reports_cell_specific_mismatches_separately",
@@ -268,8 +273,14 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert len(town01_mathematical_nodes) == TOWN01_MATHEMATICAL_TEST_NODE_COUNT
     assert TOWN01_INSPECTOR_REGRESSION_NODES <= current_nodes
     town01_nodes = town01_mathematical_nodes | TOWN01_INSPECTOR_REGRESSION_NODES
+    bound_box_mathematical_nodes = {
+        node for node in current_nodes if node.startswith("tests/test_bound_box_inference.py::")
+    }
+    assert len(bound_box_mathematical_nodes) == BOX04_MATHEMATICAL_TEST_NODE_COUNT
+    assert BOX04_DASHBOARD_REGRESSION_NODES <= current_nodes
+    box04_nodes = bound_box_mathematical_nodes | BOX04_DASHBOARD_REGRESSION_NODES
     box_nodes = box01_nodes | box02_nodes | box03_nodes
-    accounted_feature_nodes = box_nodes | town01_nodes
+    accounted_feature_nodes = box_nodes | town01_nodes | box04_nodes
     legacy_nodes = current_nodes - accounted_feature_nodes
     assert (
         checkpoint_node_count
@@ -283,6 +294,7 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
         + len(box02_nodes)
         + len(box03_nodes)
         + len(town01_nodes)
+        + len(box04_nodes)
     )
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (

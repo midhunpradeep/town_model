@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
@@ -209,7 +210,7 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
     assert any("membership mismatches: 0" in item.value for item in app.success)
     assert any("clearance mismatches: 0" in item.value for item in app.success)
     assert not app.info
-    assert len(app.dataframe) == 3
+    assert len(app.dataframe) == 5
     table = app.dataframe[0].value
     assert table.columns.tolist() == [
         "Point",
@@ -236,12 +237,119 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
     ]
     assert any("Multi-box membership mismatches: 0 of 12" in item.value for item in app.success)
     assert any("Multi-box clearance mismatches: 0 of 12" in item.value for item in app.success)
+    bound_membership = app.dataframe[3].value
+    bound_clearance = app.dataframe[4].value
+    assert bound_membership.index.tolist() == ["A", "B", "C", "D", "E", "F"]
+    assert bound_membership.columns.tolist() == ["Box 0", "Box 1"]
+    assert bound_membership.values.tolist() == [
+        [True, True], [True, False], [False, True],
+        [False, False], [True, True], [False, False],
+    ]
+    assert bound_clearance.values.tolist() == [
+        [0.5, 0.25], [0.25, -0.5], [-0.25, 0.25],
+        [-0.25, -0.5], [0.0, 0.0], [-0.25, -1.0],
+    ]
+    assert any("ordered IDs (12, 27)" in item.value for item in app.markdown)
+    assert any("vocabulary SHA-256 `fd793ac6c2c0…`" in item.value for item in app.markdown)
+    assert any("Box 0 → synthetic class ID 12, Box 1 → synthetic class ID 27" in item.value for item in app.markdown)
+    assert any("DomainThing vector (separate): expected (True, True, True, True, True, False)" in item.value for item in app.markdown)
+    assert any("Bound BOX membership mismatches: 0 of 12" in item.value for item in app.success)
+    assert any("Bound BOX clearance mismatches: 0 of 12" in item.value for item in app.success)
+    assert any("DomainThing mismatches: 0 of 6" in item.value for item in app.success)
     assert not app.sidebar.text_input
     assert not app.button
     after_exists = artifacts.exists()
     after = {path: path.read_bytes() for path in artifacts.rglob("*") if path.is_file()} if after_exists else {}
     assert after_exists == before_exists
     assert after == before
+
+
+def test_bound_box_inspector_uses_verified_synthetic_identity_and_direct_row_binding(
+    monkeypatch,
+) -> None:
+    calls = []
+    real_infer = dashboard_app.BoundBoxClassifier.infer
+
+    def infer_spy(classifier, points, geometry):
+        calls.append((points.device, geometry.lower.device, geometry.upper.device, geometry.row_class_ids))
+        return real_infer(classifier, points, geometry)
+
+    monkeypatch.setattr(dashboard_app.BoundBoxClassifier, "infer", infer_spy)
+    (
+        membership,
+        clearance,
+        domain,
+        membership_mismatches,
+        clearance_mismatches,
+        domain_mismatches,
+    ) = dashboard_app._bound_box_inference_inspection()
+
+    assert calls == [(torch.device("cpu"), torch.device("cpu"), torch.device("cpu"), (12, 27))]
+    assert membership.columns.tolist() == ["Box 0", "Box 1"]
+    assert membership.values.tolist() == [
+        [True, True], [True, False], [False, True],
+        [False, False], [True, True], [False, False],
+    ]
+    assert clearance.values.tolist() == [
+        [0.5, 0.25], [0.25, -0.5], [-0.25, 0.25],
+        [-0.25, -0.5], [0.0, 0.0], [-0.25, -1.0],
+    ]
+    assert domain == (True, True, True, True, True, False)
+    assert membership_mismatches == clearance_mismatches == domain_mismatches == ()
+
+
+def test_bound_box_inspector_reports_each_output_mismatch_with_identity(monkeypatch) -> None:
+    real_infer = dashboard_app.BoundBoxClassifier.infer
+
+    def mismatched_infer(classifier, points, geometry):
+        result = real_infer(classifier, points, geometry)
+        contains = result.contains.clone()
+        contains[0, 0] = False
+        clearance = result.signed_coordinate_clearance.clone()
+        clearance[1, 1] = 0.125
+        domain = result.domain_contains.clone()
+        domain[0] = False
+        return replace(
+            result,
+            contains=contains,
+            signed_coordinate_clearance=clearance,
+            domain_contains=domain,
+        )
+
+    class InspectorSink:
+        def __init__(self) -> None:
+            self.markdown_values: list[str] = []
+            self.tables: list[pd.DataFrame] = []
+            self.errors: list[str] = []
+            self.successes: list[str] = []
+
+        def markdown(self, value: str) -> None:
+            self.markdown_values.append(value)
+
+        def dataframe(self, frame: pd.DataFrame, **kwargs) -> None:
+            self.tables.append(frame)
+
+        def error(self, message: str) -> None:
+            self.errors.append(message)
+
+        def success(self, message: str) -> None:
+            self.successes.append(message)
+
+    monkeypatch.setattr(dashboard_app.BoundBoxClassifier, "infer", mismatched_infer)
+    inspector = InspectorSink()
+
+    dashboard_app._render_bound_box_inference_inspection(inspector)
+
+    assert len(inspector.tables) == 2
+    assert any("ordered IDs (12, 27)" in value for value in inspector.markdown_values)
+    assert any("Box 0 → synthetic class ID 12" in value for value in inspector.markdown_values)
+    assert any("DomainThing vector (separate)" in value for value in inspector.markdown_values)
+    assert inspector.errors == [
+        "Bound BOX membership mismatches: 1 of 12 (point A, box index 0: expected True, actual False)",
+        "Bound BOX clearance mismatches: 1 of 12 (point B, box index 1: expected -0.5, actual +0.125)",
+        "DomainThing mismatches: 1 of 6 (point A: expected True, actual False)",
+    ]
+    assert not inspector.successes
 
 
 def test_dashboard_explorer_loads_shared_dataset_and_renders_annotations(prepared_dataset: Path) -> None:

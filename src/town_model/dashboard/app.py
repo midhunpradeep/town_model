@@ -29,6 +29,8 @@ from town_model.models.bounded_multi_box import (
     multi_box_signed_clearance,
 )
 from town_model.models.bounded_multi_box_fixture import BOUNDED_MULTI_BOX_INSPECTION_FIXTURE
+from town_model.models.bound_box_inference import BoundBoxClassifier, BoundBoxGeometry
+from town_model.models.bound_box_inference_fixture import BOUND_BOX_INFERENCE_INSPECTION_FIXTURE
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATASET_CONFIG = REPOSITORY_ROOT / "dataset.toml"
@@ -486,6 +488,7 @@ def _render_mathematical_inspector(st) -> None:
             " · clearance mismatches: 0"
         )
     _render_multi_box_inspection(st)
+    _render_bound_box_inference_inspection(st)
 
 
 def _bounded_multi_box_inspection_matrices() -> tuple[
@@ -566,6 +569,140 @@ def _render_multi_box_inspection(st) -> None:
         )
     else:
         st.success(f"Multi-box clearance mismatches: 0 of {total_cells}")
+
+
+def _bound_box_inference_inspection() -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    tuple[bool, ...],
+    tuple[tuple[str, int, bool, bool], ...],
+    tuple[tuple[str, int, float, float], ...],
+    tuple[tuple[str, bool, bool], ...],
+]:
+    identity = BOUND_BOX_INFERENCE_INSPECTION_FIXTURE
+    fixture = BOUNDED_MULTI_BOX_INSPECTION_FIXTURE
+    points = torch.tensor(fixture.points, dtype=torch.float32, device="cpu")
+    lower = torch.tensor(fixture.lower, dtype=torch.float32, device="cpu")
+    upper = torch.tensor(fixture.upper, dtype=torch.float32, device="cpu")
+    geometry = BoundBoxGeometry.from_ordered_rows(
+        lower,
+        upper,
+        row_class_ids=identity.row_class_ids,
+        class_manifest_sha256=identity.binding.class_manifest_sha256,
+        expected_binding=identity.binding,
+    )
+    result = BoundBoxClassifier(identity.binding).infer(points, geometry)
+    actual_membership = result.contains.tolist()
+    actual_clearances = result.signed_coordinate_clearance.tolist()
+    actual_domain = tuple(bool(value) for value in result.domain_contains.tolist())
+    labels = fixture.labels
+    membership_matrix = pd.DataFrame(
+        actual_membership, index=labels, columns=identity.row_labels
+    )
+    clearance_matrix = pd.DataFrame(
+        actual_clearances, index=labels, columns=identity.row_labels
+    )
+    membership_mismatches = tuple(
+        (labels[row], column, expected, bool(actual_membership[row][column]))
+        for row, expected_row in enumerate(fixture.expected_membership)
+        for column, expected in enumerate(expected_row)
+        if bool(actual_membership[row][column]) != expected
+    )
+    clearance_mismatches = tuple(
+        (
+            labels[row],
+            column,
+            expected,
+            float(actual_clearances[row][column]),
+        )
+        for row, expected_row in enumerate(fixture.expected_clearances)
+        for column, expected in enumerate(expected_row)
+        if float(actual_clearances[row][column]) != expected
+    )
+    domain_mismatches = tuple(
+        (label, expected, actual)
+        for label, expected, actual in zip(
+            labels, identity.expected_domain_contains, actual_domain, strict=True
+        )
+        if expected != actual
+    )
+    return (
+        membership_matrix,
+        clearance_matrix,
+        actual_domain,
+        membership_mismatches,
+        clearance_mismatches,
+        domain_mismatches,
+    )
+
+
+def _render_bound_box_inference_inspection(st) -> None:
+    identity = BOUND_BOX_INFERENCE_INSPECTION_FIXTURE
+    fixture = BOUNDED_MULTI_BOX_INSPECTION_FIXTURE
+    (
+        membership_matrix,
+        clearance_matrix,
+        actual_domain,
+        membership_mismatches,
+        clearance_mismatches,
+        domain_mismatches,
+    ) = _bound_box_inference_inspection()
+    total_cells = len(fixture.labels) * len(identity.row_labels)
+
+    st.markdown("#### Class-bound BOX inference")
+    st.markdown(
+        f"Synthetic class binding · ordered IDs {identity.binding.trainable_class_ids} · "
+        f"vocabulary SHA-256 `{identity.binding.class_manifest_sha256[:12]}…`"
+    )
+    row_associations = ", ".join(
+        f"{label} → synthetic class ID {class_id}"
+        for label, class_id in zip(identity.row_labels, identity.row_class_ids, strict=True)
+    )
+    st.markdown(f"Geometry row association: {row_associations}")
+    st.markdown("Bound BOX membership matrix")
+    st.dataframe(membership_matrix, width="stretch")
+    st.markdown("Bound BOX signed-coordinate-clearance matrix")
+    st.dataframe(clearance_matrix, width="stretch")
+    st.markdown(
+        "DomainThing vector (separate): "
+        f"expected {identity.expected_domain_contains}; actual {actual_domain}"
+    )
+
+    if membership_mismatches:
+        details = "; ".join(
+            f"point {point}, box index {box_index}: expected {expected}, actual {actual}"
+            for point, box_index, expected, actual in membership_mismatches
+        )
+        st.error(
+            f"Bound BOX membership mismatches: {len(membership_mismatches)} of "
+            f"{total_cells} ({details})"
+        )
+    else:
+        st.success(f"Bound BOX membership mismatches: 0 of {total_cells}")
+
+    if clearance_mismatches:
+        details = "; ".join(
+            f"point {point}, box index {box_index}: expected {expected:+.9g}, actual {actual:+.9g}"
+            for point, box_index, expected, actual in clearance_mismatches
+        )
+        st.error(
+            f"Bound BOX clearance mismatches: {len(clearance_mismatches)} of "
+            f"{total_cells} ({details})"
+        )
+    else:
+        st.success(f"Bound BOX clearance mismatches: 0 of {total_cells}")
+
+    if domain_mismatches:
+        details = "; ".join(
+            f"point {point}: expected {expected}, actual {actual}"
+            for point, expected, actual in domain_mismatches
+        )
+        st.error(
+            f"DomainThing mismatches: {len(domain_mismatches)} of {len(fixture.labels)} "
+            f"({details})"
+        )
+    else:
+        st.success(f"DomainThing mismatches: 0 of {len(fixture.labels)}")
 
 
 def _render_geometry_laboratory(st, runs_root: Path) -> None:
