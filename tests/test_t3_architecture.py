@@ -40,6 +40,12 @@ TOWN01_INSPECTOR_REGRESSION_NODES = {
     "tests/test_town_math_inspector.py::test_wrong_evaluator_injection_shows_point_specific_mismatches",
 }
 TOWN01_MATHEMATICAL_TEST_NODE_COUNT = 44
+TOWN02_INSPECTOR_REGRESSION_NODES = {
+    "tests/test_town_math_inspector.py::test_composition_tables_use_cpu_evaluators_and_independent_literals",
+    "tests/test_town_math_inspector.py::test_composition_inspector_renders_five_scenarios_without_changing_town01_table",
+    "tests/test_town_math_inspector.py::test_composition_wrong_evaluator_identifies_each_scenario_and_point",
+}
+TOWN02_MATHEMATICAL_TEST_NODE_COUNT = 119
 BOX03_DASHBOARD_REGRESSION_NODES = {
     "tests/test_dashboard_app.py::test_multi_box_inspector_matrices_use_cpu_evaluators_and_literal_fixture",
     "tests/test_dashboard_app.py::test_multi_box_inspector_reports_cell_specific_mismatches_separately",
@@ -268,8 +274,14 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert len(town01_mathematical_nodes) == TOWN01_MATHEMATICAL_TEST_NODE_COUNT
     assert TOWN01_INSPECTOR_REGRESSION_NODES <= current_nodes
     town01_nodes = town01_mathematical_nodes | TOWN01_INSPECTOR_REGRESSION_NODES
+    town02_mathematical_nodes = {
+        node for node in current_nodes if node.startswith("tests/test_town_composition.py::")
+    }
+    assert len(town02_mathematical_nodes) == TOWN02_MATHEMATICAL_TEST_NODE_COUNT
+    assert TOWN02_INSPECTOR_REGRESSION_NODES <= current_nodes
+    town02_nodes = town02_mathematical_nodes | TOWN02_INSPECTOR_REGRESSION_NODES
     box_nodes = box01_nodes | box02_nodes | box03_nodes
-    accounted_feature_nodes = box_nodes | town01_nodes
+    accounted_feature_nodes = box_nodes | town01_nodes | town02_nodes
     legacy_nodes = current_nodes - accounted_feature_nodes
     assert (
         checkpoint_node_count
@@ -283,6 +295,7 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
         + len(box02_nodes)
         + len(box03_nodes)
         + len(town01_nodes)
+        + len(town02_nodes)
     )
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
