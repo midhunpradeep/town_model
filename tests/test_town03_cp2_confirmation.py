@@ -18,6 +18,10 @@ from town_model.models.town_geometry import (
 ROOT = Path(__file__).parents[1]
 MANIFEST = ROOT / "docs/reconstruction/TOWN03_CP2_CONFIRMATION_SET.json"
 MANIFEST_SHA256 = "acb1f9c43110ac839530066ef2aa3311755003321b945b65345f3445b4548f3e"
+SUPPLEMENT = ROOT / "docs/reconstruction/TOWN03_CP2_INDEPENDENCE_SUPPLEMENT_V1.json"
+SUPPLEMENT_SHA256 = "b53625dcc7eb428ef02cca5dbba48831b0c8ca9fff5182e98df558d48867eafa"
+INPUT_AUDIT = ROOT / "docs/reconstruction/TOWN03_CP2_INPUT_INDEPENDENCE_AUDIT_V1.json"
+INPUT_AUDIT_SHA256 = "4bec527d803f3c8c017c4fee6a8d3d6e533cda2a965a8d418b2877bdef78b344"
 ABSOLUTE_GRADIENT_BUDGET = 1e-6
 FINITE_DIFFERENCE_BUDGET = 2e-5
 
@@ -51,6 +55,95 @@ def test_frozen_confirmation_manifest_hash_and_inventory() -> None:
     assert set(manifest["total_configuration_counts"]) == {
         f"d{d}-h{h}-w{w}" for d in (1, 2) for h in (1, 2) for w in (0, 1, 2)
     }
+
+
+def test_r1_supplement_regenerates_and_full_inputs_are_disjoint(
+    tmp_path: Path,
+) -> None:
+    regenerated = tmp_path / "supplement.json"
+    audit_output = tmp_path / "input-audit.json"
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(ROOT / "src")
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/town03_cp2_freeze_independence_supplement.py"),
+            str(regenerated),
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert hashlib.sha256(regenerated.read_bytes()).hexdigest() == SUPPLEMENT_SHA256
+    assert regenerated.read_bytes() == SUPPLEMENT.read_bytes()
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/town03_cp2_audit_input_independence.py"),
+            "--supplement",
+            str(SUPPLEMENT),
+            "--output",
+            str(audit_output),
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert hashlib.sha256(INPUT_AUDIT.read_bytes()).hexdigest() == INPUT_AUDIT_SHA256
+    audit = json.loads(audit_output.read_text(encoding="utf-8"))
+    assert audit["status"] == "PASS"
+    assert audit["cp1_input_case_count"] == 146
+    assert audit["original_cp1_overlap"] == {
+        "total": 50,
+        "by_group": {"generated": 0, "literal": 14, "nextafter": 36},
+    }
+    assert audit["retained_original_cp2_independent_count"] == 196
+    assert audit["supplement_overlap_with_cp1"] == 0
+    assert audit["supplement_overlap_with_retained_original_cp2"] == 0
+    assert audit["combined_distinct_full_inputs"] == 246
+    assert set(audit["combined_configuration_counts"]) == {
+        f"d{d}-h{h}-w{w}" for d in (1, 2) for h in (1, 2) for w in (0, 1, 2)
+    }
+
+
+def test_r1_combined_confirmation_runner_passes_locked_budgets(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "r1-results.json"
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(ROOT / "src")
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/town03_cp2_verify_independence_remediation.py"),
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    results = json.loads(output.read_text(encoding="utf-8"))
+    assert results["status"] == "PASS"
+    assert results["frozen_inputs"]["combined_case_count"] == 246
+    assert results["frozen_inputs"]["pre_evaluation_combined_distinct_full_inputs"] == 246
+    assert results["frozen_inputs"]["group_counts"] == {
+        "original_seeded_generated": 192,
+        "original_independent_literals": 4,
+        "supplement_nextafter": 36,
+        "supplement_literals": 14,
+    }
+    assert results["boolean_mismatches"] == 0
+    assert results["failures"] == []
+    assert results["H1_W0_BOX_equivalence_calls"] > 0
+    assert results["device_metrics"]["cpu"]["house"]["outputs"] == 246
+    assert results["device_metrics"]["cuda:0"]["town"]["outputs"] == 246
 
 
 def test_locked_confirmation_runner_passes_forward_and_boolean_budgets(

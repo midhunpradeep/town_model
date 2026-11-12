@@ -52,7 +52,7 @@ TOWN02_INSPECTOR_REGRESSION_NODES = {
 }
 TOWN02_MATHEMATICAL_TEST_NODE_COUNT = 119
 TOWN03_MATHEMATICAL_TEST_NODE_COUNT = 36
-TOWN03_CONFIRMATION_TEST_NODE_COUNT = 6
+TOWN03_CONFIRMATION_TEST_NODE_COUNT = 8
 TOWN03_INSPECTOR_REGRESSION_NODES = {
     "tests/test_town_math_inspector.py::test_clearance_tables_use_cpu_evaluators_and_independent_literal_fixtures",
     "tests/test_town_math_inspector.py::test_clearance_inspector_renders_boundaries_and_degeneracies_read_only",
