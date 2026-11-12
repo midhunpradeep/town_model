@@ -166,6 +166,46 @@ def house_contains(
     return in_domain & in_frame & ~excluded
 
 
+def house_signed_clearance(
+    points: Tensor,
+    frame_lower: Tensor,
+    frame_upper: Tensor,
+    window_lower: Tensor,
+    window_upper: Tensor,
+) -> Tensor:
+    """Return the exact min-composed signed coordinate clearance of a house.
+
+    The result is ``min(s_F, -s_W1, ..., -s_WW)`` in raw physical
+    coordinate units, where each box score is the minimum of its lower- and
+    upper-face coordinate clearances. It is not Euclidean distance or a
+    Boolean-membership result. Inputs use TOWN-02's physical-corner shapes
+    and validation rules; finite outside-domain query points are accepted.
+    ``W=0`` returns the frame's box clearance exactly. ``torch.amin`` and
+    native PyTorch autograd/tie behavior are used without smoothing, scaling,
+    clipping, or custom backward operations.
+    """
+    points, frame_lower, frame_upper, window_lower, window_upper = _validate_house_inputs(
+        points, frame_lower, frame_upper, window_lower, window_upper
+    )
+
+    frame_faces = torch.cat((points - frame_lower, frame_upper - points), dim=-1)
+    frame_clearance = torch.amin(frame_faces, dim=-1)
+    if window_lower.shape[0] == 0:
+        return frame_clearance
+
+    points_by_window = points.unsqueeze(1)
+    window_faces = torch.cat(
+        (
+            points_by_window - window_lower.unsqueeze(0),
+            window_upper.unsqueeze(0) - points_by_window,
+        ),
+        dim=-1,
+    )
+    window_clearances = torch.amin(window_faces, dim=-1)
+    branches = torch.cat((frame_clearance.unsqueeze(1), -window_clearances), dim=1)
+    return torch.amin(branches, dim=1)
+
+
 def _validate_town_inputs(
     points: Tensor,
     frame_lower: Tensor,
@@ -268,3 +308,56 @@ def town_contains(
     excluded = inside_windows.any(dim=-1)
     house_membership = closed_frames & ~excluded
     return house_membership.any(dim=1)
+
+
+def town_signed_clearance(
+    points: Tensor,
+    frame_lower: Tensor,
+    frame_upper: Tensor,
+    window_lower: Tensor,
+    window_upper: Tensor,
+) -> Tensor:
+    """Return the exact max-composed signed coordinate clearance of a town.
+
+    The result is ``max_h s_Hh`` in raw physical coordinate units. Frame and
+    window scores use their minimum lower-/upper-face coordinate clearance;
+    each house is the exact minimum of its frame score and negated window
+    scores. This numerical measurement is not Boolean membership or Euclidean
+    distance. Inputs use TOWN-02's stacked physical-corner shapes and
+    validation rules; finite outside-domain queries are accepted. ``H >= 1``
+    and ``W=0`` are supported. Exact ``torch.amin``/``torch.amax`` reductions
+    and native PyTorch autograd/tie behavior are retained, with no smoothing,
+    scaling, clipping, or custom backward operations.
+    """
+    points, frame_lower, frame_upper, window_lower, window_upper = _validate_town_inputs(
+        points, frame_lower, frame_upper, window_lower, window_upper
+    )
+
+    points_by_house = points.unsqueeze(1)
+    frame_faces = torch.cat(
+        (
+            points_by_house - frame_lower.unsqueeze(0),
+            frame_upper.unsqueeze(0) - points_by_house,
+        ),
+        dim=-1,
+    )
+    frame_clearances = torch.amin(frame_faces, dim=-1)
+
+    if window_lower.shape[1] == 0:
+        house_clearances = frame_clearances
+    else:
+        points_by_window = points[:, None, None, :]
+        window_faces = torch.cat(
+            (
+                points_by_window - window_lower.unsqueeze(0),
+                window_upper.unsqueeze(0) - points_by_window,
+            ),
+            dim=-1,
+        )
+        window_clearances = torch.amin(window_faces, dim=-1)
+        house_branches = torch.cat(
+            (frame_clearances.unsqueeze(-1), -window_clearances), dim=-1
+        )
+        house_clearances = torch.amin(house_branches, dim=-1)
+
+    return torch.amax(house_clearances, dim=1)
