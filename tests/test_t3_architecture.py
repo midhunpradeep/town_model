@@ -56,6 +56,7 @@ BOX03_DASHBOARD_REGRESSION_NODES = {
     "tests/test_dashboard_app.py::test_multi_box_inspector_reports_cell_specific_mismatches_separately",
 }
 BOX03_MATHEMATICAL_TEST_NODE_COUNT = 58
+BOX05_CP1_MATHEMATICAL_TEST_NODE_COUNT = 16
 
 
 def _source_files() -> list[Path]:
@@ -291,8 +292,14 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
     assert len(town02_mathematical_nodes) == TOWN02_MATHEMATICAL_TEST_NODE_COUNT
     assert TOWN02_INSPECTOR_REGRESSION_NODES <= current_nodes
     town02_nodes = town02_mathematical_nodes | TOWN02_INSPECTOR_REGRESSION_NODES
+    box05_cp1_nodes = {
+        node for node in current_nodes if node.startswith("tests/test_box05_cp1_geometry.py::")
+    }
+    assert len(box05_cp1_nodes) == BOX05_CP1_MATHEMATICAL_TEST_NODE_COUNT
     box_nodes = box01_nodes | box02_nodes | box03_nodes
-    accounted_feature_nodes = box_nodes | town01_nodes | box04_nodes | town02_nodes
+    accounted_feature_nodes = (
+        box_nodes | town01_nodes | box04_nodes | town02_nodes | box05_cp1_nodes
+    )
     legacy_nodes = current_nodes - accounted_feature_nodes
     assert (
         checkpoint_node_count
@@ -308,6 +315,7 @@ def test_retirement_manifest_accounts_for_each_original_node_and_mixed_assertion
         + len(town01_nodes)
         + len(box04_nodes)
         + len(town02_nodes)
+        + len(box05_cp1_nodes)
     )
     assert summary["original_node_ids_accounted_in_entries"] == len(covered)
     assert (
