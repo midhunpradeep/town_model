@@ -20,6 +20,7 @@ from town_model.application import (
 )
 from town_model.config import DEFAULT_PIZZA_TYPES, DatasetConfig, load_config
 from town_model.dataset.constants import SCHEMA_VERSION
+from town_model.dashboard.box05_inspector import _render_box05_inspector
 from town_model.dashboard.data import class_names_for_targets, find_sample, load_dashboard_data
 from town_model.dashboard.runtime import submit_generation
 from town_model.models.bounded_box import bounded_box_contains, box_signed_clearance
@@ -489,6 +490,7 @@ def _render_mathematical_inspector(st) -> None:
         )
     _render_multi_box_inspection(st)
     _render_bound_box_inference_inspection(st)
+    _render_box05_inspector(st)
 
 
 def _bounded_multi_box_inspection_matrices() -> tuple[

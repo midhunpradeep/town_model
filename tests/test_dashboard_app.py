@@ -69,6 +69,9 @@ def test_mathematical_inspector_reports_clearance_mismatches_separately(monkeypa
         def markdown(self, value: str) -> None:
             pass
 
+        def caption(self, value: str) -> None:
+            pass
+
         def pyplot(self, figure, **kwargs) -> None:
             pass
 
@@ -210,7 +213,7 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
     assert any("membership mismatches: 0" in item.value for item in app.success)
     assert any("clearance mismatches: 0" in item.value for item in app.success)
     assert not app.info
-    assert len(app.dataframe) == 5
+    assert len(app.dataframe) == 8
     table = app.dataframe[0].value
     assert table.columns.tolist() == [
         "Point",
@@ -256,6 +259,15 @@ def test_mathematical_inspector_navigation_is_read_only_and_minimal() -> None:
     assert any("Bound BOX membership mismatches: 0 of 12" in item.value for item in app.success)
     assert any("Bound BOX clearance mismatches: 0 of 12" in item.value for item in app.success)
     assert any("DomainThing mismatches: 0 of 6" in item.value for item in app.success)
+    box05_physical = app.dataframe[5].value
+    assert box05_physical["Class ID"].tolist() == [12, 27]
+    assert box05_physical["Width policy"].tolist() == ["ordinary", "hosting_frame"]
+    assert "sigma_min(J)" in box05_physical.columns
+    assert app.dataframe[6].value.shape == (5, 2)
+    assert app.dataframe[7].value.shape == (5, 2)
+    assert any("BOX-05 membership mismatches: 0 of 10" in item.value for item in app.success)
+    assert any("BOX-05 clearance mismatches: 0 of 10" in item.value for item in app.success)
+    assert any("BOX-05 endpoint reconstruction-budget mismatches: 0" in item.value for item in app.success)
     assert not app.sidebar.text_input
     assert not app.button
     after_exists = artifacts.exists()
