@@ -217,6 +217,33 @@ def _gradient_probes(device: torch.device) -> dict[str, Any]:
         "grads": [value.detach().cpu().tolist() for value in grads],
     }
 
+    points = tensor([[0.25]], True)
+    lower = tensor([[-1.0], [0.0]], True)
+    upper = tensor([[0.0], [1.0]], True)
+    empty = torch.empty((2, 0, 1), dtype=torch.float32, device=device)
+    score = town_signed_clearance(points, lower, upper, empty, empty).sum()
+    grads = torch.autograd.grad(score, (points, lower, upper))
+    result["unique_town_frame"] = {
+        "score": score.item(),
+        "grads": [value.detach().cpu().tolist() for value in grads],
+    }
+
+    points = tensor([[0.4, 0.0]], True)
+    frame_lower = tensor([[-1.0, -1.0]], True)
+    frame_upper = tensor([[1.0, 1.0]], True)
+    window_lower = tensor([[[-0.5, -0.5]]], True)
+    window_upper = tensor([[[0.5, 0.5]]], True)
+    score = town_signed_clearance(
+        points, frame_lower, frame_upper, window_lower, window_upper
+    ).sum()
+    grads = torch.autograd.grad(
+        score, (points, frame_lower, frame_upper, window_lower, window_upper)
+    )
+    result["unique_town_window"] = {
+        "score": score.item(),
+        "grads": [value.detach().cpu().tolist() for value in grads],
+    }
+
     points = tensor([[0.0]], True)
     lower = tensor([-1.0], True)
     upper = tensor([1.0], True)
@@ -556,6 +583,14 @@ def run(manifest_path: Path = MANIFEST_PATH) -> dict[str, Any]:
             [0.0, 0.0],
             [[0.0, 0.0]],
             [[-1.0, 0.0]],
+        ],
+        "unique_town_frame": [[[1.0]], [[0.0], [-1.0]], [[0.0], [0.0]]],
+        "unique_town_window": [
+            [[1.0, 0.0]],
+            [[0.0, 0.0]],
+            [[0.0, 0.0]],
+            [[[0.0, 0.0]]],
+            [[[-1.0, 0.0]]],
         ],
         "tied_amin_faces": [[[0.0]], [-0.5], [0.5]],
         "tied_house_branches": [[[0.0]], [-0.5], [[0.5]]],

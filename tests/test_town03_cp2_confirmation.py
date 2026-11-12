@@ -131,6 +131,49 @@ def test_cp2_unique_and_native_tied_gradients_match_locked_expectations(
         for actual, wanted in zip(grads, expected, strict=True)
     )
 
+    points = _tensor([[0.25]], device, True)
+    frame_lower = _tensor([[-1.0], [0.0]], device, True)
+    frame_upper = _tensor([[0.0], [1.0]], device, True)
+    no_town_windows = torch.empty((2, 0, 1), dtype=torch.float32, device=device)
+    score = town_signed_clearance(
+        points, frame_lower, frame_upper, no_town_windows, no_town_windows
+    ).sum()
+    grads = torch.autograd.grad(score, (points, frame_lower, frame_upper))
+    expected = (
+        _tensor([[1.0]], device),
+        _tensor([[0.0], [-1.0]], device),
+        _tensor([[0.0], [0.0]], device),
+    )
+    assert abs(score.item() - 0.25) <= ABSOLUTE_GRADIENT_BUDGET
+    assert all(
+        torch.allclose(actual, wanted, atol=ABSOLUTE_GRADIENT_BUDGET, rtol=0)
+        for actual, wanted in zip(grads, expected, strict=True)
+    )
+
+    points = _tensor([[0.4, 0.0]], device, True)
+    frame_lower = _tensor([[-1.0, -1.0]], device, True)
+    frame_upper = _tensor([[1.0, 1.0]], device, True)
+    window_lower = _tensor([[[-0.5, -0.5]]], device, True)
+    window_upper = _tensor([[[0.5, 0.5]]], device, True)
+    score = town_signed_clearance(
+        points, frame_lower, frame_upper, window_lower, window_upper
+    ).sum()
+    grads = torch.autograd.grad(
+        score, (points, frame_lower, frame_upper, window_lower, window_upper)
+    )
+    expected = (
+        _tensor([[1.0, 0.0]], device),
+        _tensor([[0.0, 0.0]], device),
+        _tensor([[0.0, 0.0]], device),
+        _tensor([[[0.0, 0.0]]], device),
+        _tensor([[[-1.0, 0.0]]], device),
+    )
+    assert abs(score.item() - (-0.1)) <= ABSOLUTE_GRADIENT_BUDGET
+    assert all(
+        torch.allclose(actual, wanted, atol=ABSOLUTE_GRADIENT_BUDGET, rtol=0)
+        for actual, wanted in zip(grads, expected, strict=True)
+    )
+
     points = _tensor([[0.0]], device, True)
     lower = _tensor([-1.0], device, True)
     upper = _tensor([1.0], device, True)
