@@ -1,0 +1,21 @@
+{
+  "statuses": {
+    "P6": "PASS",
+    "P7": "PASS",
+    "P4": "PASS",
+    "P5": "PASS"
+  },
+  "environment": {
+    "source_commit": "404d76112a9d53282b3f55698b4decb705a5601c",
+    "python": "3.12.0",
+    "torch": "2.5.1+cu124",
+    "torchvision": "0.20.1+cu124",
+    "numpy": "2.5.4",
+    "device": "cpu",
+    "torch_threads": [
+      1,
+      1
+    ]
+  },
+  "raw_observations_sha256": "f4f1939d699632f59ea0454f3b4bbbce1858df807760affd248ae257041d3a71"
+}
