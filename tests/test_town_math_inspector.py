@@ -8,6 +8,7 @@ from streamlit.testing.v1 import AppTest
 from town_model.dashboard import town_math_inspector
 from town_model.models import town_geometry
 from town_model.models.town_composition_fixture import TOWN_COMPOSITION_FIXTURES
+from town_model.models.town_clearance_fixture import TOWN_CLEARANCE_INSPECTION_FIXTURES
 from town_model.models.town_geometry_fixture import TOWN_STRICT_INTERIOR_FIXTURE
 
 
@@ -150,12 +151,12 @@ def test_composition_inspector_renders_five_scenarios_without_changing_town01_ta
     assert not app.exception
     assert any(item.value == "TOWN-01 · Strict-Box Interior" for item in app.title)
     assert any(item.value == "TOWN-02 · Boolean House and Town Composition" for item in app.header)
-    assert [item.value for item in app.subheader[1:]] == [
+    assert [item.value for item in app.subheader[1:6]] == [
         fixture.name for fixture in TOWN_COMPOSITION_FIXTURES
     ]
     assert len(app.dataframe) == 1
-    assert len(app.table) == 5
-    for fixture, element in zip(TOWN_COMPOSITION_FIXTURES, app.table, strict=True):
+    assert len(app.table) == 10
+    for fixture, element in zip(TOWN_COMPOSITION_FIXTURES, app.table[:5], strict=True):
         table = element.value
         assert table["Scenario"].tolist() == [fixture.name] * len(fixture.labels)
         assert table["Point"].tolist() == list(fixture.labels)
@@ -189,7 +190,7 @@ def test_composition_wrong_evaluator_identifies_each_scenario_and_point(monkeypa
 
     assert not app.exception
     errors = [item.value for item in app.error]
-    assert len(errors) == 5
+    assert len(errors) == 10
     joined = "\n".join(errors)
     assert "F1 single window: membership mismatches 3 of 5" in joined
     assert "F1 single window · B: expected True, actual False" in joined
@@ -197,7 +198,9 @@ def test_composition_wrong_evaluator_identifies_each_scenario_and_point(monkeypa
     assert "F3 protruding window · F: expected True, actual False" in joined
     assert "F4 zero windows · A: expected True, actual False" in joined
     assert "F5 two-house town · A: expected True, actual False" in joined
-    for fixture, element in zip(TOWN_COMPOSITION_FIXTURES, app.table, strict=True):
+    assert "C1 frame/window boundaries and hole interior: Boolean/clearance mismatches 3 of 4" in joined
+    assert "C2 one-axis-degenerate window: Boolean/clearance mismatches 3 of 3" in joined
+    for fixture, element in zip(TOWN_COMPOSITION_FIXTURES, app.table[:5], strict=True):
         assert element.value["Actual membership"].tolist() == [False] * len(element.value)
         assert element.value["Agreement"].tolist() == [
             not expected for expected in fixture.expected_contains
@@ -224,3 +227,126 @@ def test_wrong_evaluator_injection_shows_point_specific_mismatches(monkeypatch) 
     assert "A: expected True, actual False" in messages[0]
     assert "G: expected True, actual False" in messages[0]
     assert "Membership mismatches: 2 of 9" in messages[0]
+
+
+def test_clearance_tables_use_cpu_evaluators_and_independent_literal_fixtures(monkeypatch) -> None:
+    devices: list[tuple[str, tuple[torch.device, ...]]] = []
+    house_score = town_geometry.house_signed_clearance
+    town_score = town_geometry.town_signed_clearance
+    house_member = town_geometry.house_contains
+    town_member = town_geometry.town_contains
+
+    def house_score_spy(points, frame_lower, frame_upper, window_lower, window_upper):
+        devices.append(("house_score", tuple(t.device for t in (points, frame_lower, frame_upper, window_lower, window_upper))))
+        return house_score(points, frame_lower, frame_upper, window_lower, window_upper)
+
+    def town_score_spy(points, frame_lower, frame_upper, window_lower, window_upper):
+        devices.append(("town_score", tuple(t.device for t in (points, frame_lower, frame_upper, window_lower, window_upper))))
+        return town_score(points, frame_lower, frame_upper, window_lower, window_upper)
+
+    def house_member_spy(points, frame_lower, frame_upper, window_lower, window_upper):
+        devices.append(("house_member", tuple(t.device for t in (points, frame_lower, frame_upper, window_lower, window_upper))))
+        return house_member(points, frame_lower, frame_upper, window_lower, window_upper)
+
+    def town_member_spy(points, frame_lower, frame_upper, window_lower, window_upper):
+        devices.append(("town_member", tuple(t.device for t in (points, frame_lower, frame_upper, window_lower, window_upper))))
+        return town_member(points, frame_lower, frame_upper, window_lower, window_upper)
+
+    monkeypatch.setattr(town_math_inspector, "house_signed_clearance", house_score_spy)
+    monkeypatch.setattr(town_math_inspector, "town_signed_clearance", town_score_spy)
+    monkeypatch.setattr(town_math_inspector, "house_contains", house_member_spy)
+    monkeypatch.setattr(town_math_inspector, "town_contains", town_member_spy)
+
+    inspections = town_math_inspector._clearance_inspection_tables()
+
+    assert [entry[0].name for entry in inspections] == [
+        fixture.name for fixture in TOWN_CLEARANCE_INSPECTION_FIXTURES
+    ]
+    assert [kind for kind, _ in devices].count("house_score") == 4
+    assert [kind for kind, _ in devices].count("house_member") == 4
+    assert [kind for kind, _ in devices].count("town_score") == 1
+    assert [kind for kind, _ in devices].count("town_member") == 1
+    assert all(device_tuple == (torch.device("cpu"),) * 5 for _, device_tuple in devices)
+
+    for fixture, table, mismatches in inspections:
+        assert table["Scenario"].tolist() == [fixture.name] * len(fixture.labels)
+        assert table["Point"].tolist() == list(fixture.labels)
+        assert table["Expected membership"].tolist() == list(fixture.expected_membership)
+        assert table["Actual membership"].tolist() == list(fixture.expected_membership)
+        assert table["Expected clearance"].tolist() == list(fixture.expected_clearance)
+        assert table["Actual clearance"].tolist() == list(fixture.expected_clearance)
+        assert table["Boolean agreement"].tolist() == [True] * len(fixture.labels)
+        assert table["Clearance agreement"].tolist() == [True] * len(fixture.labels)
+        assert mismatches == ()
+
+
+def test_clearance_inspector_renders_boundaries_and_degeneracies_read_only() -> None:
+    app_path = Path(town_math_inspector.__file__)
+    root = app_path.parents[3]
+    artifacts = root / "artifacts"
+    before_exists = artifacts.exists()
+    before_files = {
+        path.relative_to(artifacts): path.read_bytes()
+        for path in artifacts.rglob("*")
+        if path.is_file()
+    } if before_exists else {}
+
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+
+    assert not app.exception
+    assert any(item.value == "TOWN-03 · Signed Clearance and Exact Membership" for item in app.header)
+    assert [item.value for item in app.subheader[-5:]] == [
+        fixture.name for fixture in TOWN_CLEARANCE_INSPECTION_FIXTURES
+    ]
+    assert len(app.table) == 10
+    for fixture, element in zip(TOWN_CLEARANCE_INSPECTION_FIXTURES, app.table[5:], strict=True):
+        table = element.value
+        assert table["Point"].tolist() == list(fixture.labels)
+        assert table["Expected membership"].tolist() == list(fixture.expected_membership)
+        assert table["Actual membership"].tolist() == list(fixture.expected_membership)
+        assert table["Expected clearance"].tolist() == list(fixture.expected_clearance)
+        assert table["Actual clearance"].tolist() == list(fixture.expected_clearance)
+        assert table["Clearance ≥ 0 (diagnostic)"].tolist() == [value >= 0 for value in fixture.expected_clearance]
+        assert table["Strict-positive differs from membership"].tolist() == [
+            member != (value > 0) for member, value in zip(fixture.expected_membership, fixture.expected_clearance, strict=True)
+        ]
+    assert any("clearance > 0` column is only a strict-positive boundary diagnostic" in item.value for item in app.markdown)
+    assert any("included zero-clearance points" in item.value for item in app.success[-5:])
+    assert not app.error
+    assert not app.button and not app.slider and not app.selectbox
+    assert not app.number_input and not app.text_input and not app.checkbox
+
+    after_exists = artifacts.exists()
+    after_files = {
+        path.relative_to(artifacts): path.read_bytes()
+        for path in artifacts.rglob("*")
+        if path.is_file()
+    } if after_exists else {}
+    assert after_exists == before_exists
+    assert after_files == before_files
+
+
+def test_clearance_inspector_reports_literal_score_mismatches(monkeypatch) -> None:
+    def wrong_house_score(points, frame_lower, frame_upper, window_lower, window_upper):
+        del frame_lower, frame_upper, window_lower, window_upper
+        return torch.full((points.shape[0],), 0.125, dtype=torch.float32, device=points.device)
+
+    def wrong_town_score(points, frame_lower, frame_upper, window_lower, window_upper):
+        del frame_lower, frame_upper, window_lower, window_upper
+        return torch.full((points.shape[0],), 0.125, dtype=torch.float32, device=points.device)
+
+    monkeypatch.setattr(town_geometry, "house_signed_clearance", wrong_house_score)
+    monkeypatch.setattr(town_geometry, "town_signed_clearance", wrong_town_score)
+    app_path = Path(town_math_inspector.__file__)
+    app = AppTest.from_file(str(app_path), default_timeout=30).run()
+
+    assert not app.exception
+    clearance_errors = [
+        item.value for item in app.error
+        if "Boolean/clearance mismatches" in item.value
+    ]
+    assert len(clearance_errors) == len(TOWN_CLEARANCE_INSPECTION_FIXTURES)
+    joined = "\n".join(clearance_errors)
+    assert "C1 frame/window boundaries and hole interior" in joined
+    assert "A: membership expected True, actual True; clearance expected 0.0, actual 0.125" in joined
+    assert "C3 collapsed closed frame" in joined
