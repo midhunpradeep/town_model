@@ -8,13 +8,19 @@ import torch
 from town_model.models.town_geometry import (
     box_strict_interior,
     house_contains,
+    house_signed_clearance,
     town_contains,
+    town_signed_clearance,
 )
 from town_model.models.town_composition_fixture import (
     TOWN_COMPOSITION_FIXTURES,
     TownCompositionFixture,
 )
 from town_model.models.town_geometry_fixture import TOWN_STRICT_INTERIOR_FIXTURE
+from town_model.models.town_clearance_fixture import (
+    TOWN_CLEARANCE_INSPECTION_FIXTURES,
+    TownClearanceFixture,
+)
 
 
 def _inspection_table() -> tuple[pd.DataFrame, tuple[tuple[str, bool, bool], ...]]:
@@ -131,6 +137,7 @@ def _render_inspector(st) -> None:
         )
 
     _render_composition_inspector(st)
+    _render_clearance_inspector(st)
 
 
 def _composition_inspection_tables() -> tuple[
@@ -344,6 +351,123 @@ def _render_composition_inspector(st) -> None:
             st.success(
                 f"{fixture.name}: membership mismatches 0 of {len(fixture.labels)} · "
                 f"fixture agreement {len(fixture.labels)}/{len(fixture.labels)}"
+            )
+
+
+def _clearance_inspection_tables() -> tuple[
+    tuple[TownClearanceFixture, pd.DataFrame, tuple[tuple[str, str, bool, bool, float, float], ...]],
+    ...,
+]:
+    """Show independently evaluated Boolean membership and signed clearance."""
+    inspections = []
+    for fixture in TOWN_CLEARANCE_INSPECTION_FIXTURES:
+        points = torch.tensor(fixture.points, dtype=torch.float32, device="cpu")
+        frame_lower = torch.tensor(fixture.frame_lower, dtype=torch.float32, device="cpu")
+        frame_upper = torch.tensor(fixture.frame_upper, dtype=torch.float32, device="cpu")
+        house_count = len(fixture.frame_lower)
+        dimensions = len(fixture.frame_lower[0])
+        window_count = len(fixture.window_lower[0])
+        if window_count:
+            window_lower = torch.tensor(fixture.window_lower, dtype=torch.float32, device="cpu")
+            window_upper = torch.tensor(fixture.window_upper, dtype=torch.float32, device="cpu")
+        else:
+            window_lower = torch.empty((house_count, 0, dimensions), dtype=torch.float32)
+            window_upper = torch.empty_like(window_lower)
+
+        if house_count == 1:
+            actual_scores = house_signed_clearance(
+                points, frame_lower[0], frame_upper[0], window_lower[0], window_upper[0]
+            )
+            actual_membership = house_contains(
+                points, frame_lower[0], frame_upper[0], window_lower[0], window_upper[0]
+            )
+        else:
+            actual_scores = town_signed_clearance(
+                points, frame_lower, frame_upper, window_lower, window_upper
+            )
+            actual_membership = town_contains(
+                points, frame_lower, frame_upper, window_lower, window_upper
+            )
+
+        scores = tuple(float(value) for value in actual_scores.tolist())
+        members = tuple(bool(value) for value in actual_membership.tolist())
+        rows = []
+        mismatches = []
+        for label, coordinates, expected_score, expected_member, score, member in zip(
+            fixture.labels,
+            fixture.points,
+            fixture.expected_clearance,
+            fixture.expected_membership,
+            scores,
+            members,
+            strict=True,
+        ):
+            strict_positive = score > 0.0
+            rows.append(
+                {
+                    "Scenario": fixture.name,
+                    "Point": label,
+                    "Coordinates": coordinates,
+                    "Expected membership": expected_member,
+                    "Actual membership": member,
+                    "Expected clearance": expected_score,
+                    "Actual clearance": score,
+                    "Clearance ≥ 0 (diagnostic)": score >= 0.0,
+                    "Clearance > 0 (strict-positive diagnostic)": strict_positive,
+                    "Strict-positive differs from membership": member != strict_positive,
+                    "Boolean agreement": member == expected_member,
+                    "Clearance agreement": score == expected_score,
+                }
+            )
+            if member != expected_member or score != expected_score:
+                mismatches.append(
+                    (fixture.name, label, expected_member, member, expected_score, score)
+                )
+        inspections.append((fixture, pd.DataFrame(rows), tuple(mismatches)))
+    return tuple(inspections)
+
+
+def _render_clearance_inspector(st) -> None:
+    st.header("TOWN-03 · Signed Clearance and Exact Membership")
+    st.markdown(
+        "Clearance and Boolean membership are evaluated independently. The approved "
+        "equations make nonnegative clearance align with membership for valid geometry; "
+        "the `clearance > 0` column is only a strict-positive boundary diagnostic and "
+        "is never used to produce the Boolean output."
+    )
+    for fixture, table, mismatches in _clearance_inspection_tables():
+        st.subheader(fixture.name)
+        st.caption(
+            f"H={len(fixture.frame_lower)} · W={len(fixture.window_lower[0])} "
+            f"· d={len(fixture.frame_lower[0])} · fixed CPU fixture · read-only"
+        )
+        st.table(table)
+        if mismatches:
+            details = "; ".join(
+                f"{scenario} · {label}: membership expected {expected_member}, "
+                f"actual {actual_member}; clearance expected {expected_score}, "
+                f"actual {actual_score}"
+                for scenario, label, expected_member, actual_member, expected_score, actual_score
+                in mismatches
+            )
+            st.error(
+                f"{fixture.name}: Boolean/clearance mismatches {len(mismatches)} "
+                f"of {len(fixture.labels)} · {details}"
+            )
+        else:
+            zero_members = sum(
+                score == 0.0 and member
+                for score, member in zip(
+                    table["Actual clearance"], table["Actual membership"], strict=True
+                )
+            )
+            strict_positive_disagreements = int(
+                table["Strict-positive differs from membership"].sum()
+            )
+            st.success(
+                f"{fixture.name}: Boolean mismatches 0; clearance mismatches 0; "
+                f"included zero-clearance points {zero_members}; strict-positive "
+                f"boundary differences {strict_positive_disagreements}"
             )
 
 
